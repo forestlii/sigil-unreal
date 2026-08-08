@@ -2,27 +2,40 @@
 
 # Sigil — Unreal Engine Gameplay Plugin Suite
 
-A set of modular, code-only gameplay framework plugins for **Unreal Engine 5.6**, designed to be dropped into a new project so you can start building gameplay instead of infrastructure.
+A suite of modular, code-only gameplay framework plugins for **Unreal Engine 5.8**, designed to be dropped into a new project so you can start building gameplay instead of infrastructure.
 
-## Plugins
+## Packages
 
-| Plugin | What it provides |
-|---|---|
-| `GenericCombatSystem` | GAS-based multiplayer combat framework: ability sets, activation groups, tag relationships, game phases, input buffering, collision tracing, pooled projectiles, target lock-on, predictive montage playback |
-| `GenericMovementSystem` | Data-driven movement & locomotion (Lyra-style layered AnimBP): multi-gait movement, rotation modes, turn-in-place, distance matching, orientation/stride warping |
-| `GenericInventorySystem` | Fragment-based inventory framework: stacks, slots, equipment, pickups, drops, shops, crafting, save serialization; fully replicated (FastArray + push model), zero GAS coupling |
-| `GenericGameSystem` | Four independent subsystems: SmartObject-driven interaction, camera mode stack, CommonUI extensions (layers/actions/modals), context-driven SFX/VFX |
+| Package | Plugin | What it provides |
+|---|---|---|
+| `sigil.input` | `SigilInput` | Tag-driven input abstraction over EnhancedInput with input buffering and checker/processor pipeline |
+| `sigil.gas` | `SigilGas` | GAS infrastructure: ability sets, activation groups, tag relationships, game phases, common attribute sets (Health/Stamina/Mana), ability/async task toolbox |
+| `sigil.combat` | `SigilCombat` | GAS-based multiplayer combat: combat flow pipeline, collision tracing, pooled projectiles, target lock-on, predictive montage playback |
+| `sigil.movement` | `SigilMovement` | Data-driven movement & locomotion (Lyra-style layered AnimBP): multi-gait, rotation modes, turn-in-place, distance matching, warping |
+| `sigil.inventory` | `SigilInventory` | Fragment-based inventory: stacks, slots, equipment, pickups, drops, shops, crafting, save serialization; fully replicated, zero GAS coupling |
+| `sigil.interaction` | `SigilInteraction` | SmartObject-driven interaction bridged with GameplayBehaviors and GAS |
+| `sigil.camera` | `SigilCamera` | Camera mode stack driving spring-arm cameras with penetration avoidance |
+| `sigil.ui` | `SigilUI` | CommonUI extensions: layered game UI, data-driven UI actions, modals, extension points, widget factories |
+| `sigil.effects` | `SigilEffects` | Context-driven SFX/VFX selected by gameplay tag queries and physical surfaces |
 
-All plugins are mutually independent — take only what you need.
+All packages are mutually independent — the only cross-package dependency is `sigil.combat → sigil.gas`. Take only what you need.
 
-## Status
+All gameplay tags live under the `Sigil.*` namespace; C++ types use the unified `Sigil` prefix (e.g. `USigilAbilitySet`, `USigilItemDefinition`).
 
-⚠️ **Pre-refactor baseline.** This is the original codebase published as-is. It is being refactored into domain packages under the `sigil.*` namespace (`sigil.combat`, `sigil.movement`, `sigil.inventory`, …) with unified naming and cleanup. Expect breaking changes; legacy copyright headers in source files will be normalized during the refactor.
+## Getting started
+
+1. Copy the plugin folders from `source/` into your project's `Plugins/` directory (or the whole repo and reference them).
+2. Enable the plugins you need in your `.uproject`.
+3. See `Host/` for a minimal host project used to compile and smoke-test the suite.
 
 ## Requirements
 
-- Unreal Engine **5.6**
+- Unreal Engine **5.8**
 - C++ project (these are code-only plugins, `CanContainContent: false`)
+
+## Status
+
+Version **0.1.0** — freshly refactored from an internal codebase (dead code purged, defects fixed, renamed from legacy `Generic*` naming). APIs may still shift before 1.0.
 
 ## License
 
