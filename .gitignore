@@ -1,0 +1,10 @@
+# Unreal Engine build artifacts
+Binaries/
+Intermediate/
+DerivedDataCache/
+Saved/
+*.zip
+
+# Internal working docs & session memory (not part of the open-source release)
+MD/
+记忆.md
