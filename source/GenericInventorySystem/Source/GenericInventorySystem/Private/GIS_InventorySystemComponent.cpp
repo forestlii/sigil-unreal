@@ -16,8 +16,6 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GIS_InventorySystemComponent)
 
-// const FName UGIS_InventorySystemComponent::NAME_ActorFeatureName("InventorySystem");
-
 UGIS_InventorySystemComponent::UGIS_InventorySystemComponent(const FObjectInitializer& ObjectInitializer): Super(ObjectInitializer), CollectionContainer(this)
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -795,127 +793,6 @@ void UGIS_InventorySystemComponent::LoadDefaultLoadouts()
 	}
 }
 
-#pragma region InitState
-
-// FName UGIS_InventorySystemComponent::GetFeatureName() const
-// {
-// 	return NAME_ActorFeatureName;
-// }
-//
-// bool UGIS_InventorySystemComponent::CanChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState) const
-// {
-// 	check(Manager);
-// 	AActor* Owner = GetOwner();
-// 	if (!CurrentState.IsValid() && DesiredState == GIS_InventoryInitState::Spawned)
-// 	{
-// 		// As long as we are on a valid actor, we count as spawned
-// 		if (IsValid(Owner))
-// 		{
-// 			return true;
-// 		}
-// 	}
-// 	if (CurrentState == GIS_InventoryInitState::Spawned && DesiredState == GIS_InventoryInitState::DataAvailable)
-// 	{
-// 		// requires controller if owner is pawn.
-// 		if (APawn* Pawn = Cast<APawn>(Owner))
-// 		{
-// 			// The player state is required.
-// 			if (!Pawn->GetController<AController>())
-// 			{
-// 				return false;
-// 			}
-// 		}
-//
-// 		// requires pawn if owner is player state.
-// 		if (APlayerState* OwningPlayerState = Cast<APlayerState>(Owner))
-// 		{
-// 			if (!OwningPlayerState->GetPawn())
-// 			{
-// 				return false;
-// 			}
-// 		}
-//
-// 		return true;
-// 	}
-//
-// 	if (CurrentState == GIS_InventoryInitState::DataAvailable && DesiredState == GIS_InventoryInitState::DataInitialized)
-// 	{
-// 		for (const auto& Definition : CollectionDefinitions)
-// 		{
-// 			bool bFound = false;
-//
-// 			for (const FGIS_CollectionEntry& Entry : CollectionContainer.Entries)
-// 			{
-// 				if (IsValid(Entry.Instance) && IsValid(Entry.Definition) && Entry.Definition == Definition)
-// 				{
-// 					bFound = true;
-// 					break;
-// 				}
-// 			}
-// 			if (!bFound)
-// 			{
-// 				return false;
-// 			}
-// 		}
-// 		return true;
-// 	}
-//
-// 	if (CurrentState == GIS_InventoryInitState::DataInitialized && DesiredState == GIS_InventoryInitState::GameplayReady)
-// 	{
-// 		return true;
-// 	}
-//
-// 	return false;
-// }
-//
-// void UGIS_InventorySystemComponent::HandleChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState)
-// {
-// 	if (CurrentState == GIS_InventoryInitState::Spawned && DesiredState == GIS_InventoryInitState::DataAvailable)
-// 	{
-// 		if (GetOwner()->HasAuthority())
-// 		{
-// 			InitializeInventorySystem();
-// 		}
-// 	}
-// 	if (CurrentState == GIS_InventoryInitState::DataInitialized && DesiredState == GIS_InventoryInitState::GameplayReady)
-// 	{
-// 		if (GetOwner()->HasAuthority())
-// 		{
-// 			LoadDefaultLoadouts();
-// 		}
-// 	}
-// 	CurrentInitState = DesiredState;
-// }
-//
-// void UGIS_InventorySystemComponent::OnActorInitStateChanged(const FActorInitStateChangedParams& Params)
-// {
-// }
-//
-// bool UGIS_InventorySystemComponent::HasReachedInitState(FGameplayTag State) const
-// {
-// 	return IGameFrameworkInitStateInterface::HasReachedInitState(State);
-// }
-//
-// void UGIS_InventorySystemComponent::CheckDefaultInitialization()
-// {
-// 	// Before checking our progress, try progressing any other features we might depend on
-// 	CheckDefaultInitializationForImplementers();
-//
-// 	static const TArray<FGameplayTag> StateChain = {
-// 		GIS_InventoryInitState::Spawned, GIS_InventoryInitState::DataAvailable, GIS_InventoryInitState::DataInitialized, GIS_InventoryInitState::GameplayReady
-// 	};
-//
-// 	// This will try to progress from spawned (which is only set in BeginPlay) through the data initialization stages until it gets to gameplay ready
-// 	ContinueInitStateChain(StateChain);
-// }
-//
-// void UGIS_InventorySystemComponent::CheckInventoryInitialization()
-// {
-// 	CheckDefaultInitialization();
-// }
-
-#pragma endregion
-
 void UGIS_InventorySystemComponent::ServerLoadDefaultLoadouts_Implementation()
 {
 	ServerLoadDefaultLoadouts();
@@ -1039,12 +916,6 @@ void UGIS_InventorySystemComponent::BindToInventorySystemInitialized(FGIS_Invent
 void UGIS_InventorySystemComponent::OnRegister()
 {
 	Super::OnRegister();
-
-	// // Register with the init state system early, this will only work if this is a game world
-	// if (bUseInitStateChain)
-	// {
-	// 	RegisterInitStateFeature();
-	// }
 }
 
 void UGIS_InventorySystemComponent::InitializeComponent()
@@ -1070,20 +941,6 @@ void UGIS_InventorySystemComponent::InitializeComponent()
 void UGIS_InventorySystemComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
-	// Notifies state manager that we have spawned, then try rest of default initialization
-	// if (bUseInitStateChain)
-	// {
-	// 	ensure(TryToChangeInitState(GIS_InventoryInitState::Spawned));
-	// 	CheckDefaultInitialization();
-	// }
-	// else
-	// {
-	// 	if (bInitializeOnBeginplay && GetOwner()->HasAuthority())
-	// 	{
-	// 		InitializeInventorySystem();
-	// 	}
-	// }
 
 	if (bInitializeOnBeginplay && GetOwner()->HasAuthority())
 	{

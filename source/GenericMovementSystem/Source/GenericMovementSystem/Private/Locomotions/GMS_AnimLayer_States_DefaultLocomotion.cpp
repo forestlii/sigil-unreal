@@ -13,7 +13,7 @@
 #include "SequenceEvaluatorLibrary.h"
 #include "SequencePlayerLibrary.h"
 #include "AnimNodes/AnimNode_SequenceEvaluator.h"
-#include "BlendStack/AnimNode_BlendStack.h"
+#include "Animation/AnimNode_SequencePlayer.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Locomotions/GMS_MainAnimInstance.h"
 #include "Utility/GMS_Log.h"
@@ -72,7 +72,6 @@ void FGMS_AnimData_Cycle::Validate()
 		bValid = Animations.ValidAnimations();
 		if (bValid)
 		{
-			// bHasRootMotion = Animations.HasRootMotion();
 		}
 	}
 
@@ -81,7 +80,6 @@ void FGMS_AnimData_Cycle::Validate()
 		bValid = Animations_8Direction.ValidAnimations();
 		if (bValid)
 		{
-			// bHasRootMotion = Animations_8Direction.HasRootMotion();
 		}
 	}
 
@@ -90,7 +88,6 @@ void FGMS_AnimData_Cycle::Validate()
 		bValid = Animation != nullptr;
 		if (bValid)
 		{
-			// bHasRootMotion = Animation->HasRootMotion();
 		}
 	}
 }
@@ -454,19 +451,6 @@ void UGMS_AnimLayer_States_DefaultLocomotion::ResetSetting_Implementation()
 	bEnableFall = false;
 }
 
-// float UGMS_AnimLayer_States_DefaultLocomotion::GetInputVelocityDelta() const
-// {
-// 	if (GetParent()->LocomotionState.Velocity.Equals(FVector(0, 0, 0), 10) || GetParent()->InputDirection.Equals(FVector(0, 0, 0), 0.01))
-// 	{
-// 		return 0;
-// 	}
-//
-// 	return UKismetMathLibrary::DegAcos(
-// 		FVector::DotProduct(
-// 			GetParent()->LocomotionState.Velocity.GetSafeNormal(0.0001),
-// 			GetParent()->InputDirection.GetSafeNormal(0.0001)));
-// }
-
 bool UGMS_AnimLayer_States_DefaultLocomotion::IsMovingPerpendicularToInitialPivot() const
 {
 	//We stay in a pivot when pivoting along a line (e.g. triggering a left-right pivot while playing a right-left pivot), but break out if the character makes a perpendicular change in direction.
@@ -816,7 +800,6 @@ void UGMS_AnimLayer_States_DefaultLocomotion::RefreshTurnInPlaceInViewDirection(
 	//更新转身过程的状态。
 	if (TurnInPlaceState.bShouldTurn)
 	{
-		// if (TurnInPlaceState.ActivationDelay <= 0)
 		if (!bShouldDelay)
 		{
 			if (GetParent()->GetOffsetRootBoneRotationMode() == EOffsetRootBoneMode::Accumulate)
@@ -945,26 +928,6 @@ UAnimSequence* UGMS_AnimLayer_States_DefaultLocomotion::GetStartAnimSequence_Imp
 			{
 				Animation = AnimData_Start_VelocityDirection.Animations.StartForward;
 			}
-			// if (UKismetMathLibrary::InRange_FloatFloat(Delta, -135, -45, false, true))
-			// {
-			// 	Animation = AnimData_Start_VelocityDirection.Animations.StartForwardL90;
-			// }
-			// else if (UKismetMathLibrary::InRange_FloatFloat(Delta, -180, -135, true, true))
-			// {
-			// 	Animation = AnimData_Start_VelocityDirection.Animations.StartForwardL180;
-			// }
-			// else if (UKismetMathLibrary::InRange_FloatFloat(Delta, 45, 135, true, false))
-			// {
-			// 	Animation = AnimData_Start_VelocityDirection.Animations.StartForwardR90;
-			// }
-			// else if (UKismetMathLibrary::InRange_FloatFloat(Delta, 135, 180, true, true))
-			// {
-			// 	Animation = AnimData_Start_VelocityDirection.Animations.StartForwardR180;
-			// }
-			// else
-			// {
-			// 	Animation = AnimData_Start_VelocityDirection.Animations.StartForward;
-			// }
 		}
 		if (AnimData_Start_VelocityDirection.AnimType == EGMS_StartAnimType_VelocityDir::Single)
 		{
@@ -1250,18 +1213,6 @@ void UGMS_AnimLayer_States_DefaultLocomotion::Cycle_StateEntry_Implementation(FA
 
 void UGMS_AnimLayer_States_DefaultLocomotion::Cycle_StateUpdate_Implementation(FAnimUpdateContext& Context, FAnimNodeReference& Node)
 {
-	// if (CycleState.Animation)
-	// {
-	// 	float AnimationSpeed = AnimData_Cycle.bHasRootMotion ? UGMS_Utility::CalculateAnimatedSpeed(CycleState.Animation) : AnimData_Cycle.AnimatedSpeed;
-	// 	float DesiredPlayRate = GetParent()->LocomotionState.DisplacementSpeed / AnimationSpeed;
-	//
-	// 	if (AnimData_Cycle.PlayRateClamp.X >= 0.0f && AnimData_Cycle.PlayRateClamp.X < AnimData_Cycle.PlayRateClamp.Y)
-	// 	{
-	// 		DesiredPlayRate = FMath::Clamp(DesiredPlayRate, AnimData_Cycle.PlayRateClamp.X, AnimData_Cycle.PlayRateClamp.Y);
-	// 	}
-	// 	CycleState.PlayRate = DesiredPlayRate;
-	// }
-
 	GetParent()->SetOffsetRootBoneRotationMode(EOffsetRootBoneMode::Release);
 }
 

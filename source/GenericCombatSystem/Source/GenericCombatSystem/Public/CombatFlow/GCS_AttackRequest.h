@@ -14,7 +14,7 @@
  * 所有攻击请求类型的基类。
  */
 UCLASS(Abstract, Blueprintable, BlueprintType, Const, DefaultToInstanced, EditInlineNew, meta=(DisplayName="GCS Attack Request"))
-class UGCS_AttackRequest_Base : public UObject
+class GENERICCOMBATSYSTEM_API UGCS_AttackRequest_Base : public UObject
 {
 	GENERATED_BODY()
 

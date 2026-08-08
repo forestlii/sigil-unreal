@@ -161,16 +161,4 @@ public:
 	static bool HasOrigin(FGameplayEffectContextHandle EffectContext);
 
 #pragma endregion
-
-#pragma region Custom Effect Context
-
-	// UFUNCTION(BlueprintCallable, Category = "GGA|GameplayEffect|Context")
-	// static bool HasPayload(FGameplayEffectContextHandle EffectContext, const UScriptStruct* PayloadType);
-	//
-	// UFUNCTION(BlueprintCallable, Category = "GGA|GameplayEffect|Context")
-	// static bool SetPayload(FGameplayEffectContextHandle EffectContext, const FInstancedStruct& NewPayload);
-	//
-	// UFUNCTION(BlueprintCallable, Category = "GGA|GameplayEffect|Context", meta=(ExpandBoolAsExecs="bValid"))
-	// static FInstancedStruct GetPayload(FGameplayEffectContextHandle EffectContext, const UScriptStruct* PayloadType, bool& bValid);
-#pragma endregion
 };

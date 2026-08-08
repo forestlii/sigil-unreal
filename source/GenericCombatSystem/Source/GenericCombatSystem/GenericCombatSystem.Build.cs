@@ -30,7 +30,6 @@ public class GenericCombatSystem : ModuleRules
 				"Engine",
 				"Niagara",
 				"AIModule",
-				"StateTreeModule",
 				"DeveloperSettings"
 			}
 		);

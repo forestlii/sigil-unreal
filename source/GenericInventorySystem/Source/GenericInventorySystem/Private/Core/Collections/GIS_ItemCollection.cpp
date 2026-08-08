@@ -815,11 +815,6 @@ FGIS_ItemInfo UGIS_ItemCollection::GiveItem(const FGIS_ItemInfo& ItemInfo, UGIS_
 	if (GivenItemInfo.Amount != RemovedItemInfo.Amount)
 	{
 		// Failed to add so add it back to the previous collection.
-		//ItemInfoToAdd.Amount = ItemInfoToAdd.Amount - GivenItemInfo.Amount;
-		//if (ItemInfoToAdd.IsValid())
-		//{
-		//	AddItem(FGIS_ItemInfo(ItemInfoToAdd));
-		//}
 	}
 	return GivenItemInfo;
 }

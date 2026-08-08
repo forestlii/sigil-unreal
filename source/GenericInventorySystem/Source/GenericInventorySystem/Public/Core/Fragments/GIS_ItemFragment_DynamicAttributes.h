@@ -23,9 +23,7 @@ class GENERICINVENTORYSYSTEM_API UGIS_ItemFragment_DynamicAttributes : public UG
 
 protected:
 	/**
-	 * Array of initial float attributes applied to–
-
-System: the item instance.
+	 * Array of initial float attributes applied to the item instance.
 	 * 应用于道具实例的初始浮点属性数组。
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category=Attribute, meta=(TitleProperty="{Tag} -> {Value}"))

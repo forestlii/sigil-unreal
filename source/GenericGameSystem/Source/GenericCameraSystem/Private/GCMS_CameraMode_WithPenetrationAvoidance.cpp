@@ -114,12 +114,6 @@ void UGCMS_CameraMode_WithPenetrationAvoidance::PreventCameraPenetration(bool bS
 
 	SphereParams.AddIgnoredActor(ViewTarget);
 
-	//TODO ILyraCameraTarget.GetIgnoredActorsForCameraPentration();
-	//if (IgnoreActorForCameraPenetration)
-	//{
-	//	SphereParams.AddIgnoredActor(IgnoreActorForCameraPenetration);
-	//}
-
 	FCollisionShape SphereShape = FCollisionShape::MakeSphere(0.f);
 	UWorld* World = GetWorld();
 

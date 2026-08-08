@@ -27,7 +27,7 @@ bool UGUIS_UIAction::CanInvoke(const UObject* Data, APlayerController* PlayerCon
 
 void UGUIS_UIAction::InvokeAction(const UObject* Data, APlayerController* PlayerController) const
 {
-	// if (CanInvoke(Data, User))
+	if (CanInvoke(Data, PlayerController))
 	{
 		InvokeActionInternal(Data, PlayerController);
 	}

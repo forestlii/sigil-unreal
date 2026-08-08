@@ -135,7 +135,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AirControl")
 	void BroadcastJumpStates(const TArray<FGMS_JumpStateSetting>& NewStates)
 	{
-		OnJumpStatesUpdated.Broadcast(JumpStates);
+		OnJumpStatesUpdated.Broadcast(NewStates);
 	}
 	UFUNCTION(BlueprintCallable, Category = "MovementControl")
 	void BroadcastMovementStates(const TArray<FGMS_MovementStateSetting>& NewStates)

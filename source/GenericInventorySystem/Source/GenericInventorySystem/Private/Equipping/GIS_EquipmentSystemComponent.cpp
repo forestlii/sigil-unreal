@@ -4,7 +4,6 @@
 #include "GIS_EquipmentSystemComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
-#include "GIS_EquipItemInstance.h"
 #include "GIS_EquipmentInstance.h"
 #include "GIS_InventorySystemComponent.h"
 #include "GIS_ItemCollection.h"
@@ -109,18 +108,6 @@ bool UGIS_EquipmentSystemComponent::OwnerHasAuthority() const
 	AActor* Owner = GetOwner();
 	return IsValid(Owner) && Owner->HasAuthority();
 }
-
-// void UGIS_EquipmentSystemComponent::UnequipInstance(UObject* EquipmentInstance)
-// {
-// 	for (int32 i = 0; i < Container.Entries.Num(); i++)
-// 	{
-// 		const FGIS_EquipmentEntry& Entry = Container.Entries[i];
-// 		if (Entry.Instance == EquipmentInstance)
-// 		{
-// 			RemoveEquipmentEntry(i);
-// 		}
-// 	}
-// }
 
 TArray<UObject*> UGIS_EquipmentSystemComponent::GetEquipments(TSubclassOf<UObject> InstanceType, FGameplayTagQuery SlotQuery) const
 {

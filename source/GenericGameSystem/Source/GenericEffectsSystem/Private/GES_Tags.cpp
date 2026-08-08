@@ -3,7 +3,7 @@
 
 #include "GES_Tags.h"
 
-namespace GMS_MovementModeTags
+namespace GES_Tags
 {
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Root, FName{TEXTVIEW("GES")},"Generic Effects System")
 }

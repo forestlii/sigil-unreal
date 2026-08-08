@@ -132,14 +132,6 @@ FTransform UGCS_AttackRequest_Bullet::GetTargetingTransform_Implementation(APawn
 		FVector AimDir = CamRot.Vector().GetSafeNormal();
 		FocalLoc = CamLoc + (AimDir * FocalDistance);
 
-		// Move the start and focal point up in front of pawn
-		// if (PC)
-		// {
-		// 	const FVector WeaponLoc = GetWeaponTargetingSourceLocation(SourcePawn);
-		// 	CamLoc = FocalLoc + (((WeaponLoc - FocalLoc) | AimDir) * AimDir);
-		// 	FocalLoc = CamLoc + (AimDir * FocalDistance);
-		// }
-
 		// valid camera and want camera's location
 		if (Source == EGCS_AbilityTargetingSourceType::CameraTowardsFocus)
 		{

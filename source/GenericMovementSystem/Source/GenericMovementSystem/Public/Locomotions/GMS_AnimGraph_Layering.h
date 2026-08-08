@@ -57,6 +57,7 @@ protected:
 	FName LayerSpine{"LayerSpine"};
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Settings")
 	FName LayerSpineAdditive{"LayerSpineAdditive"};
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Settings")
 	FName LayerSpineSlot{"LayerSpineSlot"};
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Settings")

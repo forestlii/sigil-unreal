@@ -45,13 +45,6 @@ TArray<AGCS_BulletInstance*> UGCS_BulletSubsystem::SpawnBullets(const FGCS_Bulle
 		if (SpawnParameters.ParentId.IsValid() && BulletInstances.Contains(SpawnParameters.ParentId))
 		{
 			Instance->SetParentBulletId(SpawnParameters.ParentId);
-			// if (AGCS_BulletInstance* ParentBulletInstance = BulletInstances[SpawnParameters.ParentId])
-			// {
-			// 	if (ParentBulletInstance->Definition.bUseSharedHitList)
-			// 	{
-			// 		Instance->HitActors = ParentBulletInstance->HitActors;
-			// 	}
-			// }
 		}
 
 		if (SpawnParameters.Request)

@@ -15,6 +15,7 @@
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
 #include "Utility/GCS_CombatFunctionLibrary.h"
+#include "GCS_CombatSystemSettings.h"
 
 
 UGCS_CombatSystemComponent::UGCS_CombatSystemComponent(): AttackResultContainer(this, 10)
@@ -204,9 +205,9 @@ void UGCS_CombatSystemComponent::PlayPredictedMontage(const FGCS_PlayMontageRequ
 
 USkeletalMeshComponent* UGCS_CombatSystemComponent::GetCharacterMeshComponent() const
 {
-	static FName CharacterMeshTagName = "CharacterMesh";
+	const UGCS_CombatSystemSettings* Settings = GetDefault<UGCS_CombatSystemSettings>();
 
-	return Cast<USkeletalMeshComponent>(GetOwner()->FindComponentByTag(USkeletalMeshComponent::StaticClass(), CharacterMeshTagName));
+	return Cast<USkeletalMeshComponent>(GetOwner()->FindComponentByTag(USkeletalMeshComponent::StaticClass(), Settings->CharacterMeshLookupTag));
 }
 
 void UGCS_CombatSystemComponent::OnGlobalPreGameplayEffectSpecApply(FGameplayEffectSpec& Spec, UAbilitySystemComponent* AbilitySystemComponent)

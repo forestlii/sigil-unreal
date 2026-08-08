@@ -3,7 +3,6 @@
 
 #include "Utilities/GGA_GameplayEffectFunctionLibrary.h"
 #include "GameplayEffect.h"
-#include "GGA_GameplayEffectContext.h"
 
 
 // UGameplayEffect* UGGA_GameplayEffectFunctionLibrary::MakeRuntimeGameplayEffect(FString UniqueName, EGameplayEffectDurationType DurationPolicy, TArray<FGameplayModifierInfo> AttributeModifiers)
@@ -97,31 +96,3 @@ UAbilitySystemComponent* UGGA_GameplayEffectFunctionLibrary::GetOriginalInstigat
 {
 	return EffectContext.GetOriginalInstigatorAbilitySystemComponent();
 }
-
-// bool UGGA_GameplayEffectFunctionLibrary::HasPayload(FGameplayEffectContextHandle EffectContext, const UScriptStruct* PayloadType)
-// {
-// 	if (FGGA_GameplayEffectContext* Context = static_cast<FGGA_GameplayEffectContext*>(EffectContext.Get()))
-// 	{
-// 		return Context->HasPayload(PayloadType);
-// 	}
-// 	return false;
-// }
-//
-// bool UGGA_GameplayEffectFunctionLibrary::SetPayload(FGameplayEffectContextHandle EffectContext, const FInstancedStruct& NewPayload)
-// {
-// 	if (FGGA_GameplayEffectContext* Context = static_cast<FGGA_GameplayEffectContext*>(EffectContext.Get()))
-// 	{
-// 		return Context->SetPayload(NewPayload);
-// 	}
-// 	return false;
-// }
-//
-// FInstancedStruct UGGA_GameplayEffectFunctionLibrary::GetPayload(FGameplayEffectContextHandle EffectContext, const UScriptStruct* PayloadType, bool& bValid)
-// {
-// 	if (FGGA_GameplayEffectContext* Context = static_cast<FGGA_GameplayEffectContext*>(EffectContext.Get()))
-// 	{
-// 		return Context->GetPayload(PayloadType, bValid);
-// 	}
-// 	bValid = false;
-// 	return FInstancedStruct();
-// }

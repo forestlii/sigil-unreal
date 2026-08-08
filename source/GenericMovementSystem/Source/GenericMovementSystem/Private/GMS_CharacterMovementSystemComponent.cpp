@@ -87,7 +87,7 @@ void UGMS_CharacterMovementSystemComponent::InitializeComponent()
 
 		// Make sure the mesh and animation blueprint are ticking after the character so they can access the most up-to-date character state.
 
-		//GetMesh()->AddTickPrerequisiteComponent(this);
+		GetMesh()->AddTickPrerequisiteComponent(this);
 
 		// Pass current movement settings to the movement component.
 		//TODO
@@ -101,8 +101,8 @@ void UGMS_CharacterMovementSystemComponent::BeginPlay()
 {
 	ensure(IsValid(AnimationInstance));
 
-	// ensureMsgf(!OwnerPawn->bUseControllerRotationPitch && !OwnerPawn->bUseControllerRotationYaw && !OwnerPawn->bUseControllerRotationRoll,
-	//            TEXT("These settings are not allowed and must be turned off!"));
+	ensureMsgf(!OwnerPawn->bUseControllerRotationPitch && !OwnerPawn->bUseControllerRotationYaw && !OwnerPawn->bUseControllerRotationRoll,
+	           TEXT("These settings are not allowed and must be turned off!"));
 
 
 	Super::BeginPlay();
@@ -224,8 +224,6 @@ void UGMS_CharacterMovementSystemComponent::ApplyMovementSetting()
 		CharacterMovement->MaxWalkSpeedCrouched = TempMS.Speed;
 		ControlSetting->BroadcastJumpStates(ControlSetting->JumpStates);
 		ControlSetting->BroadcastMovementStates(ControlSetting->MovementStates);
-		// OwnerCharacter->SetJumpStateSetting(ControlSetting->JumpStates);
-		// OwnerCharacter->SetMovementStateSetting(ControlSetting->MovementStates);
 	}
 }
 
@@ -242,14 +240,6 @@ void UGMS_CharacterMovementSystemComponent::RefreshInput(float DeltaTime)
 void UGMS_CharacterMovementSystemComponent::OnRotationModeChanged_Implementation(const FGameplayTag& PreviousRotationMode)
 {
 	Super::OnRotationModeChanged_Implementation(PreviousRotationMode);
-
-	// if (RotationMode == GMS_RotationModeTags::VelocityDirection && !LocomotionState.bMoving)
-	// {
-	// 	// This prevents the actor from rotating in the last input direction after the
-	// 	// rotation mode has been changed and the actor is not moving at that moment.
-	// 	LocomotionState.InputYawAngle = ViewState.Rotation.Yaw;
-	// 	LocomotionState.TargetYawAngle = ViewState.Rotation.Yaw;
-	// }
 }
 
 void UGMS_CharacterMovementSystemComponent::RefreshView(const float DeltaTime)
@@ -484,11 +474,6 @@ void UGMS_CharacterMovementSystemComponent::RefreshGroundedNotMovingRotation(flo
 				return;
 			}
 		}
-		// if (GetViewDirSetting().bRotateToViewDirectionWhileNotMoving)
-		// {
-		// 	SetRotationExtraSmooth(ViewState.Rotation.Yaw, DeltaTime, CalculateGroundedRotationInterpolationSpeed(), CalculateTargetYawRotationSpeed());
-		// 	return;
-		// }
 	}
 
 	if (RotationMode == GMS_RotationModeTags::VelocityDirection)
@@ -575,15 +560,6 @@ void UGMS_CharacterMovementSystemComponent::RefreshGroundedMovingRotation(float 
 			RefreshLocomotionLocationAndRotation();
 			return;
 		}
-		// float TargetYawAngle{UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw)};
-		//
-		// if (LocomotionState.bBlocked && GetViewDirSetting().bRotateToInputYawAngleWhenBlocked)
-		// {
-		// 	TargetYawAngle = LocomotionState.InputYawAngle;
-		// }
-		//
-		// SetRotationExtraSmooth(TargetYawAngle, DeltaTime, CalculateGroundedRotationInterpolationSpeed(), CalculateTargetYawRotationSpeed());
-		// return;
 	}
 
 	RefreshTargetYawAngleUsingLocomotionRotation();

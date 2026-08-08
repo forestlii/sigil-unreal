@@ -18,10 +18,6 @@ UGUIS_ListView::UGUIS_ListView(const FObjectInitializer& ObjectInitializer): Sup
 void UGUIS_ListView::ValidateCompiledDefaults(IWidgetCompilerLog& InCompileLog) const
 {
 	Super::ValidateCompiledDefaults(InCompileLog);
-	// if (EntryWidgetFactories.Num() == 0)
-	// {
-	// 	InCompileLog.Error(FText::Format(FText::FromString("{0} has no Entry widget Factories defined, can't create widgets without them."), FText::FromString(GetName())));
-	// }
 }
 #endif
 

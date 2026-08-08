@@ -25,7 +25,14 @@ bool UGIS_ItemDefinitionSchema::TryValidateItemDefinition(const UGIS_ItemDefinit
 		{
 			return Schema->TryValidate(Definition, OutError);
 		}
-		// OutError = FText::FromString(FString::Format(TEXT("No valid schema found for item definition at path: {0}."), {AssetPath}));
+
+		// Only treat a missing schema as an error when the project actually configured schemas;
+		// projects that don't use schema validation should pass silently.
+		if (!Settings->ItemDefinitionSchemaMap.IsEmpty() || Settings->DefaultItemDefinitionSchema.IsValid())
+		{
+			OutError = FText::FromString(FString::Format(TEXT("No valid schema found for item definition at path: {0}."), {AssetPath}));
+			return false;
+		}
 	}
 	return true;
 }
@@ -46,7 +53,10 @@ void UGIS_ItemDefinitionSchema::TryPreSaveItemDefinition(UGIS_ItemDefinition* De
 		{
 			Schema->TryPreSave(Definition, OutError);
 		}
-		// OutError = FText::FromString(FString::Format(TEXT("No valid schema found for item definition at path: {0}."), {AssetPath}));
+		else if (!Settings->ItemDefinitionSchemaMap.IsEmpty() || Settings->DefaultItemDefinitionSchema.IsValid())
+		{
+			OutError = FText::FromString(FString::Format(TEXT("No valid schema found for item definition at path: {0}."), {AssetPath}));
+		}
 	}
 }
 

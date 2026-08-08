@@ -52,8 +52,6 @@ public class GenericInventorySystem : ModuleRules
 			{
 				"CoreUObject",
 				"Engine",
-				"Slate",
-				"UMG",
 				"SlateCore",
 				"NetCore",
 				"AssetRegistry"

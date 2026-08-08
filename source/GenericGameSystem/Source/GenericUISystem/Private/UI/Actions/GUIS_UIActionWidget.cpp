@@ -130,10 +130,8 @@ void UGUIS_UIActionWidget::HandleModalAction(FGameplayTag ActionTag)
 		{
 			CurrentAction->InvokeAction(AssociatedData.Get(), GetOwningPlayer());
 		}
-		CancelAction();
 	}
-	if (ActionTag == GUIS_GameModalActionTags::No)
-	{
-		CancelAction();
-	}
+
+	// Any other result (No / Cancel / Unknown) just cancels; always clear the pending action and task.
+	CancelAction();
 }

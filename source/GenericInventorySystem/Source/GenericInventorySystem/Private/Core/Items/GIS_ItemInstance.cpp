@@ -114,7 +114,7 @@ const UGIS_ItemFragment* UGIS_ItemInstance::FindFragment(TSubclassOf<UGIS_ItemFr
 
 bool UGIS_ItemInstance::HasAnyAttribute(FGameplayTag AttributeTag) const
 {
-	return HasFloatAttribute(AttributeTag) || HasIntegerAttribute(AttributeTag); // || HasBoolAttribute(AttributeTag);
+	return HasFloatAttribute(AttributeTag) || HasIntegerAttribute(AttributeTag);
 }
 
 bool UGIS_ItemInstance::HasFloatAttribute(FGameplayTag AttributeTag) const
@@ -288,35 +288,7 @@ bool UGIS_ItemInstance::AreStackableEquivalent(const UGIS_ItemInstance* Lhs, con
 		return false;
 	}
 	return true;
-	//return AreValueEquivalent(Lhs, Rhs);
 }
-
-// bool UGIS_ItemInstance::AreValueEquivalent(const UGIS_ItemInstance* Lhs, const UGIS_ItemInstance* Rhs)
-// {
-// 	if (Lhs == nullptr || Rhs == nullptr)
-// 	{
-// 		return false;
-// 	}
-// 	if (Lhs == Rhs)
-// 	{
-// 		return true;
-// 	}
-// 	if (Lhs->GetClass() != Rhs->GetClass())
-// 	{
-// 		return false;
-// 	}
-// 	// if (Lhs->GetItemTags() != Rhs->GetItemTags())
-// 	// 	return false;
-// 	if (Lhs->GetDefinition() != Rhs->GetDefinition())
-// 	{
-// 		return false;
-// 	}
-// 	// if (!Lhs->GetDefinitionTag().IsValid() || !Rhs->GetDefinitionTag().IsValid())
-// 	// {
-// 	// 	return false;
-// 	// }
-// 	return true;
-// }
 
 bool UGIS_ItemInstance::AreSimilar(const UGIS_ItemInstance* Lhs, const UGIS_ItemInstance* Rhs)
 {
@@ -339,10 +311,6 @@ bool UGIS_ItemInstance::AreSimilar(const UGIS_ItemInstance* Lhs, const UGIS_Item
 	if (Lhs->IsUnique())
 	{
 		return false;
-	}
-	if (Lhs->GetItemId() == Rhs->GetItemId())
-	{
-		return true;
 	}
 	return true;
 }

@@ -9,7 +9,6 @@
 
 class UGIS_ItemInstance;
 class UGIS_EquipmentInstance;
-class UGIS_EquipItemInstance;
 class UGIS_ItemDefinition;
 class UGIS_EquipmentSystemComponent;
 struct FGIS_EquipmentContainer;

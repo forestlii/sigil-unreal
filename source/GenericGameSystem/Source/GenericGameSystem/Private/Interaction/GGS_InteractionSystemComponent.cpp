@@ -348,41 +348,12 @@ void UGGS_InteractionSystemComponent::RefreshOptionsForActor()
 			}
 		}
 
-		for (FGGS_InteractionOption& Option : InteractionOptions)
-		{
-			if (SlotCallbacks.Contains(Option.RequestResult.SlotHandle))
-			{
-				if (FOnSmartObjectEvent* OnEventDelegate = Subsystem->GetSlotEventDelegate(Option.RequestResult.SlotHandle))
-				{
-					OnEventDelegate->Remove(SlotCallbacks[Option.RequestResult.SlotHandle]);
-					SlotCallbacks.Remove(Option.RequestResult.SlotHandle);
-				}
-			}
-			// if (Option.DelegateHandle.IsValid())
-			// {
-			// 	if (FOnSmartObjectEvent* OnEventDelegate = Subsystem->GetSlotEventDelegate(Option.RequestResult.SlotHandle))
-			// 	{
-			// 		OnEventDelegate->Remove(Option.DelegateHandle);
-			// 		Option.DelegateHandle.Reset();
-			// 	}
-			// }
-		}
-
 		InteractionOptions = NewOptions;
 		MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, InteractionOptions, this)
 
 		GGS_CLOG(Verbose, "Interaction options changed, nums of options:%d", InteractionOptions.Num())
 
 		// register slot event callbacks.
-		// for (int32 i = 0; i < InteractionOptions.Num(); i++)
-		// {
-		// 	FGGS_InteractionOption& Option = InteractionOptions[i];
-		// 	if (FOnSmartObjectEvent* OnEventDelegate = Subsystem->GetSlotEventDelegate(Option.RequestResult.SlotHandle))
-		// 	{
-		// 		Option.DelegateHandle = OnEventDelegate->AddUObject(this, &ThisClass::OnSmartObjectEventCallback);
-		// 	}
-		// }
-
 		for (int32 i = 0; i < InteractionOptions.Num(); i++)
 		{
 			auto& Handle = InteractionOptions[i].RequestResult.SlotHandle;

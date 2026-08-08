@@ -300,7 +300,7 @@ protected:
 	 * If checked, whenever potential interactable actors changes, the first actor in the list will be selected as currency interactable actor.
 	 * 如果勾选，始终使用潜在交互演员中的第一个作为当前选择。
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing=OnInteractableActorsNumChanged, Category="GGS|InteractionSystem")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GGS|InteractionSystem")
 	bool bNewActorHasPriority{false};
 
 	/**

@@ -69,7 +69,7 @@ DECLARE_DYNAMIC_DELEGATE(FGIS_InventorySystem_Initialized_DynamicEvent);
  * 管理道具和集合的库存系统组件。
  */
 UCLASS(ClassGroup=(GIS), BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
-class GENERICINVENTORYSYSTEM_API UGIS_InventorySystemComponent : public UActorComponent /*, public IGameFrameworkInitStateInterface*/
+class GENERICINVENTORYSYSTEM_API UGIS_InventorySystemComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
@@ -241,78 +241,6 @@ protected:
 	UPROPERTY()
 	TArray<FGIS_InventorySystem_Initialized_DynamicEvent> InitializedDelegates;
 
-#pragma endregion
-
-#pragma region InitState
-
-	// /**
-	//  * The name of this overall feature.
-	//  * 此功能的整体名称。
-	//  */
-	// static const FName NAME_ActorFeatureName;
-	//
-	// /**
-	//  * Gets the feature name for the init state interface.
-	//  * 获取初始化状态接口的功能名称。
-	//  * @return The feature name. 功能名称。
-	//  */
-	// virtual FName GetFeatureName() const override;
-	//
-	// /**
-	//  * Determines if the component can change its initialization state.
-	//  * 确定组件是否可以更改其初始化状态。
-	//  * @param Manager The component manager. 组件管理器。
-	//  * @param CurrentState The current state. 当前状态。
-	//  * @param DesiredState The desired state. 期望状态。
-	//  * @return True if the state change is allowed, false otherwise. 如果允许状态更改则返回true，否则返回false。
-	//  */
-	// virtual bool CanChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState) const override;
-	//
-	// /**
-	//  * Handles a change in initialization state.
-	//  * 处理初始化状态的更改。
-	//  * @param Manager The component manager. 组件管理器。
-	//  * @param CurrentState The current state. 当前状态。
-	//  * @param DesiredState The desired state. 期望状态。
-	//  */
-	// virtual void HandleChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState) override;
-	//
-	// /**
-	//  * Called when the actor's initialization state changes.
-	//  * 演员的初始化状态更改时调用。
-	//  * @param Params The state change parameters. 状态更改参数。
-	//  */
-	// virtual void OnActorInitStateChanged(const FActorInitStateChangedParams& Params) override;
-	//
-	// /**
-	//  * Checks if the component has reached a specific initialization state.
-	//  * 检查组件是否已达到特定初始化状态。
-	//  * @param State The state to check. 要检查的状态。
-	//  * @return True if the state has been reached, false otherwise. 如果已达到状态则返回true，否则返回false。
-	//  */
-	// virtual bool HasReachedInitState(FGameplayTag State) const override;
-	//
-	// /**
-	//  * Checks the default initialization state.
-	//  * 检查默认初始化状态。
-	//  */
-	// virtual void CheckDefaultInitialization() override;
-	//
-	// /**
-	//  * Checks the initialization state of the inventory system.
-	//  * 检查库存系统的初始化状态。
-	//  */
-	// UFUNCTION(BlueprintCallable, Category="GIS|InventorySystem")
-	// virtual void CheckInventoryInitialization();
-	//
-	// /**
-	//  * The current initialization state of the component.
-	//  * 组件的当前初始化状态。
-	//  */
-	// UPROPERTY(VisibleAnywhere, Category="InventorySystem")
-	// FGameplayTag CurrentInitState{FGameplayTag::EmptyTag};
-
-private:
 #pragma endregion
 
 #pragma region Events
@@ -844,20 +772,6 @@ protected:
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="InventorySystem", Transient, meta=(ForceInlineRow))
 	TMap<FGuid, TObjectPtr<UGIS_ItemCollection>> CollectionIdToInstanceMap;
-
-	/**
-	 * Cached map for O(1) collection lookups by tag (commented out).
-	 * 按标签进行O(1)集合查找的缓存映射（已注释）。
-	 */
-	// UPROPERTY()
-	// TMap<FGameplayTag, TObjectPtr<UGIS_ItemCollection>> CollectionTagToInstanceMap;
-
-	/**
-	 * Whether to use the initialization state chain.
-	 * 是否使用初始化状态链。
-	 */
-	// UPROPERTY(EditAnywhere, Category="InventorySystem")
-	// bool bUseInitStateChain = false;
 
 	/**
 	 * Whether to initialize the inventory on BeginPlay.

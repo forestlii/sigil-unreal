@@ -22,7 +22,6 @@ void UGCS_CombatFlow::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 void UGCS_CombatFlow::Initialize(AActor* NewOwner)
 {
 	Owner = NewOwner;
-	// ProcessedAttacks.SetCombatFlow(this);
 	CombatComponent = UGCS_CombatSystemComponent::GetCombatSystemComponent(Owner);
 }
 

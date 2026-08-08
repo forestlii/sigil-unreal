@@ -8,7 +8,6 @@
 #include "GIS_LogChannels.h"
 #include "Items/GIS_ItemDefinition.h"
 #include "Items/GIS_ItemInstance.h"
-#include "Items/GIS_ItemInterface.h"
 #include "Kismet/KismetMathLibrary.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GIS_InventorySubsystem)

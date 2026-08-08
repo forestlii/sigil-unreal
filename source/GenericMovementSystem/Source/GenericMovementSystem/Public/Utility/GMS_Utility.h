@@ -3,7 +3,6 @@
 #pragma once
 
 #include "GameplayTagContainer.h"
-#include "BlendStack/BlendStackAnimNodeLibrary.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Locomotions/GMS_LocomotionStructLibrary.h"
 #include "Settings/GMS_SettingStructLibrary.h"
@@ -72,23 +71,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|Utility", meta=(BlueprintThreadSafe,DeterminesOutputType=DesiredClass,DynamicOutputParam="ReturnValue"))
 	static const UGMS_MovementSetUserSetting* GetMovementSetUserSetting(const FGMS_MovementSetSetting& MovementSetSetting, TSubclassOf<UGMS_MovementSetUserSetting> DesiredClass);
-
-	// static void BlendToWithSettings(const FAnimUpdateContext& Context, 
-	// 					const FBlendStackAnimNodeReference& BlendStackNode, 
-	// 					UAnimationAsset* AnimationAsset = nullptr,
-	// 					float AnimationTime = 0.f,
-	// 					bool bLoop = false,
-	// 					bool bMirrored = false,
-	// 					float BlendTime = 0.2f,
-	// 					UBlendProfile* BlendProfile = nullptr,
-	// 					EAlphaBlendOption BlendOption = EAlphaBlendOption::HermiteCubic,
-	// 					bool bInertialBlend = false,
-	// 					FVector BlendParameters = FVector::ZeroVector,
-	// 					float WantedPlayRate = 1.f,
-	// 					float ActivationDelay = 0.f,FName SyncGroupName = NAME_None,
-	// 					EAnimGroupRole::Type SyncGroupRole = EAnimGroupRole::Type::CanBeLeader,
-	// 					EAnimSyncMethod SyncGroupMethod = EAnimSyncMethod::DoNotSync);
-
 };
 
 constexpr FStringView UGMS_Utility::BoolToString(const bool bValue)

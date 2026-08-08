@@ -24,14 +24,6 @@ enum class EGMS_TurnInPlacePlayMethod :uint8
 	Montage,
 };
 
-// UENUM(BlueprintType)
-// enum class EGMS_TurnInPlaceStage :uint8
-// {
-// 	NotAllowed,
-// 	Accumulating,
-// 	ShouldTurn
-// };
-
 UENUM(BlueprintType)
 enum class EGMS_OverlayPlayMode :uint8
 {

@@ -24,9 +24,6 @@ class UGUIS_AsyncAction_ShowModel : public UCancellableAsyncAction
 	GENERATED_UCLASS_BODY()
 
 public:
-	// UFUNCTION(BlueprintCallable, BlueprintCosmetic, Category="GUIS", meta = (BlueprintInternalUseOnly = "true", WorldContext = "InWorldContextObject"))
-	// static UGUIS_AsyncAction_ShowModel* ShowModal(UObject* InWorldContextObject, FGameplayTag ModalTag, UGUIS_ModalDefinition* ModalDefinition);
-
 	/**
 	 * 给定一个Modal定义，然后显示该Modal。 
 	 */

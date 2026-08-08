@@ -14,7 +14,6 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/HUD.h"
 #include "Animation/AnimSequenceBase.h"
-#include "BlendStack/AnimNode_BlendStack.h"
 #include "Locomotions/GMS_AnimLayer.h"
 #include "Locomotions/GMS_MainAnimInstance.h"
 #include "Settings/GMS_SettingObjectLibrary.h"
@@ -234,42 +233,4 @@ const UGMS_MovementSetUserSetting* UGMS_Utility::GetMovementSetUserSetting(const
 	}
 	return nullptr;
 }
-
-// void UGMS_Utility::BlendToWithSettings(const FAnimUpdateContext& Context, const FBlendStackAnimNodeReference& BlendStackNode, UAnimationAsset* AnimationAsset, float AnimationTime, bool bLoop,
-// 	bool bMirrored, float BlendTime, UBlendProfile* BlendProfile, EAlphaBlendOption BlendOption, bool bInertialBlend, FVector BlendParameters, float WantedPlayRate, float ActivationDelay,
-// 	FName SyncGroupName, EAnimGroupRole::Type SyncGroupRole, EAnimSyncMethod SyncGroupMethod)
-// {
-// 	if (AnimationAsset != nullptr)
-// 	{
-// 		if (FAnimNode_BlendStack* BlendStackNodePtr = BlendStackNode.GetAnimNodePtr<FAnimNode_BlendStack>())
-// 		{
-// 			if (const FAnimationUpdateContext* AnimationUpdateContext = Context.GetContext())
-// 			{
-// 				BlendStackNodePtr->BlendTo(
-// 					*AnimationUpdateContext,
-// 					AnimationAsset,
-// 					AnimationTime,
-// 					bLoop,
-// 					bMirrored,
-// 					BlendStackNodePtr->MirrorDataTable,
-// 					BlendTime,
-// 					BlendProfile,
-// 					BlendOption,
-// 					bInertialBlend,
-// 					BlendParameters,
-// 					WantedPlayRate,
-// 					ActivationDelay,
-// 					SyncGroupName, SyncGroupRole, SyncGroupMethod);
-// 			}
-// 			else
-// 			{
-// 				UE_LOG(LogGMS, Warning, TEXT("UBlendStackAnimNodeLibrary::BlendToWithSettings called with an invalid context."));
-// 			}
-// 		}
-// 		else
-// 		{
-// 			UE_LOG(LogGMS, Warning, TEXT("UBlendStackAnimNodeLibrary::BlendToWithSettings called with an invalid type."));
-// 		}
-// 	}
-// }
 

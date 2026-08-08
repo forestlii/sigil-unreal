@@ -15,7 +15,6 @@ class UGIS_ItemSlotCollectionDefinition;
 class UGIS_InventorySystemComponent;
 class UGIS_EquipmentInstance;
 class UGIS_ItemSlotCollection;
-class UGIS_EquipItemInstance;
 
 /**
  * Delegate triggered when the equipment system is initialized.

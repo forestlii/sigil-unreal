@@ -235,18 +235,6 @@ void AGCS_BulletInstance::RefreshTravelStates()
 	}
 }
 
-// bool AGCS_BulletInstance::AlreadyHit(const FHitResult& InHitResult) const
-// {
-// 	for (int i = 0; i < HitActors.Num(); ++i)
-// 	{
-// 		if (HitActors[i] == InHitResult.GetActor())
-// 		{
-// 			return true;
-// 		}
-// 	}
-// 	return false;
-// }
-
 bool AGCS_BulletInstance::ShouldPenetrateHitResult(const FHitResult& InHitResult) const
 {
 	if (InHitResult.GetActor() != nullptr)

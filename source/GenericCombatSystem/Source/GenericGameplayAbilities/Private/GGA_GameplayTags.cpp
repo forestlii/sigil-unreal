@@ -5,7 +5,6 @@
 
 namespace GGA_AbilityActivateFailTags
 {
-	UE_DEFINE_GAMEPLAY_TAG_COMMENT(IsDead, "GGF.Ability.ActivateFail.IsDead", "Ability failed to activate because its owner is dead.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown, "GGF.Ability.ActivateFail.Cooldown", "Ability failed to activate because it is on cool down.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cost, "GGF.Ability.ActivateFail.Cost", "Ability failed to activate because it did not pass the cost checks.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(TagsBlocked, "GGF.Ability.ActivateFail.TagsBlocked", "Ability failed to activate because tags are blocking it.");

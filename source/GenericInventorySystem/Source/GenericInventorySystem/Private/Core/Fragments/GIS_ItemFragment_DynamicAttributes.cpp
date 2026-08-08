@@ -24,10 +24,6 @@ void UGIS_ItemFragment_DynamicAttributes::OnInstanceCreated(UGIS_ItemInstance* I
 			Instance->SetIntegerAttribute(InitialIntegerAttributes[i].Tag, InitialIntegerAttributes[i].Value);
 		}
 	}
-	// for (int32 i=0;i<InitialBoolAttributes.Num();i++)
-	// {
-	// 	Instance->SetBoolAttribute(InitialBoolAttributes[i].Tag,InitialBoolAttributes[i].Value);
-	// }
 }
 
 float UGIS_ItemFragment_DynamicAttributes::GetFloatAttributeDefault(FGameplayTag AttributeTag) const
@@ -46,19 +42,13 @@ void UGIS_ItemFragment_DynamicAttributes::PreSave(FObjectPreSaveContext SaveCont
 	FloatAttributeMap.Empty();
 	for (const FGIS_GameplayTagFloat& Attribute : InitialFloatAttributes)
 	{
-		if (FloatAttributeMap.Contains(Attribute.Tag))
-		{
-			FloatAttributeMap.Add(Attribute.Tag, Attribute.Value);
-		}
+		FloatAttributeMap.Add(Attribute.Tag, Attribute.Value);
 	}
 
 	IntegerAttributeMap.Empty();
 	for (const FGIS_GameplayTagInteger& Attribute : InitialIntegerAttributes)
 	{
-		if (IntegerAttributeMap.Contains(Attribute.Tag))
-		{
-			IntegerAttributeMap.Add(Attribute.Tag, Attribute.Value);
-		}
+		IntegerAttributeMap.Add(Attribute.Tag, Attribute.Value);
 	}
 
 	Super::PreSave(SaveContext);

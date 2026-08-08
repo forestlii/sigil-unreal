@@ -68,8 +68,9 @@ FTargetingSourceContext UGCS_TargetingFunctionLibrary::ConvertTargetingLocationI
 		break;
 	case EGameplayAbilityTargetingLocationType::LiteralTransform:
 		Context.SourceLocation = LocationInfo.LiteralTransform.GetLocation();
+		break;
 	default:
-		check(false);
+		checkNoEntry();
 		break;
 	}
 

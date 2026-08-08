@@ -133,7 +133,7 @@ public:
 
 	/**
 	 * Pushes a widget to a specified layer with initialization.
- olduğuna * 将控件推送到指定层并进行初始化。
+	 * 将控件推送到指定层并进行初始化。
 	 * @param LayerName The tag of the layer to push to. 要推送到的层标签。
 	 * @param ActivatableWidgetClass The class of the widget to push. 要推送的控件类。
 	 * @param InitInstanceFunc Function to initialize the widget instance. 初始化控件实例的函数。

@@ -490,13 +490,6 @@ bool UGGA_GameplayAbility::DoesAbilitySatisfyTagRequirements(const UAbilitySyste
 
 		if (AbilitySystemComponentTags.HasAny(AllBlockedTags))
 		{
-			// const FGGA_GameplayTags& GameplayTags = FGGA_GameplayTags::Get();
-			// if (OptionalRelevantTags && AbilitySystemComponentTags.HasTag(GameplayTags.Status_Death))
-			// {
-			// 	// If player is dead and was rejected due to blocking tags, give that feedback
-			// 	OptionalRelevantTags->AddTag(GameplayTags.Ability_ActivateFail_IsDead);
-			// }
-
 			bBlocked = true;
 		}
 

@@ -89,7 +89,7 @@ protected:
  * 具有标签要求的攻击结果处理器。
  */
 UCLASS(Abstract)
-class UGCS_AttackResultProcessor_WithTagRequirement : public UGCS_AttackResultProcessor
+class GENERICCOMBATSYSTEM_API UGCS_AttackResultProcessor_WithTagRequirement : public UGCS_AttackResultProcessor
 {
 	GENERATED_BODY()
 
@@ -138,7 +138,7 @@ protected:
  * 处理与死亡相关的攻击结果的处理器。
  */
 UCLASS()
-class UGCS_AttackResultProcessor_Death : public UGCS_AttackResultProcessor
+class GENERICCOMBATSYSTEM_API UGCS_AttackResultProcessor_Death : public UGCS_AttackResultProcessor
 {
 	GENERATED_BODY()
 
@@ -158,7 +158,7 @@ public:
  * @注意 仅对服务器Pawn或本地控制器Pawn执行。
  */
 UCLASS()
-class UGCS_AttackResultProcessor_GameplayEvent : public UGCS_AttackResultProcessor_WithTagRequirement
+class GENERICCOMBATSYSTEM_API UGCS_AttackResultProcessor_GameplayEvent : public UGCS_AttackResultProcessor_WithTagRequirement
 {
 	GENERATED_BODY()
 
@@ -199,7 +199,7 @@ protected:
  * @注意 提示不复制，因为攻击结果已复制。
  */
 UCLASS()
-class UGCS_AttackResultProcessor_GameplayCue : public UGCS_AttackResultProcessor
+class GENERICCOMBATSYSTEM_API UGCS_AttackResultProcessor_GameplayCue : public UGCS_AttackResultProcessor
 {
 	GENERATED_BODY()
 

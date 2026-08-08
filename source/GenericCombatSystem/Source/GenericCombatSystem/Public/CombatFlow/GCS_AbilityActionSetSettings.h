@@ -7,8 +7,6 @@
 #include "Engine/DataAsset.h"
 #include "GCS_AbilityActionSetSettings.generated.h"
 
-class UGCS_LayeredMontageSelectionSet;
-
 /**
  * Data asset for defining ability action sets.
  * 定义能力动作集的数据资产。

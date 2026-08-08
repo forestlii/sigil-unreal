@@ -28,8 +28,6 @@ public:
 
 	void PushCameraMode(TSubclassOf<UGCMS_CameraMode> CameraModeClass);
 
-	void PopCameraMode(TSubclassOf<UGCMS_CameraMode> CameraModeClass);
-
 	bool EvaluateStack(float DeltaTime, FGCMS_CameraModeView& OutCameraModeView);
 
 	void DrawDebug(UCanvas* Canvas) const;

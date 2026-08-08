@@ -99,26 +99,6 @@ void UGUIS_GameUIFunctionLibrary::PopContentFromUILayer_ForPlayer(const APlayerC
 	}
 }
 
-// void UGUIS_GameUIFunctionLibrary::PushStreamedContentToLayer_ForPlayer(const ULocalPlayer* LocalPlayer, FGameplayTag LayerName, TSoftClassPtr<UCommonActivatableWidget> WidgetClass)
-// {
-// 	if (!ensure(LocalPlayer) || !ensure(!WidgetClass.IsNull()))
-// 	{
-// 		return;
-// 	}
-//
-// 	if (UGameUIManagerSubsystem* UIManager = LocalPlayer->GetGameInstance()->GetSubsystem<UGameUIManagerSubsystem>())
-// 	{
-// 		if (UGameUIPolicy* Policy = UIManager->GetCurrentUIPolicy())
-// 		{
-// 			if (UPrimaryGameLayout* RootLayout = Policy->GetRootLayout(CastChecked<UCommonLocalPlayer>(LocalPlayer)))
-// 			{
-// 				const bool bSuspendInputUntilComplete = true;
-// 				RootLayout->PushWidgetToLayerStackAsync(LayerName, bSuspendInputUntilComplete, WidgetClass);
-// 			}
-// 		}
-// 	}
-// }
-
 void UGUIS_GameUIFunctionLibrary::PopContentFromUILayer(UCommonActivatableWidget* ActivatableWidget)
 {
 	if (!ActivatableWidget)

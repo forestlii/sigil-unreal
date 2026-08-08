@@ -33,18 +33,8 @@ void UGUIS_GameUILayout::SetIsDormant(bool InDormant)
 
 void UGUIS_GameUILayout::OnIsDormantChanged()
 {
-	//@TODO NDarnell Determine what to do with dormancy, in the past we treated dormancy as a way to shutoff rendering
+	//@TODO Determine what to do with dormancy, in the past we treated dormancy as a way to shutoff rendering
 	//and the view for the other local players when we force multiple players to use the player view of a single player.
-
-	//if (ULocalPlayer* LocalPlayer = GetOwningLocalPlayer<ULocalPlayer>())
-	//{
-	//	// When the root layout is dormant, we don't want to render anything from the owner's view either
-	//	LocalPlayer->SetIsPlayerViewEnabled(!bIsDormant);
-	//}
-
-	//SetVisibility(bIsDormant ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
-
-	//OnLayoutDormancyChanged().Broadcast(bIsDormant);
 }
 
 void UGUIS_GameUILayout::RegisterLayer(FGameplayTag LayerTag, UCommonActivatableWidgetContainerBase* LayerWidget)

@@ -109,7 +109,11 @@ void UGUIS_GameUIPolicy::RemoveContext(const ULocalPlayer* LocalPlayer, TSubclas
 				break;
 			}
 		}
-		LayoutInfo->Contexts.RemoveAt(FoundContext);
+
+		if (FoundContext != INDEX_NONE)
+		{
+			LayoutInfo->Contexts.RemoveAt(FoundContext);
+		}
 	}
 }
 

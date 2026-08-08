@@ -11,7 +11,7 @@
  * The base gameplay ability for any ability that is used to change the active game phase.
  */
 UCLASS(Abstract, HideCategories = Input)
-class UGGA_GamePhaseAbility : public UGGA_GameplayAbility
+class GENERICGAMEPLAYABILITIES_API UGGA_GamePhaseAbility : public UGGA_GameplayAbility
 {
 	GENERATED_BODY()
 

@@ -181,12 +181,6 @@ int32 UGIS_ItemMultiStackCollection::GetMaxStackSize(UGIS_ItemInstance* Item) co
 		return MyDefinition->DefaultStackSizeLimit;
 	}
 	return Item->GetDefinition()->GetIntegerAttribute(MyDefinition->StackSizeLimitAttribute);
-
-	// if (!Item->HasIntegerAttribute(MyDefinition->StackSizeLimitAttribute))
-	// {
-	// 	return MyDefinition->DefaultStackSizeLimit;
-	// }
-	// return Item->GetIntegerAttribute(MyDefinition->StackSizeLimitAttribute);
 }
 
 /**

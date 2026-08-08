@@ -48,10 +48,6 @@ int32 UGIS_ItemRestriction_StackSizeLimit::GetStackSizeLimit(const UGIS_ItemInst
 	{
 		return Item->GetDefinition()->GetIntegerAttribute(StackSizeLimitAttributeTag);
 	}
-	// if (StackSizeLimitAttributeTag.IsValid() && Item->HasIntegerAttribute(StackSizeLimitAttributeTag))
-	// {
-	// 	return Item->GetIntegerAttribute(StackSizeLimitAttributeTag);
-	// }
 
 	return DefaultStackSizeLimit;
 }

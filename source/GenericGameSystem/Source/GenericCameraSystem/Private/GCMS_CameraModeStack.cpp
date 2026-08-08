@@ -113,10 +113,6 @@ void UGCMS_CameraModeStack::PushCameraMode(TSubclassOf<UGCMS_CameraMode> CameraM
 	}
 }
 
-void UGCMS_CameraModeStack::PopCameraMode(TSubclassOf<UGCMS_CameraMode> CameraModeClass)
-{
-}
-
 bool UGCMS_CameraModeStack::EvaluateStack(float DeltaTime, FGCMS_CameraModeView& OutCameraModeView)
 {
 	if (!bIsActive)

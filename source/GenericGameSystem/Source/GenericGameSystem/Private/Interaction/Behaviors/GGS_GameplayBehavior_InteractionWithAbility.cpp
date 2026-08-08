@@ -76,7 +76,6 @@ bool UGGS_GameplayBehavior_InteractionWithAbility::Trigger(AActor& InAvatar, con
 
 	//TODO what happens when avatar or target get destoryied?
 	// SOOwner销毁的时候, 需要Abort当前行为, 目的是清除赋予的Ability
-	// SmartObjectOwner->OnDestroyed.AddDynamic(this, &ThisClass::OnSmartObjectOwnerDestroyed);
 	GGS_CLOG(Verbose, "Interaction begins with ability:%s", *AbilityClass->GetName())
 
 	bTransientIsTriggering = false;

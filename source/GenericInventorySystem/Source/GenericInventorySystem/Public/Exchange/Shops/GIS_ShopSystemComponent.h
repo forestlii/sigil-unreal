@@ -214,22 +214,22 @@ protected:
 	 * The target item collection to add items to when purchased.
 	 * 购买时道具添加到的目标道具集合。
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop", meta=(Categories="GIS.ItemCollection"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop", meta=(Categories="GIS.Collection"))
 	FGameplayTag TargetItemCollectionToAddOnBuy = GIS_CollectionTags::Main;
 
 	/**
-	 * Controls the buy price modifier for this shop.
-	 * 控制此商店的购买价格浮动。
+	 * Additive buy price modifier for this shop (final multiplier = 1 + modifier).
+	 * 此商店的购买价格加成（最终乘数 = 1 + 加成值）。
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop", meta=(ClampMin=0))
 	float BuyPriceModifier = 0;
 
 	/**
-	 * Controls the sell price modifier for this shop.
-	 * 控制此商店的出售价格浮动。
+	 * Additive sell price modifier for this shop (final multiplier = 1 + modifier).
+	 * 此商店的出售价格加成（最终乘数 = 1 + 加成值）。
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Shop", meta=(ClampMin=0))
-	float SellPriceModifer = 0;
+	float SellPriceModifier = 0;
 
 	/**
 	 * The inventory component associated with the shop.

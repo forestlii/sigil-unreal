@@ -520,13 +520,6 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, Category="ItemCollection", Transient, meta=(ForceInlineRow))
 	TMap<FGuid, int32> StackToIdxMap;
 
-	/**
-	 * Store the stack id and position mapping within this collection.
-	 * 存储在此集合中Stack id到位置的映射关系。
-	 */
-	// UPROPERTY(VisibleInstanceOnly, Category="ItemCollection", Transient)
-	// TMap<FGuid, int32> IdxToStackMap;
-
 private:
 	/**
 	 * Temporary storage for pending item stacks.

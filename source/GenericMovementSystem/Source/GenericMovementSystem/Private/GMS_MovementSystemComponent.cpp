@@ -335,34 +335,25 @@ const FGMS_VelocityDirectionSetting& UGMS_MovementSystemComponent::GetVelocityDi
 
 const UGMS_MovementControlSetting_Default* UGMS_MovementSystemComponent::GetControlSetting() const
 {
-	// 添加安全检查和空指针保护
-	if(IsValid(ControlSetting))
+	if (IsValid(ControlSetting))
 	{
 		return ControlSetting;
 	}
-    
-	// 可选：记录警告或返回默认值
-	UE_LOG(LogTemp, Warning, TEXT("ControlSetting is not valid"));
+
+	UE_LOG(LogGMS, Warning, TEXT("ControlSetting is not valid"));
 	return nullptr;
 }
 
-void UGMS_MovementSystemComponent::SetJumpLogEnable(bool Enable) 
+void UGMS_MovementSystemComponent::SetJumpLogEnable(bool Enable)
 {
-
-	if (!IsValid(ControlSetting)) return;
-	
-	for (int32 i = 0; i < ControlSetting->JumpStates.Num(); ++i)
-	{
-		ControlSetting->JumpStates[i].bIsShowDebug = Enable;
-	}
-    
-	RefreshControlSetting();
+	// ControlSetting is a const shared DataAsset and must not be mutated at runtime,
+	// so the debug toggle lives on the component instead.
+	bJumpLogEnabled = Enable;
 }
 
 int32 UGMS_MovementSystemComponent::GetNumOfMovementStateSettings() const
 {
-	return ControlSetting->MovementStates.Num();
-
+	return IsValid(ControlSetting) ? ControlSetting->MovementStates.Num() : 0;
 }
 const UGMS_MovementDefinition* UGMS_MovementSystemComponent::GetMovementDefinition() const
 {
@@ -885,8 +876,6 @@ const FGameplayTag& UGMS_MovementSystemComponent::GetRotationMode() const
 
 void UGMS_MovementSystemComponent::SetRotationMode(const FGameplayTag& NewRotationMode)
 {
-	// CharacterMovement->SetRotationMode(NewRotationMode);
-
 	if (RotationMode != NewRotationMode && GetMovementStateSetting().AllowedRotationModes.Contains(NewRotationMode))
 	{
 		const auto PreviousRotationMode{RotationMode};

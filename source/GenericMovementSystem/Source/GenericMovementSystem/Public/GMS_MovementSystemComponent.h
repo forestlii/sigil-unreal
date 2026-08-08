@@ -182,11 +182,21 @@ public:
 	// Get current selected control setting.
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem", meta=(DefaultToSelf="Actor", DisplayName="Get Control Setting"))
 	const UGMS_MovementControlSetting_Default* GetControlSetting() const;
-	// Get current selected control setting Copy(New One).
+	// Toggle jump debug logging for this component at runtime.
 	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem")
 	void SetJumpLogEnable(bool Enable);
-	
+
+	// Whether jump debug logging is enabled for this component.
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem")
+	bool IsJumpLogEnabled() const { return bJumpLogEnabled; }
+
 	int32 GetNumOfMovementStateSettings() const;
+
+private:
+	UPROPERTY(Transient)
+	bool bJumpLogEnabled{false};
+
+public:
 
 	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem", Meta = (AutoCreateRefTerm = "NewMovementSet"))
 	void SetMovementSet(UPARAM(meta=(Categories="GMS.MovementSet")) const FGameplayTag& NewMovementSet);
@@ -396,7 +406,7 @@ private:
 	void OnReplicated_OverlayMode(const FGameplayTag& PreviousOverlayMode);
 
 protected:
-	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
+	UFUNCTION(BlueprintNativeEvent, Category = "GMS|MovementSystem")
 	void OnOverlayModeChanged(const FGameplayTag& PreviousOverlayMode);
 #pragma endregion
 
@@ -526,7 +536,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings|GameplayTags")
 	FGameplayTagContainer InAirRotationBlockingTags;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="State", Transient, meta=(Categories="GMS.RotationMode"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="State", Transient, meta=(Categories="GMS.LocomotionMode"))
 	FGameplayTag LocomotionMode{GMS_MovementModeTags::Grounded};
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="State", Transient, meta=(Categories="GMS.MovementState"))
@@ -566,9 +576,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category="State", Transient)
 	FGMS_LocomotionState LocomotionState;
-
-	// UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category="State", Transient)
-	// FGMS_SpeedTransitionState SpeedTransitionState;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="State", Transient)
 	FGMS_ViewState ViewState;

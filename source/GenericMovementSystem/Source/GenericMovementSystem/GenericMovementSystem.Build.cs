@@ -30,10 +30,7 @@ public class GenericMovementSystem : ModuleRules
 				"ModularGameplay",
 				"Engine",
 				"AnimGraphRuntime",
-				"BlendStack",
-				"AnimationLocomotionLibraryRuntime", 
-				"Niagara", 
-				"DeveloperSettings"
+				"AnimationLocomotionLibraryRuntime"
 				// ... add private dependencies that you statically link with here ...	
 			}
 		);

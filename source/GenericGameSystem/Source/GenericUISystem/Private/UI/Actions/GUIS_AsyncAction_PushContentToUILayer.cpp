@@ -97,7 +97,6 @@ void UGUIS_AsyncAction_PushContentToUILayer::Cancel()
 
 void UGUIS_AsyncAction_PushContentToUILayer::Activate()
 {
-	// if (UGUIS_GameUILayout* RootLayout = UGUIS_GameUILayout::GetPrimaryGameLayout(OwningPlayerPtr.Get()))
 	if (RootLayout.IsValid())
 	{
 		TWeakObjectPtr<UGUIS_AsyncAction_PushContentToUILayer> WeakThis = this;

@@ -166,25 +166,6 @@ struct GENERICMOVEMENTSYSTEM_API FGMS_ViewState
 };
 
 
-// USTRUCT(BlueprintType)
-// struct GENERICMOVEMENTSYSTEM_API FGMS_SpeedTransitionState
-// {
-// 	GENERATED_BODY()
-//
-// 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
-// 	float InitialSpeed{0.0f};
-//
-// 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
-// 	float TargetSpeed{0.0f};
-//
-// 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
-// 	float StartTime{0.0f};
-// 	
-// 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
-// 	bool bTransitioning{false};
-// };
-
-
 USTRUCT()
 struct FGMS_PredictGroundMovementStopLocationParams
 {

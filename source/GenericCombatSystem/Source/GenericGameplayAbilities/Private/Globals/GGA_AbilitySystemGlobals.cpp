@@ -4,7 +4,6 @@
 #include "GGA_AbilitySystemGlobals.h"
 
 #include "GameplayEffect.h"
-#include "GGA_GameplayEffectContext.h"
 #include "GGA_LogChannels.h"
 
 void UGGA_AbilitySystemGlobals::GlobalPreGameplayEffectSpecApply(FGameplayEffectSpec& Spec, UAbilitySystemComponent* AbilitySystemComponent)
@@ -14,11 +13,6 @@ void UGGA_AbilitySystemGlobals::GlobalPreGameplayEffectSpecApply(FGameplayEffect
 		Receiver->ReceiveGlobalPreGameplayEffectSpecApply(Spec, AbilitySystemComponent);
 	}
 }
-
-// FGameplayEffectContext* UGGA_AbilitySystemGlobals::AllocGameplayEffectContext() const
-// {
-// 	return new FGGA_GameplayEffectContext();
-// }
 
 const UAbilitySystemGlobals* UGGA_AbilitySystemGlobals::GetAbilitySystemGlobals()
 {

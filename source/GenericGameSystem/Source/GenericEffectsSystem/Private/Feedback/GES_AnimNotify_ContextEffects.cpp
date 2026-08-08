@@ -73,11 +73,6 @@ void UGES_AnimNotify_ContextEffects::Notify(USkeletalMeshComponent* MeshComp, UA
 		SpawnRotation = MeshComp->GetOwner()->GetActorTransform().TransformRotation(RotationOffset.Quaternion()).Rotator();
 		SpawnLocation = MeshComp->GetOwner()->GetActorTransform().TransformPosition(LocationOffset);
 	}
-	// else
-	// {
-	// 	SpawnRotation = UKismetMathLibrary::ComposeRotators(SpawnRotation, RotationOffset);
-	// 	SpawnLocation = SpawnLocation + UKismetMathLibrary::Quat_RotateVector(SpawnRotation.Quaternion(), LocationOffset);
-	// }
 
 	// Make sure both MeshComp and Owning Actor is valid
 	if (AActor* OwningActor = MeshComp->GetOwner())

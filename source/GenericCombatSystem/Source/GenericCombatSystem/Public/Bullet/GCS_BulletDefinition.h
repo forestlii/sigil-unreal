@@ -224,30 +224,4 @@ struct GENERICCOMBATSYSTEM_API FGCS_BulletDefinition : public FTableRowBase
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extension", meta=(ForceInlineRow, BaseStruct = "/Script/GenericCombatSystem.GCS_UserSetting"))
 	TMap<FGameplayTag, FInstancedStruct> UserSettings;
-
-	/**
-	 * Shares the hit history to sub bullet.(prevent repeat hit for whole bullet chains.)
-	 */
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hit Configuration",meta=(Categories="GGF.Combat.Bullet.LaunchCond"))
-	// bool bUseSharedHitList{true};
-
-	/**
-	 * The amount of time between a bullet hits something and when it explodes.
-	 */
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hit Configuration", meta=(Units="s", ClampMin=0))
-	// float ExplosionDelay{0.0};
-
-	// Emitter will be added in next version.
-
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Emitter", meta=(RowType="/Script/GenericCombatSystem.GCS_BulletDefinition"))
-	// FDataTableRowHandle EmitterBulletDefinition;
-	//
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Emitter")
-	// float EmitterInitialWaitTime{0};
-	//
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Emitter")
-	// float EmitterMinShootInterval{0};
-	//
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Emitter")
-	// float EmitterMaxShootInterval{0};
 };

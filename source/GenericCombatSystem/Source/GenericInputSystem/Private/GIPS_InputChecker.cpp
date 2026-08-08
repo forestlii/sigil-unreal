@@ -64,16 +64,6 @@ void UGIPS_InputChecker_TagRelationship::PreSave(FObjectPreSaveContext SaveConte
 	for (FGIPS_InputTagRelationship& InputTagRelationship : InputTagRelationships)
 	{
 		InputTagRelationship.EditorFriendlyName = InputTagRelationship.ActorTagQuery.GetDescription();
-		// TArray<FGameplayTag> TagArray;
-		// InputTagRelationship.InputTagsAllowed.GetGameplayTagArray(TagArray);
-		// InputTagRelationship.AllowedInputs.Empty();
-		// for (FGameplayTag Tag : TagArray)
-		// {
-		// 	FGIPS_AllowedInput AllowedInput;
-		// 	AllowedInput.TriggerEvents.Empty();
-		// 	AllowedInput.InputTag = Tag;
-		// 	InputTagRelationship.AllowedInputs.Add(AllowedInput);
-		// }
 	}
 	Super::PreSave(SaveContext);
 }

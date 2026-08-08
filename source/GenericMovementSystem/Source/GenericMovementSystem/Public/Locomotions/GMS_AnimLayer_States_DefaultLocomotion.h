@@ -132,9 +132,6 @@ struct GENERICMOVEMENTSYSTEM_API FGMS_AnimData_Start_ViewDirection : public FGMS
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="GMS")
 	FGMS_StrideWarpingSettings StrideWarping;
-
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
-	// FName BlendProfile{TEXT("FastFeet_InstantRoot")};
 };
 
 UENUM(BlueprintType)
@@ -171,9 +168,6 @@ struct GENERICMOVEMENTSYSTEM_API FGMS_AnimData_Start_VelocityDirection : public 
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="GMS")
 	FGMS_SteeringSettings Steering;
-
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
-	// FName BlendProfile{TEXT("FastFeet_InstantRoot")};
 };
 
 UENUM(BlueprintType)
@@ -234,9 +228,6 @@ struct GENERICMOVEMENTSYSTEM_API FGMS_AnimData_Cycle : public FGMS_AnimData
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="GMS")
 	bool bEnableStrideWarping{true};
-
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
-	// FName BlendProfile{TEXT("FastFeet")};
 };
 
 UENUM(BlueprintType)
@@ -625,9 +616,6 @@ public:
 
 	virtual void ApplySetting_Implementation(const UGMS_AnimLayerSetting* NewSetting) override;
 	virtual void ResetSetting_Implementation() override;
-
-	// UFUNCTION(BlueprintPure, BlueprintCallable, Category="GMS|Animation", meta=(BlueprintThreadSafe))
-	// float GetInputVelocityDelta() const;
 
 	UFUNCTION(BlueprintPure, BlueprintCallable, Category="GMS|Animation", meta=(BlueprintThreadSafe))
 	bool IsMovingPerpendicularToInitialPivot() const;

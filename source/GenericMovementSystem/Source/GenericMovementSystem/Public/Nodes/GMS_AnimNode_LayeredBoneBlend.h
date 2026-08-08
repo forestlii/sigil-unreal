@@ -26,18 +26,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, editfixedsize, Category=Links, meta=(BlueprintCompilerGeneratedDefaults))
 	TArray<FPoseLink> BlendPoses;
 
-	/** Whether to use branch filters or a blend mask to specify an input pose per-bone influence */
-	// UPROPERTY(EditAnywhere, Category = Config)
-	// ELayeredBoneBlendMode BlendMode;
-
-	/** 
-	 * The blend masks to use for our layer inputs. Allows the use of per-bone alphas.
-	 * Blend masks are used when BlendMode is BlendMask.
-	 */
-	// UPROPERTY(EditAnywhere, editfixedsize, Category=Config, meta=(UseAsBlendMask=true))
-	// TArray<TObjectPtr<UBlendProfile>> BlendMasks;
-
-	/** 
+	/**
 	 * Configuration for the parts of the skeleton to blend for each layer. Allows
 	 * certain parts of the tree to be blended out or omitted from the pose.
 	 * LayerSetup is used when BlendMode is BranchFilter.

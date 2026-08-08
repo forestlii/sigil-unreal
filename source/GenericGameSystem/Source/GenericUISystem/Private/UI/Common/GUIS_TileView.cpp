@@ -18,10 +18,6 @@ UGUIS_TileView::UGUIS_TileView(const FObjectInitializer& ObjectInitializer): Sup
 void UGUIS_TileView::ValidateCompiledDefaults(IWidgetCompilerLog& InCompileLog) const
 {
 	Super::ValidateCompiledDefaults(InCompileLog);
-	// if (EntryWidgetFactories.Num() == 0)
-	// {
-	// 	InCompileLog.Error(FText::Format(FText::FromString("{0} has no Entry widget Factories defined, can't create widgets without them."), FText::FromString(GetName())));
-	// }
 }
 #endif
 

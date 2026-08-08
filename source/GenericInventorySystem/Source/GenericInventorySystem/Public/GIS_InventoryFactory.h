@@ -127,9 +127,6 @@ public:
 	void DeserializeInventory(UGIS_InventorySystemComponent* InventorySystem, const FGIS_InventoryRecord& InRecord);
 
 protected:
-	// virtual TArray<FGIS_ItemFragmentStateRecord> FilterSerializableFragmentStates(const UGIS_ItemInstance* ItemInstance);
-	// virtual TArray<FGIS_ItemFragmentStateRecord> FilterCompatibleFragmentStateRecords(const UGIS_ItemDefinition* ItemDefinition, const FGIS_ItemRecord& Record);
-
 	/**
 	 * The default class used to construct item instances.
 	 * 用于构造道具实例的默认类。

@@ -703,22 +703,6 @@ void UGMS_MainAnimInstance::RefreshOffsetRootBone_Implementation(FAnimUpdateCont
 	if (GetMovementSystemComponent())
 	{
 		RootState.Transform = UAnimationWarpingLibrary::GetOffsetRootTransform(Node);
-		// if (!GeneralSetting.bEnableOffsetRootBoneRotation || GetOffsetRootBoneRotationMode() == EOffsetRootBoneMode::Release)
-		// {
-		// 	RootState.RootTransform.SetLocation(LocomotionState.Location);
-		// 	RootState.RootTransform.SetRotation(LocomotionState.RotationQuaternion);
-		//
-		// 	// Smooth blendout to 0.
-		// 	// RootState.YawOffset = UKismetMathLibrary::FloatSpringInterp(RootState.YawOffset,0,RootState.SprintState,80,1.0,GetDeltaSeconds(),1,0.5,false);
-		// 	// RootState.YawOffset = UKismetMathLibrary::FInterpTo(RootState.YawOffset,0,Context.GetContext()->GetDeltaTime(),50);
-		// 	RootState.YawOffset = 0.0f;
-		// }
-		// else
-		// {
-		// 	FRotator Rotator = FRotator(RootState.Transform.Rotator().Pitch, RootState.Transform.Rotator().Yaw + 90.0f, RootState.Transform.Rotator().Roll);
-		// 	RootState.RootTransform = UKismetMathLibrary::MakeTransform(RootState.Transform.GetTranslation(), Rotator, FVector::One());
-		// 	RootState.YawOffset = UKismetMathLibrary::NormalizedDeltaRotator(Rotator, LocomotionState.Rotation).Yaw;
-		// }
 
 		FRotator Rotator = FRotator(RootState.Transform.Rotator().Pitch, RootState.Transform.Rotator().Yaw + 90.0f, RootState.Transform.Rotator().Roll);
 		RootState.RootTransform = UKismetMathLibrary::MakeTransform(RootState.Transform.GetTranslation(), Rotator, FVector::One());

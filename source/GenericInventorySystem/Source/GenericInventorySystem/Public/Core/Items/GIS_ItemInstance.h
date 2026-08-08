@@ -265,27 +265,6 @@ public:
 	virtual void RemoveIntegerAttribute(FGameplayTag AttributeTag, int32 Value);
 
 	/**
-	 * Checks if the item instance has a boolean attribute (commented out).
-	 * 检查道具实例是否具有布尔属性（已注释）。
-	 */
-	// UFUNCTION(BlueprintCallable, Category="GIS|ItemInstance")
-	// virtual bool HasBoolAttribute(FGameplayTag AttributeTag) const;
-
-	/**
-	 * Gets the value of a boolean attribute (commented out).
-	 * 获取布尔属性的值（已注释）。
-	 */
-	// UFUNCTION(BlueprintCallable, Category="GIS|ItemInstance")
-	// virtual bool GetBoolAttribute(FGameplayTag AttributeTag) const;
-
-	/**
-	 * Sets the value of a boolean attribute (authority only, commented out).
-	 * 设置布尔属性的值（仅限权限，已注释）。
-	 */
-	// UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="GIS|ItemInstance")
-	// virtual void SetBoolAttribute(FGameplayTag AttributeTag, bool NewValue);
-
-	/**
 	 * Gets the collection where this item belongs to.
 	 * 获取此道具的所属集合。
 	 * @attention Only available in server side. 只在服务端有效。
@@ -353,12 +332,6 @@ public:
 	 * @return True if the items are stackable equivalent, false otherwise. 如果道具在堆叠上等价则返回true，否则返回false。
 	 */
 	static bool AreStackableEquivalent(const UGIS_ItemInstance* Lhs, const UGIS_ItemInstance* Rhs);
-
-	/**
-	 * Static function to check if two item instances are similar (commented out).
-	 * 静态函数，检查两个道具实例是否相似（已注释）。
-	 */
-	// static bool AreValueEquivalent(const UGIS_ItemInstance* Lhs, const UGIS_ItemInstance* Rhs);
 
 	/**
 	 * Static function to check if two item instances are similar.

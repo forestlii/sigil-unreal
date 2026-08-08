@@ -330,63 +330,6 @@ void UGIS_InventoryFactory::DeserializeInventory_Implementation(UGIS_InventorySy
 	}
 }
 
-// TArray<FGIS_ItemFragmentStateRecord> UGIS_InventoryFactory::FilterSerializableFragmentStates(const UGIS_ItemInstance* ItemInstance)
-// {
-// 	TArray<FGIS_Mixin> Mixins = ItemInstance->GetFragmentStates().GetSerializableMixins();
-// 	TArray<FGIS_ItemFragmentStateRecord> Records;
-// 	for (const FGIS_Mixin& Mixin : Mixins)
-// 	{
-// 		if (Mixin.Target->IsA<UGIS_ItemFragment>())
-// 		{
-// 			FGIS_ItemFragmentStateRecord Record;
-// 			Record.FragmentClass = Mixin.Target->GetClass();
-// 			Record.FragmentState = Mixin.Data;
-// 			Records.Add(Record);
-// 		}
-// 	}
-// 	return Records;
-// }
-
-// TArray<FGIS_ItemFragmentStateRecord> UGIS_InventoryFactory::FilterCompatibleFragmentStateRecords(const UGIS_ItemDefinition* ItemDefinition, const FGIS_ItemRecord& Record)
-// {
-// 	TArray<FGIS_Mixin> ConvertedMixins = FGIS_MixinContainer::ConvertRecordsToMixins(Record.FragmentStateRecords);
-//
-// 	TArray<FGIS_ItemFragmentStateRecord> CompatibleRecords;
-// 	for (const FGIS_ItemFragmentStateRecord& StateRecord : Record.FragmentStateRecords)
-// 	{
-// 		if (StateRecord.FragmentClass == nullptr || !StateRecord.FragmentState.IsValid())
-// 		{
-// 			GIS_LOG(Warning, "Skip restoring invalid fragment state for item:%s", *ItemDefinition->GetName());
-// 			continue;
-// 		}
-// 		const UGIS_ItemFragment* Fragment = ItemDefinition->GetFragment(StateRecord.FragmentClass);
-//
-// 		if (Fragment == nullptr)
-// 		{
-// 			GIS_LOG(Warning, "Skip restoring fragment's state, as fragment(%s) existed in record no longer exists on item(%s).",
-// 			        *GetNameSafe(StateRecord.FragmentClass), *ItemDefinition->GetName());
-// 			continue;
-// 		}
-//
-// 		if (!Fragment->IsMixinDataSerializable())
-// 		{
-// 			GIS_LOG(Warning, "Skip restoring fragment's state, as fragment(%s) existed in record no longer considered serializable on item(%s).",
-// 			        *GetNameSafe(StateRecord.FragmentClass), *ItemDefinition->GetName());
-// 			continue;
-// 		}
-//
-// 		if (Fragment->GetCompatibleMixinDataType() != StateRecord.FragmentState.GetScriptStruct())
-// 		{
-// 			GIS_LOG(Warning,
-// 			        "Skip restoring fragment's state, as fragment(%s)'s state type(%s) in record no longer compatible with the new type(%s) on item(%s).",
-// 			        *GetNameSafe(StateRecord.FragmentClass), *GetNameSafe(StateRecord.FragmentState.GetScriptStruct()), *GetNameSafe(Fragment->GetCompatibleMixinDataType()),
-// 			        *ItemDefinition->GetName());
-// 		}
-// 		CompatibleRecords.Add(StateRecord);
-// 	}
-// 	return CompatibleRecords;
-// }
-
 #if WITH_EDITOR
 EDataValidationResult UGIS_InventoryFactory::IsDataValid(class FDataValidationContext& Context) const
 {

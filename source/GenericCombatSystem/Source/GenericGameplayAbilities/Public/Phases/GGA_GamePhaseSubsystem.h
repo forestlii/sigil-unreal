@@ -40,7 +40,7 @@ enum class EGGA_PhaseTagMatchType : uint8
  *     Game.Playing will remain active, while Game.Playing.CaptureTheFlag will end.
  */
 UCLASS()
-class UGGA_GamePhaseSubsystem : public UWorldSubsystem
+class GENERICGAMEPLAYABILITIES_API UGGA_GamePhaseSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
 

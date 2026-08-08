@@ -142,20 +142,10 @@ float UGIS_ShopSystemComponent::GetBuyModifierForBuyer_Implementation(UGIS_Inven
 	return 1 + BuyPriceModifier;
 }
 
-// float UGIS_ShopSystemComponent::GetBuyModifierForItem(UGIS_InventorySystemComponent* BuyerInventory, FGIS_ItemInfo ItemInfo) const
-// {
-// 	return 1;
-// }
-
 float UGIS_ShopSystemComponent::GetSellModifierForSeller_Implementation(UGIS_InventorySystemComponent* SellerInventory) const
 {
-	return 1 + SellPriceModifer;
+	return 1 + SellPriceModifier;
 }
-
-// float UGIS_ShopSystemComponent::GetSellModifierForItem(UGIS_InventorySystemComponent* SellerInventory, const FGIS_ItemInfo& ItemInfo) const
-// {
-// 	return 1;
-// }
 
 bool UGIS_ShopSystemComponent::TryGetBuyValueForBuyer_Implementation(UGIS_InventorySystemComponent* Buyer, const FGIS_ItemInfo& ItemInfo, TArray<FGIS_CurrencyEntry>& BuyValue) const
 {

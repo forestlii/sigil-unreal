@@ -25,7 +25,7 @@ EDataValidationResult UGUIS_UIActionFactory::IsDataValid(FDataValidationContext&
 	FText ValidationMessage;
 	for (int32 i = 0; i < PotentialActions.Num(); i++)
 	{
-		if (PotentialActions[0] == nullptr)
+		if (PotentialActions[i] == nullptr)
 		{
 			Context.AddError(FText::FromString(FString::Format(TEXT("Invalid action on index:{0}"), {i})));
 			return EDataValidationResult::Invalid;

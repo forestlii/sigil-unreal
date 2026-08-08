@@ -5,7 +5,6 @@
 #include "GameFramework/Character.h"
 #include "GMS_CharacterMovementSystemComponent.generated.h"
 
-// class AThornCharacterBase;
 class UGMS_CharacterMovementSetting_Default;
 class UGMS_CharacterRotationSetting_Default;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSimpleSignature);

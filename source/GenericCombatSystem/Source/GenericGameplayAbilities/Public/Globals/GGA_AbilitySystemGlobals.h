@@ -28,12 +28,6 @@ public:
 	virtual void GlobalPreGameplayEffectSpecApply(FGameplayEffectSpec& Spec, UAbilitySystemComponent* AbilitySystemComponent) override;
 
 	/**
-	 * Allocate a GGA_GameplayEffectContext struct. Caller is responsible for deallocation
-	 * 分配一个GGA_GameplayEffectContext.
-	 */
-	// virtual FGameplayEffectContext* AllocGameplayEffectContext() const override;
-
-	/**
 	 * Retrieves the ability system globals instance.
 	 * 获取技能系统全局实例。
 	 * @return The ability system globals instance. 技能系统全局实例。
