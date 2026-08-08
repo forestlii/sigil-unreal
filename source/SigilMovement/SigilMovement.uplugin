@@ -1,0 +1,52 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "sigil.movement",
+	"Description": "Data-driven movement control and locomotion animation framework.",
+	"Category": "Sigil",
+	"CreatedBy": "Likeon",
+	"CreatedByURL": "https://github.com/forestlii",
+	"DocsURL": "https://github.com/forestlii/sigil-unreal",
+	"SupportURL": "https://github.com/forestlii/sigil-unreal/issues",
+	"EngineVersion": "5.8.0",
+	"CanContainContent": false,
+	"Modules": [
+		{
+			"Name": "SigilMovement",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "SigilMovementEditor",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PreDefault"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ModularGameplay",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimationWarping",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimationLocomotionLibrary",
+			"Enabled": true
+		},
+		{
+			"Name": "StructUtils",
+			"Enabled": true
+		},
+		{
+			"Name": "PoseSearch",
+			"Enabled": true
+		},
+		{
+			"Name": "Chooser",
+			"Enabled": true
+		}
+	]
+}

@@ -1,0 +1,27 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "sigil.effects",
+	"Description": "Context-driven SFX/VFX playback selected by gameplay tag queries and physical surfaces.",
+	"Category": "Sigil",
+	"CreatedBy": "Likeon",
+	"CreatedByURL": "https://github.com/forestlii",
+	"DocsURL": "https://github.com/forestlii/sigil-unreal",
+	"SupportURL": "https://github.com/forestlii/sigil-unreal/issues",
+	"EngineVersion": "5.8.0",
+	"CanContainContent": false,
+	"Modules": [
+		{
+			"Name": "SigilEffects",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "Niagara",
+			"Enabled": true
+		}
+	]
+}

@@ -1,0 +1,35 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "sigil.ui",
+	"Description": "CommonUI extensions: layered game UI, data-driven UI actions, modals, extension points, widget factories.",
+	"Category": "Sigil",
+	"CreatedBy": "Likeon",
+	"CreatedByURL": "https://github.com/forestlii",
+	"DocsURL": "https://github.com/forestlii/sigil-unreal",
+	"SupportURL": "https://github.com/forestlii/sigil-unreal/issues",
+	"EngineVersion": "5.8.0",
+	"CanContainContent": false,
+	"Modules": [
+		{
+			"Name": "SigilUI",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "CommonUI",
+			"Enabled": true
+		},
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		},
+		{
+			"Name": "ModularGameplay",
+			"Enabled": true
+		}
+	]
+}

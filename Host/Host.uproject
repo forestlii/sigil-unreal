@@ -12,19 +12,39 @@
 	],
 	"Plugins": [
 		{
-			"Name": "GenericCombatSystem",
+			"Name": "SigilInput",
 			"Enabled": true
 		},
 		{
-			"Name": "GenericMovementSystem",
+			"Name": "SigilGas",
 			"Enabled": true
 		},
 		{
-			"Name": "GenericInventorySystem",
+			"Name": "SigilCombat",
 			"Enabled": true
 		},
 		{
-			"Name": "GenericGameSystem",
+			"Name": "SigilMovement",
+			"Enabled": true
+		},
+		{
+			"Name": "SigilInventory",
+			"Enabled": true
+		},
+		{
+			"Name": "SigilInteraction",
+			"Enabled": true
+		},
+		{
+			"Name": "SigilCamera",
+			"Enabled": true
+		},
+		{
+			"Name": "SigilUI",
+			"Enabled": true
+		},
+		{
+			"Name": "SigilEffects",
 			"Enabled": true
 		}
 	]
