@@ -344,13 +344,6 @@ const USigilMovementControlSetting_Default* USigilMovementSystemComponent::GetCo
 	return nullptr;
 }
 
-void USigilMovementSystemComponent::SetJumpLogEnable(bool Enable)
-{
-	// ControlSetting is a const shared DataAsset and must not be mutated at runtime,
-	// so the debug toggle lives on the component instead.
-	bJumpLogEnabled = Enable;
-}
-
 int32 USigilMovementSystemComponent::GetNumOfMovementStateSettings() const
 {
 	return IsValid(ControlSetting) ? ControlSetting->MovementStates.Num() : 0;

@@ -182,21 +182,8 @@ public:
 	// Get current selected control setting.
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem", meta=(DefaultToSelf="Actor", DisplayName="Get Control Setting"))
 	const USigilMovementControlSetting_Default* GetControlSetting() const;
-	// Toggle jump debug logging for this component at runtime.
-	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem")
-	void SetJumpLogEnable(bool Enable);
-
-	// Whether jump debug logging is enabled for this component.
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem")
-	bool IsJumpLogEnabled() const { return bJumpLogEnabled; }
 
 	int32 GetNumOfMovementStateSettings() const;
-
-private:
-	UPROPERTY(Transient)
-	bool bJumpLogEnabled{false};
-
-public:
 
 	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem", Meta = (AutoCreateRefTerm = "NewMovementSet"))
 	void SetMovementSet(UPARAM(meta=(Categories="Sigil.Movement.Set")) const FGameplayTag& NewMovementSet);

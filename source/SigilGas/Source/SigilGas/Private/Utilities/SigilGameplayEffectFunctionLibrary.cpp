@@ -5,14 +5,6 @@
 #include "GameplayEffect.h"
 
 
-// UGameplayEffect* USigilGameplayEffectFunctionLibrary::MakeRuntimeGameplayEffect(FString UniqueName, EGameplayEffectDurationType DurationPolicy, TArray<FGameplayModifierInfo> AttributeModifiers)
-// {
-// 	UGameplayEffect* GameplayEffect = NewObject<UGameplayEffect>(GetTransientPackage(), FName("RuntimeGE_" + GetNameSafe(this) + UniqueName));
-// 	GameplayEffect->DurationPolicy = DurationPolicy;
-// 	GameplayEffect->Modifiers = AttributeModifiers;
-// 	return GameplayEffect;
-// }
-
 float USigilGameplayEffectFunctionLibrary::GetSetByCallerMagnitudeByTag(FGameplayEffectSpecHandle SpecHandle, FGameplayTag DataTag, bool WarnIfNotFound, float DefaultIfNotFound)
 {
 	FGameplayEffectSpec* Spec = SpecHandle.Data.Get();

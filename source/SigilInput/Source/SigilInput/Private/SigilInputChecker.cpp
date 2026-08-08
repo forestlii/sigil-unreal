@@ -45,10 +45,6 @@ bool USigilInputChecker_TagRelationship::DoCheckInput_Implementation(USigilInput
 		{
 			return true;
 		}
-		// if (Relationship.InputTagsAllowed.HasTag(InputTag))
-		// {
-		// 	return true;
-		// }
 
 		return false;
 	}
