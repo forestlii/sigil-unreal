@@ -5,6 +5,12 @@ DerivedDataCache/
 Saved/
 *.zip
 
+# Host project: plugin junctions (real source lives in /source) & IDE artifacts
+Host/Plugins/
+*.sln
+.vs/
+.idea/
+
 # Internal working docs & session memory (not part of the open-source release)
 MD/
 记忆.md

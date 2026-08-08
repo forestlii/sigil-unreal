@@ -67,7 +67,7 @@ float UGMS_Utility::CalculateAnimatedSpeed(const UAnimSequenceBase* AnimSequence
 
 	const float AnimLength = AnimSequence->GetPlayLength();
 	// Calculate the speed as: (distance traveled by the animation) / (length of the animation)
-	const FVector RootMotionTranslation = AnimSequence->ExtractRootMotionFromRange(0.0f, AnimLength).GetTranslation();
+	const FVector RootMotionTranslation = AnimSequence->ExtractRootMotionFromRange(0.0, AnimLength, FAnimExtractContext(0.0, true)).GetTranslation();
 	const float RootMotionDistance = RootMotionTranslation.Size2D();
 	if (!FMath::IsNearlyZero(RootMotionDistance))
 	{

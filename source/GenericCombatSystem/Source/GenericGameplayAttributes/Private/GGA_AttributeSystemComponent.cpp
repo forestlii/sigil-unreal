@@ -54,8 +54,8 @@ void UGGA_AttributeSystemComponent::ReceivePostGameplayEffectExecute(UAttributeS
 	Payload.ContextHandle = ContextHandle;
 	Payload.InstigatorActor = Data.EffectSpec.GetContext().GetInstigator();
 
-	Payload.TargetActor = Data.Target.AbilityActorInfo->AvatarActor.Get();;
-	Payload.TargetAsc = Data.Target;
+	Payload.TargetActor = Data.Target.AbilityActorInfo->AvatarActor.Get();
+	Payload.TargetAsc = &Data.Target;
 
 	Payload.AggregatedSourceTags = *Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
 	Payload.AggregatedTargetTags = *Data.EffectSpec.CapturedTargetTags.GetAggregatedTags();

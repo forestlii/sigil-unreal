@@ -1,0 +1,31 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.8",
+	"Category": "",
+	"Description": "Host project for compiling and smoke-testing the Sigil plugin suite",
+	"Modules": [
+		{
+			"Name": "Host",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "GenericCombatSystem",
+			"Enabled": true
+		},
+		{
+			"Name": "GenericMovementSystem",
+			"Enabled": true
+		},
+		{
+			"Name": "GenericInventorySystem",
+			"Enabled": true
+		},
+		{
+			"Name": "GenericGameSystem",
+			"Enabled": true
+		}
+	]
+}
