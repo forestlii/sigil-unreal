@@ -1,4 +1,4 @@
-{
+﻿{
 	"FileVersion": 3,
 	"Version": 1,
 	"VersionName": "0.1.0",
@@ -34,10 +34,6 @@
 		},
 		{
 			"Name": "AnimationLocomotionLibrary",
-			"Enabled": true
-		},
-		{
-			"Name": "StructUtils",
 			"Enabled": true
 		},
 		{

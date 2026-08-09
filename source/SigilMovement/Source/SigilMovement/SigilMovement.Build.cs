@@ -15,7 +15,6 @@ public class SigilMovement : ModuleRules
 			{
 				"GameplayTags",
 				"AnimationWarpingRuntime", 
-				"StructUtils",
 				"Chooser", "PoseSearch"
 				// ... add other public dependencies that you statically link with here ...
 			}

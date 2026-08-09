@@ -22,11 +22,16 @@
 
 所有 GameplayTag 收拢在 `Sigil.*` 命名空间下；C++ 类型统一 `Sigil` 前缀（如 `USigilAbilitySet`、`USigilItemDefinition`）。
 
+## 文档
+
+完整文档在 [docs/](docs/README.zh-CN.md)：[快速上手](docs/getting-started.zh-CN.md) + 每个包一篇指南（概览、前置要求、快速开始、关键类型、网络），仿 Unreal 官方文档风格，中英双语。
+
 ## 快速开始
 
 1. 把 `source/` 下需要的插件文件夹拷进你工程的 `Plugins/` 目录。
 2. 在 `.uproject` 里启用对应插件。
-3. `Host/` 是用于编译与冒烟验证整套插件的最小宿主工程，可作参考。
+3. 按 [docs/](docs/README.zh-CN.md) 里各包的「前置要求」与「快速开始」配置。
+4. `Host/` 是用于编译与冒烟验证整套插件的最小宿主工程，可作参考。
 
 ## 环境要求
 

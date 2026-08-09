@@ -22,11 +22,16 @@ All packages are mutually independent — the only cross-package dependency is `
 
 All gameplay tags live under the `Sigil.*` namespace; C++ types use the unified `Sigil` prefix (e.g. `USigilAbilitySet`, `USigilItemDefinition`).
 
+## Documentation
+
+Full documentation lives in [docs/](docs/README.md) — a [Getting Started](docs/getting-started.md) guide plus a per-package guide (overview, prerequisites, quick start, key types, networking) in the style of the official Unreal Engine documentation.
+
 ## Getting started
 
 1. Copy the plugin folders from `source/` into your project's `Plugins/` directory (or the whole repo and reference them).
 2. Enable the plugins you need in your `.uproject`.
-3. See `Host/` for a minimal host project used to compile and smoke-test the suite.
+3. Follow each package's *Prerequisites* and *Quick Start* in [docs/](docs/README.md).
+4. See `Host/` for a minimal host project used to compile and smoke-test the suite.
 
 ## Requirements
 

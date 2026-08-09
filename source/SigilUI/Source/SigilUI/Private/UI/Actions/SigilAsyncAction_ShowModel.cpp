@@ -1,7 +1,7 @@
 ﻿// Copyright (c) 2026 Likeon. All Rights Reserved.
 
 #include "UI/Actions/SigilAsyncAction_ShowModel.h"
-#include "SigilSigilUISettings.h"
+#include "SigilUISettings.h"
 #include "Engine/GameInstance.h"
 #include "UI/SigilGameUIFunctionLibrary.h"
 #include "UI/SigilGameUILayout.h"

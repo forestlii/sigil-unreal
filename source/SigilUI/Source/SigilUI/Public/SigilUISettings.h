@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "Engine/DeveloperSettings.h"
-#include "SigilSigilUISettings.generated.h"
+#include "SigilUISettings.generated.h"
 
 class USigilGameModalWidget;
 class USigilGameUIPolicy;
@@ -15,7 +15,7 @@ class USigilGameUIPolicy;
  * 通用UI系统的开发者设置。
  */
 UCLASS(Config = Game, defaultconfig, meta = (DisplayName = "Generic UI System Settings"))
-class SIGILUI_API USigilSigilUISettings : public UDeveloperSettings
+class SIGILUI_API USigilUISettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
 
@@ -26,7 +26,7 @@ public:
 	 * @return The UI system settings. UI系统设置。
 	 */
 	UFUNCTION(BlueprintPure, Category="GUIS|Settings", meta = (DisplayName = "Get Generic UI System Settings"))
-	static const USigilSigilUISettings* Get();
+	static const USigilUISettings* Get();
 
 	/**
 	 * Default UI policy class for the game layout.

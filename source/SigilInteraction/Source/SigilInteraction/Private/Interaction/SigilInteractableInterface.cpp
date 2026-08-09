@@ -6,7 +6,7 @@
 
 // Add default functionality here for any ISigilInteractableInterface functions that are not pure virtual.
 
-FText ISigilInteractableInterface::GetInteractionDisplayNameText_Implementation() const
+FText ISigilInteractableInterface::GetInteractionDisplayName_Implementation() const
 {
 	if (UObject* Object = _getUObject())
 	{

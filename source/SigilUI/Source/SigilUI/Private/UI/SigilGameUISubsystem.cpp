@@ -2,7 +2,7 @@
 
 #include "UI/SigilGameUISubsystem.h"
 #include "GameFramework/Pawn.h"
-#include "SigilSigilUISettings.h"
+#include "SigilUISettings.h"
 #include "CommonUserWidget.h"
 #include "SigilUILogChannels.h"
 #include "Engine/GameInstance.h"
@@ -19,7 +19,7 @@ void USigilGameUISubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
-	if (USigilSigilUISettings::Get()->GameUIPolicyClass.IsNull())
+	if (USigilUISettings::Get()->GameUIPolicyClass.IsNull())
 	{
 		UE_LOG(LogSigilUI, Error, TEXT("SigilGameUISubsystem::Initialize Failed, Missing GameUIPolicyClass in SigilUISettings!!!"));
 		return;
@@ -27,7 +27,7 @@ void USigilGameUISubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	if (!CurrentPolicy)
 	{
-		TSubclassOf<USigilGameUIPolicy> PolicyClass = USigilSigilUISettings::Get()->GameUIPolicyClass.LoadSynchronous();
+		TSubclassOf<USigilGameUIPolicy> PolicyClass = USigilUISettings::Get()->GameUIPolicyClass.LoadSynchronous();
 		if (PolicyClass)
 		{
 			USigilGameUIPolicy* NewPolicy = NewObject<USigilGameUIPolicy>(this, PolicyClass);
