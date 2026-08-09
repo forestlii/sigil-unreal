@@ -103,6 +103,7 @@ void USigilItemDropperComponent::DropItemPickup(const FSigilItemInfo& ItemInfo)
 		if (ItemPickup == nullptr || WorldItem == nullptr)
 		{
 			SIGIL_INVENTORY_CLOG(Error, "Spawned pickup(%s) missing either ItemPickup component or WorldItem component.", *Pickup->GetName());
+			return;
 		}
 		WorldItem->SetItemInfo(ItemInfo.Item, ItemInfo.Amount);
 	}

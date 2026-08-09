@@ -170,7 +170,7 @@ void USigilGameUISubsystem::RegisterUIContextForActor(AActor* Actor, USigilGameU
 	APawn* Pawn = Cast<APawn>(Actor);
 	if (Pawn == nullptr || !Pawn->IsLocallyControlled())
 	{
-		UE_LOG(LogSigilUI, Error, TEXT("Trying to register ui context for actor(%s) which is not locally controlled pawn!"), *Pawn->GetName())
+		UE_LOG(LogSigilUI, Error, TEXT("Trying to register ui context for actor(%s) which is not locally controlled pawn!"), *Actor->GetName())
 		return;
 	}
 	APlayerController* PC = Cast<APlayerController>(Pawn->GetController());
