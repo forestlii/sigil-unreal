@@ -491,14 +491,7 @@ struct FSigilJumpStateSetting
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
 	float BrakingDecelerationFalling  {2048.0f};
-	
-	/**
-	 * ShowDebug Info?
-	 * 是否打调试数据
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
-	bool bIsShowDebug = false;
-	
+
 	bool operator==(const FGameplayTag& Other) const
 	{
 		return Tag == Other;
