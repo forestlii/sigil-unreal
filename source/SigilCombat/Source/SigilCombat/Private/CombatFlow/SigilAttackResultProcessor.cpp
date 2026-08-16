@@ -91,18 +91,6 @@ FString USigilAttackResultProcessor_WithTagRequirement::GetTargetTagQueryDesc() 
 	return TargetTagQuery.GetDescription();
 }
 
-void USigilAttackResultProcessor_Death::HandleIncomingAttackResult_Implementation(const FSigilAttackResult& AttackResult) const
-{
-	UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
-	if (ASC)
-	{
-		if (true)
-		{
-		}
-	}
-	Super::HandleIncomingAttackResult_Implementation(AttackResult);
-}
-
 void USigilAttackResultProcessor_GameplayEvent::HandleIncomingAttackResult_Implementation(const FSigilAttackResult& AttackResult) const
 {
 	APawn* OwningPawn = Cast<APawn>(GetOwningActor());

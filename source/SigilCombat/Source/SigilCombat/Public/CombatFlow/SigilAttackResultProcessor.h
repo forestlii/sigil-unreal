@@ -134,24 +134,6 @@ protected:
 };
 
 /**
- * Processor for handling death-related attack results.
- * 处理与死亡相关的攻击结果的处理器。
- */
-UCLASS()
-class SIGILCOMBAT_API USigilAttackResultProcessor_Death : public USigilAttackResultProcessor
-{
-	GENERATED_BODY()
-
-public:
-	/**
-	 * Handles death-related attack results.
-	 * 处理与死亡相关的攻击结果。
-	 * @param AttackResult The attack result to handle. 要处理的攻击结果。
-	 */
-	virtual void HandleIncomingAttackResult_Implementation(const FSigilAttackResult& AttackResult) const override;
-};
-
-/**
  * Processor for converting attack results to gameplay events.
  * 将攻击结果转换为游戏事件的处理器。
  * @note Only executes for server pawn or local controller pawn.
