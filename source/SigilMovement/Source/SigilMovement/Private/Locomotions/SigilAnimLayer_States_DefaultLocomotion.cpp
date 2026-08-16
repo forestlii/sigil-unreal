@@ -70,25 +70,22 @@ void FSigilAnimData_Cycle::Validate()
 	if (AnimType == ESigilCycleAnimType::Direction_4)
 	{
 		bValid = Animations.ValidAnimations();
-		if (bValid)
-		{
-		}
 	}
 
 	if (AnimType == ESigilCycleAnimType::Direction_8)
 	{
 		bValid = Animations_8Direction.ValidAnimations();
-		if (bValid)
-		{
-		}
 	}
 
 	if (AnimType == ESigilCycleAnimType::Single)
 	{
 		bValid = Animation != nullptr;
-		if (bValid)
-		{
-		}
+	}
+
+	// Dynamic play rate divides by the animation speed: a manual speed of 0 can never be valid.
+	if (bValid && bDynamicPlayRate && !bHasRootMotion && AnimatedSpeed <= KINDA_SMALL_NUMBER)
+	{
+		bValid = false;
 	}
 }
 
@@ -1181,12 +1178,33 @@ void USigilAnimLayer_States_DefaultLocomotion::Cycle_AnimUpdate_Implementation(F
 	{
 		CycleState.Animation = Anim;
 
-		float AnimationSpeed = AnimData_Cycle.bHasRootMotion ? USigilUtility::CalculateAnimatedSpeed(Anim) : AnimData_Cycle.AnimatedSpeed;
-		float DesiredPlayRate = GetParent()->LocomotionState.DisplacementSpeed / AnimationSpeed;
-
-		if (AnimData_Cycle.PlayRateClamp.X >= 0.0f && AnimData_Cycle.PlayRateClamp.X < AnimData_Cycle.PlayRateClamp.Y)
+		float DesiredPlayRate = 1.0f;
+		if (AnimData_Cycle.bDynamicPlayRate)
 		{
-			DesiredPlayRate = FMath::Clamp(DesiredPlayRate, AnimData_Cycle.PlayRateClamp.X, AnimData_Cycle.PlayRateClamp.Y);
+			const float AnimationSpeed = AnimData_Cycle.bHasRootMotion ? USigilUtility::CalculateAnimatedSpeed(Anim) : AnimData_Cycle.AnimatedSpeed;
+			if (FMath::IsFinite(AnimationSpeed) && AnimationSpeed > KINDA_SMALL_NUMBER)
+			{
+				DesiredPlayRate = GetParent()->LocomotionState.DisplacementSpeed / AnimationSpeed;
+			}
+			else
+			{
+				// No usable animation speed (asset without root motion delta, or AnimatedSpeed left at 0): fall back to 1x instead of writing Inf/NaN.
+				static bool bWarnedOnce = false;
+				if (!bWarnedOnce)
+				{
+					bWarnedOnce = true;
+					UE_LOG(LogSigilMovement, Warning, TEXT("Cycle animation '%s' has no usable animation speed (root motion delta = 0 or AnimatedSpeed = 0); play rate falls back to 1.0. Fix bHasRootMotion/AnimatedSpeed in the cycle data."), *GetNameSafe(Anim));
+				}
+			}
+
+			if (AnimData_Cycle.PlayRateClamp.X >= 0.0f && AnimData_Cycle.PlayRateClamp.X < AnimData_Cycle.PlayRateClamp.Y)
+			{
+				DesiredPlayRate = FMath::Clamp(DesiredPlayRate, AnimData_Cycle.PlayRateClamp.X, AnimData_Cycle.PlayRateClamp.Y);
+			}
+			if (!FMath::IsFinite(DesiredPlayRate))
+			{
+				DesiredPlayRate = 1.0f;
+			}
 		}
 
 		CycleState.PlayRate = DesiredPlayRate;
