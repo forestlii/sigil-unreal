@@ -70,11 +70,15 @@ public:
 
 	/**
 	 * Sets up the modal with the provided definition.
-	 * 使用提供的定义设置模态对话框。
+	 * On failure (null definition, missing bound sub-widgets) the modal closes itself with the Unknown result as soon
+	 * as it is activated, so the caller's callback always completes and no dangling modal stays on the layer.
+	 * 使用提供的定义设置模态对话框。失败时（定义为空、缺少绑定子控件）模态会在激活后立即以 Unknown 结果自行关闭，
+	 * 保证调用方回调一定完成、层上不残留悬挂模态。
 	 * @param ModalDefinition The modal definition. 模态定义。
 	 * @param ModalActionCallback Callback for modal actions. 模态动作回调。
+	 * @return True if the modal was set up successfully. 设置成功返回 true。
 	 */
-	virtual void SetupModal(const USigilModalDefinition* ModalDefinition, FSigilModalActionResultSignature ModalActionCallback);
+	virtual bool SetupModal(const USigilModalDefinition* ModalDefinition, FSigilModalActionResultSignature ModalActionCallback);
 
 	/**
 	 * Closes the modal with the specified result.
@@ -105,7 +109,12 @@ protected:
 	 */
 	FSigilModalActionResultSignature OnModalActionCallback;
 
+	virtual void NativeOnActivated() override;
+
 private:
+	/** Set when SetupModal failed; the widget closes itself with Unknown on activation. SetupModal 失败时置位；激活时以 Unknown 自关。 */
+	bool bSetupFailed{false};
+
 	/**
 	 * Dynamic entry box for modal buttons.
 	 * 模态按钮的动态入口框。

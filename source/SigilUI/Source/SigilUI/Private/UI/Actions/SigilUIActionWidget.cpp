@@ -108,6 +108,12 @@ void USigilUIActionWidget::HandleUIAction(const USigilUIAction* Action)
 		if (Action->GetRequiresConfirmation() && !Action->GetConfirmationModalClass().IsNull())
 		{
 			ModalTask = USigilAsyncAction_ShowModel::ShowModal(GetWorld(), Action->GetConfirmationModalClass());
+			if (!ModalTask)
+			{
+				// Confirmation modal could not be created (bad soft class / widget): fail closed, do not invoke the action.
+				UE_LOG(LogSigilUI, Error, TEXT("[%s] could not create the confirmation modal for action '%s'; the action was not invoked."), *GetName(), *Action->GetActionID().ToString());
+				return;
+			}
 			CurrentAction = Action;
 			ModalTask->OnModalAction.AddDynamic(this, &ThisClass::HandleModalAction);
 			ModalTask->Activate();

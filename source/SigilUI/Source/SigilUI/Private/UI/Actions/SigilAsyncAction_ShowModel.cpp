@@ -6,6 +6,7 @@
 #include "UI/SigilGameUIFunctionLibrary.h"
 #include "UI/SigilGameUILayout.h"
 #include "UI/SigilUITags.h"
+#include "SigilUILogChannels.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SigilAsyncAction_ShowModel)
 
@@ -21,9 +22,15 @@ USigilAsyncAction_ShowModel* USigilAsyncAction_ShowModel::ShowModal(UObject* InW
 		return nullptr;
 	}
 
-	ModalDefinition.LoadSynchronous();
-	
-	const USigilModalDefinition* Modal = ModalDefinition->GetDefaultObject<USigilModalDefinition>();
+	// A non-null but stale soft path can fail to load; never dereference the soft pointer without checking the loaded class.
+	UClass* ModalDefinitionClass = ModalDefinition.LoadSynchronous();
+	if (ModalDefinitionClass == nullptr)
+	{
+		UE_LOG(LogSigilUI, Error, TEXT("ShowModal: failed to load modal definition class '%s'."), *ModalDefinition.ToString());
+		return nullptr;
+	}
+
+	const USigilModalDefinition* Modal = ModalDefinitionClass->GetDefaultObject<USigilModalDefinition>();
 	if (Modal == nullptr)
 		return nullptr;
 
@@ -32,7 +39,10 @@ USigilAsyncAction_ShowModel* USigilAsyncAction_ShowModel::ShowModal(UObject* InW
 
 	const TSubclassOf<USigilGameModalWidget> ModalWidgetClass = Modal->ModalWidget.LoadSynchronous();
 	if (ModalWidgetClass == nullptr)
+	{
+		UE_LOG(LogSigilUI, Error, TEXT("ShowModal: failed to load modal widget class '%s' referenced by '%s'."), *Modal->ModalWidget.ToString(), *ModalDefinitionClass->GetName());
 		return nullptr;
+	}
 
 	USigilAsyncAction_ShowModel* Action = NewObject<USigilAsyncAction_ShowModel>();
 	Action->ModalWidgetClass = ModalWidgetClass;

@@ -8,6 +8,7 @@
 #include "UI/Foundation/SigilButtonBase.h"
 #include "UI/Modal/SigilGameModalTypes.h"
 #include "SigilUILogChannels.h"
+#include "UI/SigilUITags.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SigilGameModal)
 
@@ -18,19 +19,22 @@ USigilGameModalWidget::USigilGameModalWidget()
 	bIsModal = true;
 }
 
-void USigilGameModalWidget::SetupModal(const USigilModalDefinition* ModalDefinition, FSigilModalActionResultSignature ModalActionCallback)
+bool USigilGameModalWidget::SetupModal(const USigilModalDefinition* ModalDefinition, FSigilModalActionResultSignature ModalActionCallback)
 {
 	OnModalActionCallback = ModalActionCallback;
+	bSetupFailed = false;
 
 	if (!ModalDefinition)
 	{
 		UE_LOG(LogSigilUI, Error, TEXT("[%s] SetupModal called with a null modal definition."), *GetName());
-		return;
+		bSetupFailed = true;
+		return false;
 	}
 	if (!EntryBox_Buttons || !Text_Header || !Text_Body)
 	{
 		UE_LOG(LogSigilUI, Error, TEXT("[%s] modal widget is missing a bound sub-widget (EntryBox_Buttons / Text_Header / Text_Body)."), *GetName());
-		return;
+		bSetupFailed = true;
+		return false;
 	}
 
 	EntryBox_Buttons->Reset<USigilButtonBase>([](USigilButtonBase& Button)
@@ -61,6 +65,19 @@ void USigilGameModalWidget::SetupModal(const USigilModalDefinition* ModalDefinit
 	}
 
 	OnSetupModal(ModalDefinition);
+	return true;
+}
+
+void USigilGameModalWidget::NativeOnActivated()
+{
+	Super::NativeOnActivated();
+
+	if (bSetupFailed)
+	{
+		// Setup ran before activation and failed: leave the layer immediately and complete the caller with Unknown
+		// instead of sitting on the modal layer with no way to be dismissed.
+		CloseModal(SigilGameModalActionTags::Unknown);
+	}
 }
 
 void USigilGameModalWidget::CloseModal(FGameplayTag ModalActionResult)
