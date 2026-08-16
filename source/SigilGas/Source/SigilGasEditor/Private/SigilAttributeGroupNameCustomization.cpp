@@ -90,7 +90,7 @@ void FSigilAttributeGroupNameCustomization::CustomizeHeader(TSharedRef<IProperty
 					.HAlign(HAlign_Fill)
 					.Padding(2.f, 0.f, 2.f, 0.f)
 					[
-						PropertyCustomizationHelpers::MakePropertyComboBox(MainNamePropertyHandle,
+						PropertyCustomizationHelpers::MakePropertyComboBox(SubNamePropertyHandle,
 						                                                   FOnGetPropertyComboBoxStrings::CreateStatic(&FSigilAttributeGroupNameCustomization::GenerateSubComboboxStrings, true,
 						                                                                                               false, &FNameMap,
 						                                                                                               MainNamePropertyHandle),

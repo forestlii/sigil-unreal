@@ -95,58 +95,71 @@ void USigilGamePhaseSubsystem::K2_StartPhase(TSubclassOf<USigilGamePhaseAbility>
 	StartPhase(PhaseAbility, EndedDelegate);
 }
 
-void USigilGamePhaseSubsystem::K2_WhenPhaseStartsOrIsActive(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, FGGamePhaseTagDynamicDelegate WhenPhaseActive)
+FSigilGamePhaseObserverHandle USigilGamePhaseSubsystem::K2_WhenPhaseStartsOrIsActive(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, FGGamePhaseTagDynamicDelegate WhenPhaseActive)
 {
 	const FGGamePhaseTagDelegate ActiveDelegate = FGGamePhaseTagDelegate::CreateWeakLambda(WhenPhaseActive.GetUObject(), [WhenPhaseActive](const FGameplayTag& PhaseTag)
 	{
 		WhenPhaseActive.ExecuteIfBound(PhaseTag);
 	});
 
-	WhenPhaseStartsOrIsActive(PhaseTag, MatchType, ActiveDelegate);
+	return WhenPhaseStartsOrIsActive(PhaseTag, MatchType, ActiveDelegate);
 }
 
-void USigilGamePhaseSubsystem::K2_WhenPhaseEnds(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, FGGamePhaseTagDynamicDelegate WhenPhaseEnd)
+FSigilGamePhaseObserverHandle USigilGamePhaseSubsystem::K2_WhenPhaseEnds(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, FGGamePhaseTagDynamicDelegate WhenPhaseEnd)
 {
 	const FGGamePhaseTagDelegate EndedDelegate = FGGamePhaseTagDelegate::CreateWeakLambda(WhenPhaseEnd.GetUObject(), [WhenPhaseEnd](const FGameplayTag& PhaseTag)
 	{
 		WhenPhaseEnd.ExecuteIfBound(PhaseTag);
 	});
 
-	WhenPhaseEnds(PhaseTag, MatchType, EndedDelegate);
+	return WhenPhaseEnds(PhaseTag, MatchType, EndedDelegate);
 }
 
-FDelegateHandle USigilGamePhaseSubsystem::WhenPhaseStartsOrIsActive(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, const FGGamePhaseTagDelegate& WhenPhaseActive)
+FSigilGamePhaseObserverHandle USigilGamePhaseSubsystem::WhenPhaseStartsOrIsActive(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, const FGGamePhaseTagDelegate& WhenPhaseActive)
 {
 	FGPhaseObserver Observer;
+	Observer.Id = NextObserverId++;
 	Observer.PhaseTag = PhaseTag;
 	Observer.MatchType = MatchType;
 	Observer.PhaseCallback = WhenPhaseActive;
 	PhaseStartObservers.Add(Observer);
 
-	if (IsPhaseActive(PhaseTag))
+	// Immediate notification uses the same match rule as later events (ExactMatch must not fire for a child phase)
+	// and passes the actual active phase tag, exactly like OnBeginPhase would.
+	TArray<FGameplayTag> ActiveTags;
+	for (const auto& KVP : ActivePhaseMap)
 	{
-		WhenPhaseActive.ExecuteIfBound(PhaseTag);
+		if (KVP.Value.PhaseTag.IsValid() && Observer.IsMatch(KVP.Value.PhaseTag))
+		{
+			ActiveTags.AddUnique(KVP.Value.PhaseTag);
+		}
 	}
-	return WhenPhaseActive.GetHandle();
+	for (const FGameplayTag& ActiveTag : ActiveTags)
+	{
+		WhenPhaseActive.ExecuteIfBound(ActiveTag);
+	}
+
+	return FSigilGamePhaseObserverHandle{Observer.Id};
 }
 
-FDelegateHandle USigilGamePhaseSubsystem::WhenPhaseEnds(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, const FGGamePhaseTagDelegate& WhenPhaseEnd)
+FSigilGamePhaseObserverHandle USigilGamePhaseSubsystem::WhenPhaseEnds(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, const FGGamePhaseTagDelegate& WhenPhaseEnd)
 {
 	FGPhaseObserver Observer;
+	Observer.Id = NextObserverId++;
 	Observer.PhaseTag = PhaseTag;
 	Observer.MatchType = MatchType;
 	Observer.PhaseCallback = WhenPhaseEnd;
 	PhaseEndObservers.Add(Observer);
-	return WhenPhaseEnd.GetHandle();
+	return FSigilGamePhaseObserverHandle{Observer.Id};
 }
 
-void USigilGamePhaseSubsystem::RemovePhaseObserver(FDelegateHandle Handle)
+void USigilGamePhaseSubsystem::RemovePhaseObserver(FSigilGamePhaseObserverHandle Handle)
 {
 	if (!Handle.IsValid())
 	{
 		return;
 	}
-	auto MatchesHandle = [Handle](const FGPhaseObserver& Observer) { return Observer.PhaseCallback.GetHandle() == Handle; };
+	auto MatchesHandle = [Id = Handle.Id](const FGPhaseObserver& Observer) { return Observer.Id == Id; };
 	PhaseStartObservers.RemoveAllSwap(MatchesHandle);
 	PhaseEndObservers.RemoveAllSwap(MatchesHandle);
 }
