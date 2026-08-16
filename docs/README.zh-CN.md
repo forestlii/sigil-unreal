@@ -7,6 +7,7 @@ Sigil 是一套模块化、纯代码的 **Unreal Engine 5.8** 玩法框架插件
 ## 入门
 
 - [快速上手](getting-started.zh-CN.md) —— 安装插件、在工程中启用并编译。
+- [变更日志](CHANGELOG.zh-CN.md) —— 各版本公开 API 变化与迁移说明。
 
 ## 包指南
 

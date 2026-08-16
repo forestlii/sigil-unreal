@@ -7,6 +7,7 @@ Sigil is a suite of modular, code-only gameplay framework plugins for **Unreal E
 ## Getting Started
 
 - [Getting Started](getting-started.md) — install the plugins, enable them in your project, and compile.
+- [Changelog](CHANGELOG.md) — public API changes and migration notes per version.
 
 ## Packages
 
