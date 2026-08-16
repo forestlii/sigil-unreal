@@ -956,13 +956,12 @@ void USigilMovementSystemComponent::OnOverlayModeChanged_Implementation(const FG
 }
 #pragma endregion
 
-
-#if WITH_EDITORONLY_DATA
 void USigilMovementSystemComponent::SetEnableRotate(bool bEnable)
 {
 	EnableRotate = bEnable;
 }
 
+#if WITH_EDITORONLY_DATA
 EDataValidationResult USigilMovementSystemComponent::IsDataValid(class FDataValidationContext& Context) const
 {
 	if (!IsValid(AnimGraphSetting))
