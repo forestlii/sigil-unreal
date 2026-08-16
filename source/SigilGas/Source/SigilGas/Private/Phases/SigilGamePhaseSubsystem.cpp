@@ -37,25 +37,51 @@ bool USigilGamePhaseSubsystem::DoesSupportWorldType(const EWorldType::Type World
 	return WorldType == EWorldType::Game || WorldType == EWorldType::PIE;
 }
 
+UAbilitySystemComponent* USigilGamePhaseSubsystem::GetGameStateAbilitySystem(const TCHAR* Context) const
+{
+	const UWorld* World = GetWorld();
+	AGameStateBase* GameState = World ? World->GetGameState() : nullptr;
+	if (!GameState)
+	{
+		UE_LOG(LogSigilGamePhase, Warning, TEXT("%s: GameState is not available yet; game phases require a GameState with an AbilitySystemComponent."), Context);
+		return nullptr;
+	}
+	UAbilitySystemComponent* GameState_ASC = GameState->FindComponentByClass<UAbilitySystemComponent>();
+	if (!GameState_ASC)
+	{
+		UE_LOG(LogSigilGamePhase, Warning, TEXT("%s: GameState '%s' has no AbilitySystemComponent."), Context, *GameState->GetName());
+	}
+	return GameState_ASC;
+}
+
 void USigilGamePhaseSubsystem::StartPhase(TSubclassOf<USigilGamePhaseAbility> PhaseAbility, FGGamePhaseDelegate PhaseEndedCallback)
 {
-	UWorld* World = GetWorld();
-	UAbilitySystemComponent* GameState_ASC = World->GetGameState()->FindComponentByClass<UAbilitySystemComponent>();
-	if (ensure(GameState_ASC))
+	if (!PhaseAbility)
 	{
-		FGameplayAbilitySpec PhaseSpec(PhaseAbility, 1, 0, this);
-		FGameplayAbilitySpecHandle SpecHandle = GameState_ASC->GiveAbilityAndActivateOnce(PhaseSpec);
-		FGameplayAbilitySpec* FoundSpec = GameState_ASC->FindAbilitySpecFromHandle(SpecHandle);
+		UE_LOG(LogSigilGamePhase, Warning, TEXT("StartPhase called with a null phase ability class."));
+		PhaseEndedCallback.ExecuteIfBound(nullptr);
+		return;
+	}
 
-		if (FoundSpec && FoundSpec->IsActive())
-		{
-			FGGamePhaseEntry& Entry = ActivePhaseMap.FindOrAdd(SpecHandle);
-			Entry.PhaseEndedCallback = PhaseEndedCallback;
-		}
-		else
-		{
-			PhaseEndedCallback.ExecuteIfBound(nullptr);
-		}
+	UAbilitySystemComponent* GameState_ASC = GetGameStateAbilitySystem(TEXT("StartPhase"));
+	if (!GameState_ASC)
+	{
+		PhaseEndedCallback.ExecuteIfBound(nullptr);
+		return;
+	}
+
+	FGameplayAbilitySpec PhaseSpec(PhaseAbility, 1, 0, this);
+	FGameplayAbilitySpecHandle SpecHandle = GameState_ASC->GiveAbilityAndActivateOnce(PhaseSpec);
+	FGameplayAbilitySpec* FoundSpec = GameState_ASC->FindAbilitySpecFromHandle(SpecHandle);
+
+	if (FoundSpec && FoundSpec->IsActive())
+	{
+		FGGamePhaseEntry& Entry = ActivePhaseMap.FindOrAdd(SpecHandle);
+		Entry.PhaseEndedCallback = PhaseEndedCallback;
+	}
+	else
+	{
+		PhaseEndedCallback.ExecuteIfBound(nullptr);
 	}
 }
 
@@ -89,7 +115,7 @@ void USigilGamePhaseSubsystem::K2_WhenPhaseEnds(FGameplayTag PhaseTag, ESigilPha
 	WhenPhaseEnds(PhaseTag, MatchType, EndedDelegate);
 }
 
-void USigilGamePhaseSubsystem::WhenPhaseStartsOrIsActive(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, const FGGamePhaseTagDelegate& WhenPhaseActive)
+FDelegateHandle USigilGamePhaseSubsystem::WhenPhaseStartsOrIsActive(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, const FGGamePhaseTagDelegate& WhenPhaseActive)
 {
 	FGPhaseObserver Observer;
 	Observer.PhaseTag = PhaseTag;
@@ -101,15 +127,28 @@ void USigilGamePhaseSubsystem::WhenPhaseStartsOrIsActive(FGameplayTag PhaseTag, 
 	{
 		WhenPhaseActive.ExecuteIfBound(PhaseTag);
 	}
+	return WhenPhaseActive.GetHandle();
 }
 
-void USigilGamePhaseSubsystem::WhenPhaseEnds(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, const FGGamePhaseTagDelegate& WhenPhaseEnd)
+FDelegateHandle USigilGamePhaseSubsystem::WhenPhaseEnds(FGameplayTag PhaseTag, ESigilPhaseTagMatchType MatchType, const FGGamePhaseTagDelegate& WhenPhaseEnd)
 {
 	FGPhaseObserver Observer;
 	Observer.PhaseTag = PhaseTag;
 	Observer.MatchType = MatchType;
 	Observer.PhaseCallback = WhenPhaseEnd;
 	PhaseEndObservers.Add(Observer);
+	return WhenPhaseEnd.GetHandle();
+}
+
+void USigilGamePhaseSubsystem::RemovePhaseObserver(FDelegateHandle Handle)
+{
+	if (!Handle.IsValid())
+	{
+		return;
+	}
+	auto MatchesHandle = [Handle](const FGPhaseObserver& Observer) { return Observer.PhaseCallback.GetHandle() == Handle; };
+	PhaseStartObservers.RemoveAllSwap(MatchesHandle);
+	PhaseEndObservers.RemoveAllSwap(MatchesHandle);
 }
 
 bool USigilGamePhaseSubsystem::IsPhaseActive(const FGameplayTag& PhaseTag) const
@@ -133,9 +172,13 @@ void USigilGamePhaseSubsystem::OnBeginPhase(const USigilGamePhaseAbility* PhaseA
 
 	UE_LOG(LogSigilGamePhase, Log, TEXT("Beginning Phase '%s' (%s)"), *IncomingPhaseTag.ToString(), *GetNameSafe(PhaseAbility));
 
-	const UWorld* World = GetWorld();
-	USigilAbilitySystemComponent* GameState_ASC = World->GetGameState()->FindComponentByClass<USigilAbilitySystemComponent>();
-	if (ensure(GameState_ASC))
+	// Ending sibling phases needs CancelAbilitiesByFunc, which lives on the Sigil ASC.
+	USigilAbilitySystemComponent* GameState_ASC = Cast<USigilAbilitySystemComponent>(GetGameStateAbilitySystem(TEXT("OnBeginPhase")));
+	if (!GameState_ASC)
+	{
+		UE_LOG(LogSigilGamePhase, Warning, TEXT("OnBeginPhase: the GameState's AbilitySystemComponent must be a USigilAbilitySystemComponent for game phases to work."));
+	}
+	else
 	{
 		TArray<FGameplayAbilitySpec*> ActivePhases;
 		for (const auto& KVP : ActivePhaseMap)
@@ -175,12 +218,22 @@ void USigilGamePhaseSubsystem::OnBeginPhase(const USigilGamePhaseAbility* PhaseA
 		Entry.PhaseTag = IncomingPhaseTag;
 
 		// Notify all observers of this phase that it has started.
-		for (int32 i = 0; i < PhaseStartObservers.Num(); i++)
+		NotifyObservers(PhaseStartObservers, IncomingPhaseTag);
+	}
+}
+
+void USigilGamePhaseSubsystem::NotifyObservers(TArray<FGPhaseObserver>& Observers, const FGameplayTag& PhaseTag)
+{
+	// Drop observers whose bound object has been destroyed so the list cannot grow unbounded across a long session.
+	Observers.RemoveAllSwap([](const FGPhaseObserver& Observer) { return !Observer.PhaseCallback.IsBound(); });
+
+	// Iterate over a copy: a callback may register new observers.
+	const TArray<FGPhaseObserver> Snapshot = Observers;
+	for (const FGPhaseObserver& Observer : Snapshot)
+	{
+		if (Observer.IsMatch(PhaseTag))
 		{
-			if (PhaseStartObservers[i].IsMatch(IncomingPhaseTag))
-			{
-				PhaseStartObservers[i].PhaseCallback.ExecuteIfBound(IncomingPhaseTag);
-			}
+			Observer.PhaseCallback.ExecuteIfBound(PhaseTag);
 		}
 	}
 }
@@ -190,19 +243,14 @@ void USigilGamePhaseSubsystem::OnEndPhase(const USigilGamePhaseAbility* PhaseAbi
 	const FGameplayTag EndedPhaseTag = PhaseAbility->GetGamePhaseTag();
 	UE_LOG(LogSigilGamePhase, Log, TEXT("Ended Phase '%s' (%s)"), *EndedPhaseTag.ToString(), *GetNameSafe(PhaseAbility));
 
-	const FGGamePhaseEntry& Entry = ActivePhaseMap.FindChecked(PhaseAbilityHandle);
-	Entry.PhaseEndedCallback.ExecuteIfBound(PhaseAbility);
-
-	ActivePhaseMap.Remove(PhaseAbilityHandle);
+	if (const FGGamePhaseEntry* Entry = ActivePhaseMap.Find(PhaseAbilityHandle))
+	{
+		Entry->PhaseEndedCallback.ExecuteIfBound(PhaseAbility);
+		ActivePhaseMap.Remove(PhaseAbilityHandle);
+	}
 
 	// Notify all observers of this phase that it has ended.
-	for (int32 i = 0; i < PhaseEndObservers.Num(); i++)
-	{
-		if (PhaseEndObservers[i].IsMatch(EndedPhaseTag))
-		{
-			PhaseEndObservers[i].PhaseCallback.ExecuteIfBound(EndedPhaseTag);
-		}
-	}
+	NotifyObservers(PhaseEndObservers, EndedPhaseTag);
 }
 
 bool USigilGamePhaseSubsystem::FGPhaseObserver::IsMatch(const FGameplayTag& ComparePhaseTag) const
