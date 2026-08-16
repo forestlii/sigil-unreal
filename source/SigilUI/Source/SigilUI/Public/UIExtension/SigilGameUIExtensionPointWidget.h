@@ -53,29 +53,36 @@ public:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 
 	/**
-	 * Registers the widget for the player state if ready.
-	 * 如果准备好，为玩家状态注册小部件。
+	 * Registers the PlayerState-context extension point as soon as both the owning PlayerController and its
+	 * PlayerState exist; otherwise schedules a bounded retry (PlayerState replicates after the controller).
+	 * 当拥有者 PlayerController 与其 PlayerState 都存在时立即注册 PlayerState 上下文扩展点；
+	 * 否则安排有限次数的重试（PlayerState 晚于控制器复制到达）。
 	 */
 	void RegisterForPlayerStateIfReady();
 
 	/**
-	 * Checks the player state.
-	 * 检查玩家状态。
-	 * @return True if player state is valid, false otherwise. 如果玩家状态有效返回true，否则返回false。
-	 */
-	bool CheckPlayerState();
-
-	/**
-	 * Called to check the player state.
-	 * 检查玩家状态时调用。
+	 * Timer callback: retries RegisterForPlayerStateIfReady until it succeeds or the retry budget is spent.
+	 * 定时器回调：重试 RegisterForPlayerStateIfReady，直到成功或重试预算耗尽。
 	 */
 	void OnCheckPlayerState();
+
+	/**
+	 * Cancels any pending PlayerState retry.
+	 * 取消尚未触发的 PlayerState 重试。
+	 */
+	void StopWaitingForPlayerState();
 
 	/**
 	 * Timer handle for player state checks.
 	 * 玩家状态检查的定时器句柄。
 	 */
 	FTimerHandle TimerHandle;
+
+	/**
+	 * Remaining PlayerState retry attempts (0.2 s apart). Reset every time the widget is constructed.
+	 * 剩余的 PlayerState 重试次数（每 0.2 秒一次）。控件每次构建时重置。
+	 */
+	int32 PlayerStateRetriesLeft{0};
 
 #if WITH_EDITOR
 	/**

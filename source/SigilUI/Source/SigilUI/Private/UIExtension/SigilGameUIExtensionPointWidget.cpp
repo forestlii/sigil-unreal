@@ -8,6 +8,7 @@
 #include "Misc/UObjectToken.h"
 #include "GameFramework/PlayerState.h"
 #include "UI/Common/SigilUserWidgetInterface.h"
+#include "SigilUILogChannels.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SigilGameUIExtensionPointWidget)
 
@@ -35,6 +36,8 @@ TSharedRef<SWidget> USigilGameUIExtensionPointWidget::RebuildWidget()
 		ResetExtensionPoint();
 		RegisterExtensionPoint();
 
+		// PlayerState may replicate a few frames after the controller: allow ~10 seconds of retries.
+		PlayerStateRetriesLeft = 50;
 		RegisterForPlayerStateIfReady();
 	}
 
@@ -64,54 +67,50 @@ TSharedRef<SWidget> USigilGameUIExtensionPointWidget::RebuildWidget()
 
 void USigilGameUIExtensionPointWidget::RegisterForPlayerStateIfReady()
 {
-	if (APlayerController* PC = GetOwningPlayer())
-	{
-		if (APlayerState* PS = PC->GetPlayerState<APlayerState>())
-		{
-			RegisterExtensionPointForPlayerState(GetOwningLocalPlayer(), PS);
-		}
-	}
-	else
-	{
-		GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &ThisClass::OnCheckPlayerState, 0.2f);
-	}
-}
+	StopWaitingForPlayerState();
 
-bool USigilGameUIExtensionPointWidget::CheckPlayerState()
-{
-	if (APlayerController* PC = GetOwningPlayer())
+	APlayerController* PC = GetOwningPlayer();
+	APlayerState* PS = PC ? PC->GetPlayerState<APlayerState>() : nullptr;
+	if (PC && PS)
 	{
-		if (APlayerState* PS = PC->GetPlayerState<APlayerState>())
-		{
-			if (TimerHandle.IsValid())
-			{
-				TimerHandle.Invalidate();
-			}
-			RegisterExtensionPointForPlayerState(GetOwningLocalPlayer(), PS);
-			return true;
-		}
+		RegisterExtensionPointForPlayerState(GetOwningLocalPlayer(), PS);
+		return;
 	}
 
-	return false;
+	// Either the controller or its PlayerState has not arrived yet: retry on a bounded timer.
+	if (PlayerStateRetriesLeft <= 0)
+	{
+		UE_LOG(LogSigilUI, Warning, TEXT("[%s] gave up waiting for a PlayerState; the PlayerState-context extension point was not registered."), *GetName());
+		return;
+	}
+	if (UWorld* World = GetWorld())
+	{
+		--PlayerStateRetriesLeft;
+		World->GetTimerManager().SetTimer(TimerHandle, this, &ThisClass::OnCheckPlayerState, 0.2f, false);
+	}
 }
 
 void USigilGameUIExtensionPointWidget::OnCheckPlayerState()
 {
-	if (APlayerController* PC = GetOwningPlayer())
+	TimerHandle.Invalidate();
+	RegisterForPlayerStateIfReady();
+}
+
+void USigilGameUIExtensionPointWidget::StopWaitingForPlayerState()
+{
+	if (TimerHandle.IsValid())
 	{
-		if (APlayerState* PS = PC->GetPlayerState<APlayerState>())
+		if (UWorld* World = GetWorld())
 		{
-			if (TimerHandle.IsValid())
-			{
-				TimerHandle.Invalidate();
-			}
-			RegisterExtensionPointForPlayerState(GetOwningLocalPlayer(), PS);
+			World->GetTimerManager().ClearTimer(TimerHandle);
 		}
+		TimerHandle.Invalidate();
 	}
 }
 
 void USigilGameUIExtensionPointWidget::ResetExtensionPoint()
 {
+	StopWaitingForPlayerState();
 	ResetInternal();
 
 	ExtensionMapping.Reset();
