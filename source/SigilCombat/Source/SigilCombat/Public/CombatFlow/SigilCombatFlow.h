@@ -60,6 +60,15 @@ public:
 	void Initialize(AActor* NewOwner);
 
 	/**
+	 * True once Initialize() has run (Owner and CombatComponent resolved). On clients this happens in
+	 * OnRep_CombatFlow, which fires *after* FastArray callbacks in the same bunch — callers must not
+	 * dispatch attack results before this is true.
+	 * Initialize() 执行后为 true（Owner 与 CombatComponent 已解析）。客户端上它在 OnRep_CombatFlow 里发生，
+	 * 而 OnRep 晚于同一 bunch 内的 FastArray 回调——在此之前不得分发攻击结果。
+	 */
+	bool IsInitialized() const { return bInitialized; }
+
+	/**
 	 * Adds dynamic tags to a gameplay effect spec.
 	 * 为游戏效果规格添加动态标签。
 	 * @note Requires SigilAbilitySystemGlobals as default AbilitySystemGlobals.
@@ -111,4 +120,8 @@ protected:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Instanced, Category = "GCS|Combat Flow Settings", meta=(TitleProperty="EditorFriendlyName"))
 	TArray<TObjectPtr<USigilAttackResultProcessor>> AttackResultProcessors;
+
+private:
+	/** Set by Initialize(); never replicated (each side initializes locally). 由 Initialize() 置位；不复制（两端各自初始化）。 */
+	bool bInitialized{false};
 };

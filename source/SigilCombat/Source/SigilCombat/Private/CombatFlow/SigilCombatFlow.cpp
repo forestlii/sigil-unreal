@@ -23,6 +23,7 @@ void USigilCombatFlow::Initialize(AActor* NewOwner)
 {
 	Owner = NewOwner;
 	CombatComponent = USigilCombatSystemComponent::GetCombatSystemComponent(Owner);
+	bInitialized = IsValid(CombatComponent);
 }
 
 void USigilCombatFlow::HandlePreGameplayEffectSpecApply_Implementation(const FGameplayEffectSpec& Spec, UAbilitySystemComponent* AbilitySystemComponent,
@@ -36,6 +37,11 @@ void USigilCombatFlow::HandleGameplayEffectExecute_Implementation(const FSigilGa
 
 void USigilCombatFlow::HandleAttackResult_Implementation(const FSigilAttackResult& InPayload)
 {
+	if (!IsValid(CombatComponent))
+	{
+		// Not initialized yet (client OnRep ordering) or owner already gone; the container keeps the entry pending.
+		return;
+	}
 	CombatComponent->SetLastProcessedAttackResult(InPayload);
 
 	for (TObjectPtr<USigilAttackResultProcessor>& Processor : AttackResultProcessors)

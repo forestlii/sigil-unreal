@@ -38,19 +38,23 @@ void FSigilAttackResultContainer::AddEntry(FSigilAttackResult& NewEntry)
 	FSigilAttackResult& AddedEntry = Results.Add_GetRef(NewEntry);
 	AddedEntry.ReplicationID = INDEX_NONE;
 	AddedEntry.ReplicationKey = INDEX_NONE;
-	AddedEntry.bConsumed = false;
 
-	if (USigilCombatFlow* Flow = CombatSystemComponent->GetCombatFlow())
+	USigilCombatFlow* Flow = CombatSystemComponent->IsCombatFlowReady() ? CombatSystemComponent->GetCombatFlow() : nullptr;
+
+	// Finish every write to the array element *before* handing control to the (Blueprint-overridable) flow:
+	// a processor may call RegisterAttackResult again, which can reallocate or trim Results and invalidate AddedEntry.
+	AddedEntry.bConsumed = (Flow != nullptr);
+	MarkItemDirty(AddedEntry);
+	const FSigilAttackResult DispatchCopy = AddedEntry;
+
+	if (Flow)
 	{
-		Flow->HandleAttackResult(AddedEntry);
-		AddedEntry.bConsumed = true;
+		Flow->HandleAttackResult(DispatchCopy);
 	}
 	else
 	{
-		UE_LOG(LogSigilCombat, Error, TEXT("Missing Combat Flow on %s's combat system component."), *CombatSystemComponent->GetOwner()->GetName());
+		UE_LOG(LogSigilCombat, Error, TEXT("Combat Flow on %s's combat system component is missing or not initialized; attack result kept pending."), *CombatSystemComponent->GetOwner()->GetName());
 	}
-
-	MarkItemDirty(AddedEntry);
 }
 
 void FSigilAttackResultContainer::ConsumeEntry(int32 Index)
@@ -59,18 +63,18 @@ void FSigilAttackResultContainer::ConsumeEntry(int32 Index)
 	{
 		return;
 	}
-	if (!IsValid(CombatSystemComponent))
+	if (!IsValid(CombatSystemComponent) || !CombatSystemComponent->IsCombatFlowReady())
 	{
+		// CombatFlow has not replicated / initialized yet (its RepNotify runs after FastArray callbacks in the same bunch);
+		// the entry stays unconsumed and is picked up by ConsumePendingEntries() from OnRep_CombatFlow.
 		return;
 	}
 	USigilCombatFlow* Flow = CombatSystemComponent->GetCombatFlow();
-	if (!IsValid(Flow))
-	{
-		// CombatFlow has not replicated yet; the entry stays unconsumed and is picked up by ConsumePendingEntries().
-		return;
-	}
-	Flow->HandleAttackResult(Results[Index]);
+
+	// Mark first, dispatch a copy: the flow may mutate this container re-entrantly.
 	Results[Index].bConsumed = true;
+	const FSigilAttackResult DispatchCopy = Results[Index];
+	Flow->HandleAttackResult(DispatchCopy);
 }
 
 void FSigilAttackResultContainer::ConsumePendingEntries()
