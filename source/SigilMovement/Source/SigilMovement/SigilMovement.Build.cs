@@ -29,9 +29,7 @@ public class SigilMovement : ModuleRules
 				"ModularGameplay",
 				"Engine",
 				"AnimGraphRuntime",
-				"AnimationLocomotionLibraryRuntime",
-				// Engine's Animation headers pull in UniversalObjectLocators; non-editor targets don't get this include path transitively.
-				"UniversalObjectLocator"
+				"AnimationLocomotionLibraryRuntime"
 			}
 		);
 

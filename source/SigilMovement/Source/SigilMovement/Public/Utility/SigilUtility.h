@@ -48,6 +48,13 @@ public:
 		Meta = (DefaultToSelf = "Actor", AutoCreateRefTerm = "DisplayName", ReturnDisplayName = "Value"))
 	static bool ShouldDisplayDebugForActor(const AActor* Actor, const FName& DisplayName);
 
+	/**
+	 * Root-motion 2D speed of the whole sequence (distance / length). Returns 0 for null sequences or sequences without
+	 * root motion delta. Thread-safe and log-free — it extracts root motion over the full range, so cache the result
+	 * per asset instead of calling it every frame.
+	 * 整段序列的根运动 2D 速度（位移 / 时长）。序列为空或无根运动位移时返回 0。线程安全且不打日志——它会提取
+	 * 整段根运动，请按资产缓存结果，不要每帧调用。
+	 */
 	UFUNCTION(BlueprintCallable, Category="GMS|Animation", meta=(BlueprintThreadSafe))
 	static float CalculateAnimatedSpeed(const UAnimSequenceBase* AnimSequence);
 

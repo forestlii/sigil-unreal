@@ -82,8 +82,12 @@ void FSigilAnimData_Cycle::Validate()
 		bValid = Animation != nullptr;
 	}
 
-	// Dynamic play rate divides by the animation speed: a manual speed of 0 can never be valid.
-	if (bValid && bDynamicPlayRate && !bHasRootMotion && AnimatedSpeed <= KINDA_SMALL_NUMBER)
+	// Dynamic play rate divides by the animation speed: a manual speed that is 0, negative or non-finite can never be valid.
+	if (bValid && bDynamicPlayRate && !bHasRootMotion && (!FMath::IsFinite(AnimatedSpeed) || AnimatedSpeed <= KINDA_SMALL_NUMBER))
+	{
+		bValid = false;
+	}
+	if (bValid && (!FMath::IsFinite(PlayRateClamp.X) || !FMath::IsFinite(PlayRateClamp.Y)))
 	{
 		bValid = false;
 	}
@@ -1178,23 +1182,27 @@ void USigilAnimLayer_States_DefaultLocomotion::Cycle_AnimUpdate_Implementation(F
 	{
 		CycleState.Animation = Anim;
 
+		// This runs on the animation worker thread (BlueprintThreadSafe): no logging, no shared mutable state.
+		// Root-motion speed is cached per instance and only recomputed when the cycle asset changes.
 		float DesiredPlayRate = 1.0f;
 		if (AnimData_Cycle.bDynamicPlayRate)
 		{
-			const float AnimationSpeed = AnimData_Cycle.bHasRootMotion ? USigilUtility::CalculateAnimatedSpeed(Anim) : AnimData_Cycle.AnimatedSpeed;
+			float AnimationSpeed = AnimData_Cycle.AnimatedSpeed;
+			if (AnimData_Cycle.bHasRootMotion)
+			{
+				if (CycleState.CachedAnimatedSpeedSource != Anim)
+				{
+					CycleState.CachedAnimatedSpeedSource = Anim;
+					CycleState.CachedAnimatedSpeed = USigilUtility::CalculateAnimatedSpeed(Anim);
+				}
+				AnimationSpeed = CycleState.CachedAnimatedSpeed;
+			}
+
+			// No usable animation speed (asset without root motion delta, or AnimatedSpeed left at 0) falls back to 1x
+			// instead of writing Inf/NaN; the editor-side Validate() flags this configuration.
 			if (FMath::IsFinite(AnimationSpeed) && AnimationSpeed > KINDA_SMALL_NUMBER)
 			{
 				DesiredPlayRate = GetParent()->LocomotionState.DisplacementSpeed / AnimationSpeed;
-			}
-			else
-			{
-				// No usable animation speed (asset without root motion delta, or AnimatedSpeed left at 0): fall back to 1x instead of writing Inf/NaN.
-				static bool bWarnedOnce = false;
-				if (!bWarnedOnce)
-				{
-					bWarnedOnce = true;
-					UE_LOG(LogSigilMovement, Warning, TEXT("Cycle animation '%s' has no usable animation speed (root motion delta = 0 or AnimatedSpeed = 0); play rate falls back to 1.0. Fix bHasRootMotion/AnimatedSpeed in the cycle data."), *GetNameSafe(Anim));
-				}
 			}
 
 			if (AnimData_Cycle.PlayRateClamp.X >= 0.0f && AnimData_Cycle.PlayRateClamp.X < AnimData_Cycle.PlayRateClamp.Y)

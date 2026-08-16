@@ -367,8 +367,16 @@ struct SIGILMOVEMENT_API FSigilAnimState_Cycle
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
 	float PlayRate{1.0f};
 
-	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS")
-	// TObjectPtr<UBlendProfile> BlendProfile{nullptr};
+	/**
+	 * Per-instance cache of the root-motion speed of CachedAnimatedSpeedSource, so the full-range root motion
+	 * extraction runs once per asset change instead of every animation update.
+	 * 每实例缓存：CachedAnimatedSpeedSource 的根运动速度，让整段根运动提取只在资产切换时执行一次，而非每次动画更新。
+	 */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="GMS")
+	float CachedAnimatedSpeed{0.0f};
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category="GMS")
+	TObjectPtr<const UAnimSequence> CachedAnimatedSpeedSource{nullptr};
 };
 
 USTRUCT(BlueprintType)

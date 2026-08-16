@@ -58,23 +58,26 @@ bool USigilUtility::ShouldDisplayDebugForActor(const AActor* Actor, const FName&
 
 float USigilUtility::CalculateAnimatedSpeed(const UAnimSequenceBase* AnimSequence)
 {
+	// Callable from animation worker threads: no logging, no shared mutable state.
 	if (AnimSequence == nullptr)
 	{
-		UE_LOG(LogSigilMovement, Warning, TEXT("Passed invalid anim sequence"));
 		return 0.0f;
 	}
 
 	const float AnimLength = AnimSequence->GetPlayLength();
+	if (AnimLength <= KINDA_SMALL_NUMBER)
+	{
+		return 0.0f;
+	}
 	// Calculate the speed as: (distance traveled by the animation) / (length of the animation)
 	const FVector RootMotionTranslation = AnimSequence->ExtractRootMotionFromRange(0.0, AnimLength, FAnimExtractContext(0.0, true)).GetTranslation();
 	const float RootMotionDistance = RootMotionTranslation.Size2D();
-	if (!FMath::IsNearlyZero(RootMotionDistance))
+	if (FMath::IsNearlyZero(RootMotionDistance))
 	{
-		const float AnimationSpeed = RootMotionDistance / AnimLength;
-		return AnimationSpeed;
+		return 0.0f;
 	}
-	UE_LOG(LogSigilMovement, Warning, TEXT("Unable to Calculate animation speed for animation with no root motion delta (%s)."), *GetNameSafe(AnimSequence));
-	return 0.0f;
+	const float AnimationSpeed = RootMotionDistance / AnimLength;
+	return FMath::IsFinite(AnimationSpeed) ? AnimationSpeed : 0.0f;
 }
 
 

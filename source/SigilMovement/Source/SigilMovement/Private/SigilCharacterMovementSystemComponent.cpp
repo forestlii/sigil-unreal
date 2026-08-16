@@ -12,7 +12,6 @@
 #include "Animation/AnimInstance.h"
 #include "Locomotions/SigilMainAnimInstance.h"
 #include "Settings/SigilSettingObjectLibrary.h"
-#include "UniversalObjectLocators/AnimInstanceLocatorFragment.h"
 #include "Utility/SigilConstants.h"
 #include "Utility/SigilLog.h"
 #include "Utility/SigilMath.h"
