@@ -296,14 +296,26 @@ protected:
 	TArray<TObjectPtr<AActor>> EquipmentActors;
 
 	/**
+	 * Stops the equipment-actor wait timer (all completion / failure / teardown paths go through here).
+	 * 停止装备 Actor 等待计时器（完成 / 失败 / 销毁路径统一走这里）。
+	 */
+	void StopWaitingForEquipmentActors();
+
+	/**
 	 * Timer handle for waiting on equipment actors.
 	 * 等待装备Actor的定时器句柄。
 	 */
 	FTimerHandle WaitEquipmentActorsTimer;
 
 	/**
-	 * Counter for tracking wait attempts for equipment actors.
-	 * 用于跟踪等待装备Actor尝试的计数器。
+	 * Number of wait ticks (0.2 s each) performed so far for the current wait; bounded by MaxWaitEquipmentActorsTicks.
+	 * 当前等待已执行的 tick 次数（每 0.2 秒一次），上限为 MaxWaitEquipmentActorsTicks。
 	 */
 	int32 WaitCounter = 0;
+
+	/**
+	 * Maximum wait ticks before giving up (default 50 ticks = 10 seconds).
+	 * 放弃前的最大 tick 次数（默认 50 次 = 10 秒）。
+	 */
+	static constexpr int32 MaxWaitEquipmentActorsTicks = 50;
 };

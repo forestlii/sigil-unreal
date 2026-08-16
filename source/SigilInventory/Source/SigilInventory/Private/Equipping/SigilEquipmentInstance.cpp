@@ -87,6 +87,7 @@ void USigilEquipmentInstance::OnEquipmentBeginPlay_Implementation()
 
 void USigilEquipmentInstance::OnEquipmentEndPlay_Implementation()
 {
+	StopWaitingForEquipmentActors();
 	DestroyEquipmentActors();
 }
 
@@ -271,34 +272,63 @@ void USigilEquipmentInstance::TryWaitEquipmentActors()
 	}
 	if (UWorld* World = GetWorld())
 	{
+		WaitCounter = 0;
 		World->GetTimerManager().SetTimer(WaitEquipmentActorsTimer, FTimerDelegate::CreateUObject(this, &ThisClass::WaitEquipmentActors), 0.2f, true);
 	}
 }
 
+void USigilEquipmentInstance::StopWaitingForEquipmentActors()
+{
+	if (WaitEquipmentActorsTimer.IsValid())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(WaitEquipmentActorsTimer);
+		}
+		WaitEquipmentActorsTimer.Invalidate();
+	}
+	WaitCounter = 0;
+}
+
 void USigilEquipmentInstance::WaitEquipmentActors()
 {
-	if (SourceItem == nullptr || OwningPawn == nullptr || !WaitEquipmentActorsTimer.IsValid())
+	if (!WaitEquipmentActorsTimer.IsValid())
 	{
+		return;
+	}
+	// SourceItem / OwningPawn may still be replicating; keep waiting within the budget instead of aborting silently.
+	if (SourceItem == nullptr || OwningPawn == nullptr)
+	{
+		if (++WaitCounter >= MaxWaitEquipmentActorsTicks)
+		{
+			SIGIL_INVENTORY_CLOG(Warning, "Gave up waiting for equipment actors: SourceItem or OwningPawn never replicated.")
+			StopWaitingForEquipmentActors();
+		}
 		return;
 	}
 	if (OwningPawn->HasAuthority())
 	{
-		WaitEquipmentActorsTimer.Invalidate();
+		StopWaitingForEquipmentActors();
 		return;
 	}
 	const USigilItemFragment_Equippable* Equippable = SourceItem->FindFragmentByClass<USigilItemFragment_Equippable>();
 	if (Equippable == nullptr || Equippable->bActorBased || Equippable->ActorsToSpawn.IsEmpty())
 	{
-		WaitEquipmentActorsTimer.Invalidate();
+		StopWaitingForEquipmentActors();
 		return;
 	}
 
 	if (!IsEquipmentActorsValid(Equippable->ActorsToSpawn.Num()))
 	{
+		if (++WaitCounter >= MaxWaitEquipmentActorsTicks)
+		{
+			SIGIL_INVENTORY_CLOG(Warning, "Gave up waiting for equipment actors: expected %d actor(s), %d replicated.", Equippable->ActorsToSpawn.Num(), EquipmentActors.Num())
+			StopWaitingForEquipmentActors();
+		}
 		return;
 	}
 
-	WaitEquipmentActorsTimer.Invalidate();
+	StopWaitingForEquipmentActors();
 	SetupInitialStateForEquipmentActors(EquipmentActors);
 	SIGIL_INVENTORY_CLOG(VeryVerbose, "Equipment Actors synced.")
 }
