@@ -32,6 +32,15 @@ public:
 	FName CharacterMeshLookupTag{TEXT("Main")};
 
 	/**
+	 * Server-side distance limit (in world units) between an instigator and the target of a predictable montage request.
+	 * 0 disables the check. Used by USigilCombatSystemComponent::CanPlayMontageOnTarget's default implementation.
+	 * 服务器侧校验：可预测蒙太奇请求的发起者与目标之间允许的最大距离（世界单位）。0 表示不检查。
+	 * 由 USigilCombatSystemComponent::CanPlayMontageOnTarget 的默认实现使用。
+	 */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Networking", meta=(ClampMin=0, Units="cm"))
+	float MaxPredictableMontageTargetDistance{0.0f};
+
+	/**
 	 * Disables affiliation checks for debugging (allows cross-team damage).
 	 * 禁用归属检查以进行调试（允许跨队伍伤害）。
 	 */

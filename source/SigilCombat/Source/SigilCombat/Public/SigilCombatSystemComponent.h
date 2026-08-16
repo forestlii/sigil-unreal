@@ -128,6 +128,13 @@ struct FSigilReplicatedMontageInfo
 	 */
 	UPROPERTY()
 	float TriggeredTime{0.0f};
+
+	/**
+	 * Montage-timeline position (seconds) the playback started from on the server.
+	 * 服务器起播时所在的蒙太奇时间轴位置（秒）。
+	 */
+	UPROPERTY()
+	float StartTimeSeconds{0.0f};
 };
 
 /**
@@ -217,7 +224,7 @@ public:
 	 * 注册攻击结果。
 	 * @param Payload The attack result to register. 要注册的攻击结果。
 	 */
-	UFUNCTION(BlueprintCallable, Category="GCS|Combat")
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="GCS|Combat")
 	void RegisterAttackResult(UPARAM(ref) FSigilAttackResult& Payload);
 
 	/**
@@ -255,17 +262,51 @@ public:
 	void ServerPlayPredictableMontageForTarget(USigilCombatSystemComponent* TargetCSC, FSigilPlayMontageRequest Request);
 
 	/**
-	 * Sets the replicated montage information.
-	 * 设置复制的蒙太奇信息。
+	 * Structural validation of a montage request (non-null montage, finite positive play rate,
+	 * start time inside the montage, existing section). Runs on every role; never trusts the caller.
+	 * 蒙太奇请求的结构校验（蒙太奇非空、播放倍率为有限正数、起始时间在蒙太奇内、Section 存在）。
+	 * 所有角色都执行，不信任调用方。
+	 * @param TargetCSC The component the montage would be applied to. 蒙太奇作用的目标组件。
+	 * @param Request The request to validate. 待校验请求。
+	 * @param OutReason Optional human-readable rejection reason. 可选的拒绝原因。
+	 * @return True if the request is well-formed. 请求合法则返回 true。
+	 */
+	virtual bool IsMontageRequestValid(const USigilCombatSystemComponent* TargetCSC, const FSigilPlayMontageRequest& Request, FString* OutReason = nullptr) const;
+
+	/**
+	 * Authorization hook evaluated on the server before a montage request from this component is applied to a target.
+	 * The default implementation requires the target to live in the same world and, when
+	 * USigilCombatSystemSettings::MaxPredictableMontageTargetDistance is greater than zero, to be within that distance.
+	 * Override to enforce team, attack-flow-state or other project rules.
+	 * 服务器在把本组件发出的蒙太奇请求应用到目标前调用的授权钩子。默认实现要求目标处于同一世界，
+	 * 且当 USigilCombatSystemSettings::MaxPredictableMontageTargetDistance 大于 0 时目标须在该距离内。
+	 * 覆写以加入阵营、攻击流程状态或其它项目规则。
+	 * @param TargetCSC The target combat system component. 目标战斗系统组件。
+	 * @param Request The montage play request. 蒙太奇播放请求。
+	 * @return True if this component may apply the montage to the target. 允许则返回 true。
+	 */
+	UFUNCTION(BlueprintNativeEvent, Category="GCS|Combat")
+	bool CanPlayMontageOnTarget(const USigilCombatSystemComponent* TargetCSC, const FSigilPlayMontageRequest& Request) const;
+	virtual bool CanPlayMontageOnTarget_Implementation(const USigilCombatSystemComponent* TargetCSC, const FSigilPlayMontageRequest& Request) const;
+
+	/**
+	 * Sets the replicated montage information. Caller must have validated the request.
+	 * 设置复制的蒙太奇信息。调用方须已校验请求。
 	 * @param Request The montage play request. 蒙太奇播放请求。
 	 */
 	void SetReplicatedMontage(const FSigilPlayMontageRequest& Request);
 
 	/**
-	 * Timer handle for montage-related operations.
-	 * 蒙太奇相关操作的计时器句柄。
+	 * Timer that clears ReplicatedMontageInfo once the current montage has finished.
+	 * 当前蒙太奇播完后清空 ReplicatedMontageInfo 的计时器。
 	 */
-	FTimerHandle TimerHandle;
+	FTimerHandle MontageClearTimerHandle;
+
+	/**
+	 * Monotonic serial of montage requests; guards the clear timer against stale callbacks.
+	 * 蒙太奇请求的单调序号，用于防止过期计时器回调清掉新请求。
+	 */
+	uint32 MontageRequestSerial{0};
 
 	/**
 	 * Handles replication of montage information.
