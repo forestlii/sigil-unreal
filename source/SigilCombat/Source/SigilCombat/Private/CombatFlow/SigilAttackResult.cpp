@@ -23,37 +23,69 @@ FSigilAttackResultContainer::FSigilAttackResultContainer(USigilCombatSystemCompo
 
 void FSigilAttackResultContainer::AddEntry(FSigilAttackResult& NewEntry)
 {
-	if (Results.Num() >= 5)
+	check(CombatSystemComponent != nullptr && CombatSystemComponent->GetOwner());
+
+	// Trim oldest entries first, preserving order (Results is a chronological ring).
+	const int32 EffectiveMaxSize = FMath::Max(MaxSize, 1);
+	while (Results.Num() >= EffectiveMaxSize)
 	{
-		Results.RemoveAtSwap(0);
+		Results.RemoveAt(0, EAllowShrinking::No);
 		MarkArrayDirty();
 	}
 
-	Results.Add(NewEntry);
-	check(CombatSystemComponent != nullptr && CombatSystemComponent->GetOwner());
+	// Only the element that lives inside the array may be marked dirty; the caller's payload must
+	// never carry FastArray replication metadata (it may be reused for the next attack).
+	FSigilAttackResult& AddedEntry = Results.Add_GetRef(NewEntry);
+	AddedEntry.ReplicationID = INDEX_NONE;
+	AddedEntry.ReplicationKey = INDEX_NONE;
+	AddedEntry.bConsumed = false;
 
-	if (CombatSystemComponent->GetCombatFlow())
+	if (USigilCombatFlow* Flow = CombatSystemComponent->GetCombatFlow())
 	{
-		CombatSystemComponent->GetCombatFlow()->HandleAttackResult(NewEntry);
-		NewEntry.bConsumed = true;
+		Flow->HandleAttackResult(AddedEntry);
+		AddedEntry.bConsumed = true;
 	}
 	else
 	{
 		UE_LOG(LogSigilCombat, Error, TEXT("Missing Combat Flow on %s's combat system component."), *CombatSystemComponent->GetOwner()->GetName());
 	}
 
-	MarkItemDirty(NewEntry);
+	MarkItemDirty(AddedEntry);
+}
+
+void FSigilAttackResultContainer::ConsumeEntry(int32 Index)
+{
+	if (!Results.IsValidIndex(Index) || Results[Index].bConsumed)
+	{
+		return;
+	}
+	if (!IsValid(CombatSystemComponent))
+	{
+		return;
+	}
+	USigilCombatFlow* Flow = CombatSystemComponent->GetCombatFlow();
+	if (!IsValid(Flow))
+	{
+		// CombatFlow has not replicated yet; the entry stays unconsumed and is picked up by ConsumePendingEntries().
+		return;
+	}
+	Flow->HandleAttackResult(Results[Index]);
+	Results[Index].bConsumed = true;
+}
+
+void FSigilAttackResultContainer::ConsumePendingEntries()
+{
+	for (int32 Index = 0; Index < Results.Num(); ++Index)
+	{
+		ConsumeEntry(Index);
+	}
 }
 
 void FSigilAttackResultContainer::PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize)
 {
 	for (int32 Index : AddedIndices)
 	{
-		if (!Results[Index].bConsumed)
-		{
-			CombatSystemComponent->GetCombatFlow()->HandleAttackResult(Results[Index]);
-			Results[Index].bConsumed = true;
-		}
+		ConsumeEntry(Index);
 	}
 }
 
@@ -61,10 +93,6 @@ void FSigilAttackResultContainer::PostReplicatedChange(const TArrayView<int32>& 
 {
 	for (int32 Index : ChangedIndices)
 	{
-		if (!Results[Index].bConsumed)
-		{
-			CombatSystemComponent->GetCombatFlow()->HandleAttackResult(Results[Index]);
-			Results[Index].bConsumed = true;
-		}
+		ConsumeEntry(Index);
 	}
 }

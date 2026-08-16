@@ -126,6 +126,20 @@ public:
 	void AddEntry(FSigilAttackResult& NewEntry);
 
 	/**
+	 * Hands the entry at Index to the owning CombatFlow if it has not been consumed yet.
+	 * Safe to call when the CombatFlow has not replicated; the entry then stays pending.
+	 * 若条目尚未被消费，则交给所属 CombatFlow 处理。CombatFlow 尚未复制时可安全调用，条目保持待处理。
+	 * @param Index The entry index. 条目索引。
+	 */
+	void ConsumeEntry(int32 Index);
+
+	/**
+	 * Consumes every entry that arrived before the CombatFlow was available. Call once the CombatFlow replicates.
+	 * 消费所有在 CombatFlow 可用之前到达的条目。CombatFlow 复制到达后调用一次。
+	 */
+	void ConsumePendingEntries();
+
+	/**
 	 * Handles post-replication addition of entries.
 	 * 处理条目添加后的复制。
 	 * @param AddedIndices The indices of added entries. 添加的条目索引。
