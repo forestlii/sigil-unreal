@@ -34,10 +34,15 @@ The stack keeps an instance pool (`CameraModeInstances`): each mode class is ins
 
 Cooperating actors can implement `ISigilCameraAssistInterface` (C++-only virtuals): `GetIgnoredActorsForCameraPentration`, `GetCameraPreventPenetrationTarget`, and `OnCameraPenetratingTarget`. Actors tagged with the actor tag `IgnoreCameraCollision` are skipped by the feeler traces.
 
+### Coordinate ownership and penetration avoidance
+
+The **SpringArm owns the final camera transform**: the system component only writes control rotation, FOV, arm length and the two arm offsets each tick; `View.Location` / `View.Rotation` are the pivot the arm hangs from, not a camera position. `UpdatePreventPenetration` follows the same model — it computes the camera location the arm would produce, feels along the aim line, and **shortens `View.SpringArmLength`** by the blocked fraction. Call it from your `OnUpdateView` after filling the view, and **disable the SpringArm's own `bDoCollisionTest`** so the two systems do not both push the camera in.
+
+`AddFieldOfViewOffset` is a one-frame offset: it is added to the FOV the tick it is applied and then cleared, so callers must re-apply it every frame they want it.
+
 ### Known limitations (honest notes)
 
-- **Penetration avoidance currently has no visible effect.** `UpdatePreventPenetration` writes its corrected position into `View.Location`, but the system component's tick never applies `View.Location` to the camera or spring arm (only FOV, arm length, offsets, and control rotation are applied). Until this is resolved, keep using the SpringArm's own `bDoCollisionTest` for collision handling.
-- **`AddFieldOfViewOffset` is currently a no-op.** The accumulated `FieldOfViewOffset` is never consumed when the view is applied.
+- Penetration avoidance approximates the corrected position by scaling the arm length along the aim line; large socket/target offsets make the approximation coarser. It has not been validated in PIE (wall corner / doorway / back-to-wall scenes are still to be tested).
 - `DetermineCameraModeDelegate` is a plain C++ delegate — it cannot be bound from Blueprint. Blueprint-only projects should call `PushCameraMode` / `PushDefaultCameraMode` instead.
 
 ## Prerequisites

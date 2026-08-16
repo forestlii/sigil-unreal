@@ -55,8 +55,14 @@ void USigilCameraMode_WithPenetrationAvoidance::UpdatePreventPenetration(float D
 	ISigilCameraAssistInterface* TargetActorAssist = Cast<ISigilCameraAssistInterface>(TargetActor);
 
 	TOptional<AActor*> OptionalPPTarget = TargetActorAssist ? TargetActorAssist->GetCameraPreventPenetrationTarget() : TOptional<AActor*>();
-	AActor* PPActor = OptionalPPTarget.IsSet() ? OptionalPPTarget.GetValue() : TargetActor;
-	ISigilCameraAssistInterface* PPActorAssist = OptionalPPTarget.IsSet() ? Cast<ISigilCameraAssistInterface>(PPActor) : nullptr;
+	// A set-but-null override is treated as "no override" and falls back to the target actor.
+	const bool bHasValidOverride = OptionalPPTarget.IsSet() && IsValid(OptionalPPTarget.GetValue());
+	AActor* PPActor = bHasValidOverride ? OptionalPPTarget.GetValue() : TargetActor;
+	if (!IsValid(PPActor))
+	{
+		return;
+	}
+	ISigilCameraAssistInterface* PPActorAssist = bHasValidOverride ? Cast<ISigilCameraAssistInterface>(PPActor) : nullptr;
 
 	const UPrimitiveComponent* PPActorRootComponent = Cast<UPrimitiveComponent>(PPActor->GetRootComponent());
 	if (PPActorRootComponent)
@@ -81,9 +87,26 @@ void USigilCameraMode_WithPenetrationAvoidance::UpdatePreventPenetration(float D
 			SafeLocation += (SafeLocation - ClosestPointOnLineToCapsuleCenter).GetSafeNormal() * PushInDistance;
 		}
 
+		// Desired camera location as the SpringArm will place it: pivot + target offset, back along the view
+		// direction by the arm length, plus the socket offset in view space.
+		const FRotator ArmRotation = View.Rotation;
+		const FVector DesiredCameraLocation = View.Location + View.SpringArmTargetOffset
+			- ArmRotation.Vector() * View.SpringArmLength
+			+ ArmRotation.RotateVector(View.SpringArmSocketOffset);
+
 		// Then aim line to desired camera position
 		bool const bSingleRayPenetrationCheck = !bDoPredictiveAvoidance;
-		PreventCameraPenetration(bSingleRayPenetrationCheck, DeltaTime, PPActor, SafeLocation, View.Location, AimLineToDesiredPosBlockedPct);
+		FVector CorrectedCameraLocation = DesiredCameraLocation;
+		PreventCameraPenetration(bSingleRayPenetrationCheck, DeltaTime, PPActor, SafeLocation, CorrectedCameraLocation, AimLineToDesiredPosBlockedPct);
+
+		// Fold the correction back into the arm length (the SpringArm owns the final camera transform).
+		const float DesiredDistance = FVector::Dist(SafeLocation, DesiredCameraLocation);
+		if (DesiredDistance > KINDA_SMALL_NUMBER)
+		{
+			const float CorrectedDistance = FVector::Dist(SafeLocation, CorrectedCameraLocation);
+			const float Ratio = FMath::Clamp(CorrectedDistance / DesiredDistance, 0.0f, 1.0f);
+			View.SpringArmLength *= Ratio;
+		}
 
 		ISigilCameraAssistInterface* AssistArray[] = {TargetControllerAssist, TargetActorAssist, PPActorAssist};
 

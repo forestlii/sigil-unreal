@@ -245,7 +245,8 @@ void USigilCameraModeStack::GetBlendInfo(float& OutWeightOfTopLayer, FGameplayTa
 	}
 	else
 	{
-		USigilCameraMode* TopEntry = CameraModeStack.Last();
+		// Index 0 is the top of the stack (PushCameraMode inserts at 0; Last() is the always-100% bottom layer).
+		USigilCameraMode* TopEntry = CameraModeStack[0];
 		check(TopEntry);
 		OutWeightOfTopLayer = TopEntry->GetBlendWeight();
 		OutTagOfTopLayer = TopEntry->GetCameraTypeTag();

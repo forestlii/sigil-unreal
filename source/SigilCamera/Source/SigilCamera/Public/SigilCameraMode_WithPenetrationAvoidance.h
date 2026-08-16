@@ -63,6 +63,19 @@ public:
 #endif
 
 protected:
+	/**
+	 * Runs penetration avoidance for the current View and folds the result into the view's spring-arm parameters.
+	 * Coordinate ownership: the camera's final transform is produced by the SpringArm that USigilCameraSystemComponent
+	 * drives, so this function does NOT move the camera directly. It computes the desired camera location from
+	 * View.Location (pivot) + SpringArm rotation/length/offsets, feels along the aim line, and shortens
+	 * View.SpringArmLength proportionally to the blocked distance. Disable the SpringArm's own bDoCollisionTest when
+	 * using this, otherwise both systems push the camera in.
+	 * Call it from OnUpdateView after the view has been filled in.
+	 * 对当前 View 执行穿模规避并把结果折算进弹簧臂参数。坐标归属：最终相机变换由 USigilCameraSystemComponent
+	 * 驱动的 SpringArm 生成，本函数不直接移动相机——它按 View.Location（枢轴）+ 弹簧臂旋转/长度/偏移算出期望
+	 * 相机位置，沿瞄准线做探测，再按被遮挡比例缩短 View.SpringArmLength。使用时请关闭 SpringArm 自带的
+	 * bDoCollisionTest，否则两套系统会叠加推近。请在 OnUpdateView 填完 View 之后调用。
+	 */
 	UFUNCTION(BlueprintCallable, Category="CameraMode|PenetrationAvoidance")
 	void UpdatePreventPenetration(float DeltaTime);
 	UFUNCTION(BlueprintCallable, Category="CameraMode|PenetrationAvoidance")

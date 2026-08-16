@@ -34,10 +34,15 @@ sigil.camera 是一套 Lyra 风格的相机模式栈，但架构上有一个关�
 
 配合的 Actor 可以实现 `ISigilCameraAssistInterface`（纯 C++ 虚函数）：`GetIgnoredActorsForCameraPentration`、`GetCameraPreventPenetrationTarget`、`OnCameraPenetratingTarget`。带 Actor 标签 `IgnoreCameraCollision` 的 Actor 会被触须射线跳过。
 
+### 坐标归属与穿模规避
+
+**最终相机变换由 SpringArm 拥有**：系统组件每 Tick 只写 ControlRotation、FOV、臂长和两个臂偏移；`View.Location` / `View.Rotation` 是弹簧臂悬挂的枢轴，不是相机位置。`UpdatePreventPenetration` 遵循同一模型——它算出弹簧臂将产生的相机位置，沿瞄准线做触须探测，再按被遮挡比例**缩短 `View.SpringArmLength`**。请在你的 `OnUpdateView` 填完 View 后调用它，并**关闭 SpringArm 自带的 `bDoCollisionTest`**，避免两套系统叠加推近。
+
+`AddFieldOfViewOffset` 是单帧偏移：在应用视图的那一帧加到 FOV 上然后清零，想持续生效就每帧重新调用。
+
 ### 已知限制（如实说明）
 
-- **穿模规避目前不会产生可见效果。** `UpdatePreventPenetration` 把修正后的位置写进 `View.Location`，但系统组件的 Tick 从不把 `View.Location` 应用到相机或弹簧臂（只应用 FOV、臂长、偏移和 ControlRotation）。在这个问题解决之前，碰撞处理请继续用 SpringArm 自带的 `bDoCollisionTest`。
-- **`AddFieldOfViewOffset` 目前是空操作。** 累积的 `FieldOfViewOffset` 在应用视图时从未被消费。
+- 穿模规避是沿瞄准线按比例缩臂长的近似；Socket/Target 偏移越大近似越粗。尚未在 PIE 里验证（墙角 / 窄门 / 背墙三个场景待测）。
 - `DetermineCameraModeDelegate` 是普通 C++ 委托，蓝图绑不了。纯蓝图项目请改用 `PushCameraMode` / `PushDefaultCameraMode`。
 
 ## 前置条件（Prerequisites）
