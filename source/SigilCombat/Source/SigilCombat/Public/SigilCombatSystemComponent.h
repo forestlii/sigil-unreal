@@ -52,6 +52,15 @@ struct SIGILCOMBAT_API FSigilPlayMontageRequest
 	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="GCS")
 	float StartTimeSeconds{0.0f};
+
+	/**
+	 * Per-instigator request serial, assigned automatically by PlayPredictableMontageForTarget (0 = unassigned).
+	 * Used to reconcile the client prediction with the server's accept/reject decision. Do not set by hand.
+	 * 由 PlayPredictableMontageForTarget 自动分配的请求序号（0 = 未分配），用于把客户端预测与服务器的
+	 * 接受/拒绝结果对账。不要手动设置。
+	 */
+	UPROPERTY(BlueprintReadOnly, Category="GCS")
+	int32 RequestId{0};
 };
 
 /**
@@ -90,6 +99,13 @@ struct FSigilPredictedMontageInfo
 	 */
 	UPROPERTY()
 	float TriggeredTime{0.0f};
+
+	/**
+	 * Request serial this prediction belongs to (0 = no active prediction).
+	 * 该预测对应的请求序号（0 = 当前无预测）。
+	 */
+	UPROPERTY()
+	int32 RequestId{0};
 };
 
 /**
@@ -135,6 +151,20 @@ struct FSigilReplicatedMontageInfo
 	 */
 	UPROPERTY()
 	float StartTimeSeconds{0.0f};
+
+	/**
+	 * Request serial of the accepted request (0 = none). Lets the predicting client match its prediction exactly.
+	 * 被接受请求的序号（0 = 无），让预测端精确对账。
+	 */
+	UPROPERTY()
+	int32 RequestId{0};
+
+	/**
+	 * Root motion translation scale applied on every machine while this montage plays.
+	 * 该蒙太奇播放期间在每台机器上应用的根运动平移缩放。
+	 */
+	UPROPERTY()
+	float RootTranslationScale{1.0f};
 };
 
 /**
@@ -220,6 +250,15 @@ public:
 	USigilCombatFlow* GetCombatFlow() const;
 
 	/**
+	 * True when the combat flow exists and has been initialized on this machine (server: after creation;
+	 * client: after OnRep_CombatFlow). Attack results are only dispatched once this is true.
+	 * 战斗流程存在且已在本机初始化（服务器：创建后；客户端：OnRep_CombatFlow 后）时为 true。
+	 * 攻击结果只在此之后分发。
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "GCS|Combat")
+	bool IsCombatFlowReady() const;
+
+	/**
 	 * Registers an attack result.
 	 * 注册攻击结果。
 	 * @param Payload The attack result to register. 要注册的攻击结果。
@@ -253,19 +292,32 @@ public:
 	void PlayPredictableMontageForTarget(USigilCombatSystemComponent* TargetCSC, FSigilPlayMontageRequest Request);
 
 	/**
-	 * Server RPC to play a predictable montage for a target.
-	 * 为目标播放可预测蒙太奇的服务器RPC。
+	 * Server RPC to play a predictable montage for a target. Not meant to be called directly — use
+	 * PlayPredictableMontageForTarget, which assigns the RequestId and predicts locally.
+	 * 为目标播放可预测蒙太奇的服务器 RPC。不建议直接调用——请用 PlayPredictableMontageForTarget，
+	 * 它会分配 RequestId 并在本地预测。
 	 * @param TargetCSC The target combat system component. 目标战斗系统组件。
 	 * @param Request The montage play request. 蒙太奇播放请求。
 	 */
-	UFUNCTION(Server, Reliable, BlueprintCallable, Category="GCS|Combat")
+	UFUNCTION(Server, Reliable, Category="GCS|Combat")
 	void ServerPlayPredictableMontageForTarget(USigilCombatSystemComponent* TargetCSC, FSigilPlayMontageRequest Request);
 
 	/**
-	 * Structural validation of a montage request (non-null montage, finite positive play rate,
-	 * start time inside the montage, existing section). Runs on every role; never trusts the caller.
-	 * 蒙太奇请求的结构校验（蒙太奇非空、播放倍率为有限正数、起始时间在蒙太奇内、Section 存在）。
-	 * 所有角色都执行，不信任调用方。
+	 * Client RPC: the server rejected the request with this id; roll back the local prediction on its target.
+	 * 客户端 RPC：服务器拒绝了该序号的请求，回滚其目标上的本地预测。
+	 * @param RequestId The rejected request serial. 被拒绝的请求序号。
+	 */
+	UFUNCTION(Client, Reliable)
+	void ClientMontageRequestRejected(int32 RequestId);
+
+	/**
+	 * Structural validation of a montage request: non-null montage, finite play rate within the configured
+	 * min/max, finite non-negative root translation scale, start time inside the montage, existing section,
+	 * and a *linear* montage (no looping / non-linear section graph — predictable playback derives clear time
+	 * and late-join position from linear time). Runs on every role; never trusts the caller.
+	 * 蒙太奇请求的结构校验：蒙太奇非空、播放倍率有限且在配置的上下限内、根运动缩放有限非负、
+	 * 起始时间在蒙太奇内、Section 存在，且蒙太奇为**线性**（无循环 / 非线性 Section 图——可预测播放按
+	 * 线性时间推导清理时机与延迟补播位置）。所有角色都执行，不信任调用方。
 	 * @param TargetCSC The component the montage would be applied to. 蒙太奇作用的目标组件。
 	 * @param Request The request to validate. 待校验请求。
 	 * @param OutReason Optional human-readable rejection reason. 可选的拒绝原因。
@@ -274,13 +326,20 @@ public:
 	virtual bool IsMontageRequestValid(const USigilCombatSystemComponent* TargetCSC, const FSigilPlayMontageRequest& Request, FString* OutReason = nullptr) const;
 
 	/**
+	 * Returns true if every montage section either ends the montage or links to the next section in order.
+	 * 若每个 Section 要么结束蒙太奇、要么按顺序衔接下一个 Section，则返回 true。
+	 */
+	static bool IsMontageLinear(const UAnimMontage* Montage);
+
+	/**
 	 * Authorization hook evaluated on the server before a montage request from this component is applied to a target.
-	 * The default implementation requires the target to live in the same world and, when
-	 * USigilCombatSystemSettings::MaxPredictableMontageTargetDistance is greater than zero, to be within that distance.
-	 * Override to enforce team, attack-flow-state or other project rules.
-	 * 服务器在把本组件发出的蒙太奇请求应用到目标前调用的授权钩子。默认实现要求目标处于同一世界，
-	 * 且当 USigilCombatSystemSettings::MaxPredictableMontageTargetDistance 大于 0 时目标须在该距离内。
-	 * 覆写以加入阵营、攻击流程状态或其它项目规则。
+	 * Default implementation: the component may always target itself; any other target is rejected unless
+	 * USigilCombatSystemSettings::MaxPredictableMontageTargetDistance is greater than zero *and* the target lives in the
+	 * same world within that distance. Cross-target playback is therefore opt-in. Override to enforce team,
+	 * attack-flow-state or other project rules.
+	 * 服务器在把本组件发出的蒙太奇请求应用到目标前调用的授权钩子。默认实现：本组件可以始终作用于自身；
+	 * 其它目标一律拒绝，除非 USigilCombatSystemSettings::MaxPredictableMontageTargetDistance 大于 0 **且**目标位于
+	 * 同一世界、在该距离内。因此跨目标播放需要显式开启。覆写以加入阵营、攻击流程状态或其它项目规则。
 	 * @param TargetCSC The target combat system component. 目标战斗系统组件。
 	 * @param Request The montage play request. 蒙太奇播放请求。
 	 * @return True if this component may apply the montage to the target. 允许则返回 true。
@@ -316,11 +375,40 @@ public:
 	void OnRep_ReplicatedMontageInfo();
 
 	/**
-	 * Plays a predicted montage.
-	 * 播放预测的蒙太奇。
+	 * Plays a predicted montage locally. Prediction state is only recorded if the montage actually started.
+	 * 在本地播放预测蒙太奇。仅当蒙太奇确实开始播放时才记录预测状态。
 	 * @param Request The montage play request. 蒙太奇播放请求。
+	 * @return True if the montage started. 蒙太奇已开始播放则返回 true。
 	 */
-	void PlayPredictedMontage(const FSigilPlayMontageRequest& Request);
+	bool PlayPredictedMontage(const FSigilPlayMontageRequest& Request);
+
+	/**
+	 * Stops and forgets the local prediction with the given request id (no-op if it is not the active prediction).
+	 * 停止并清除指定序号的本地预测（若它不是当前预测则无操作）。
+	 */
+	void CancelPredictedMontage(int32 RequestId);
+
+	/**
+	 * Applies a root-motion translation scale to the owning character (no-op for non-character owners).
+	 * 对拥有者角色应用根运动平移缩放（非角色拥有者无操作）。
+	 */
+	void ApplyRootTranslationScale(float Scale) const;
+
+private:
+	/** Server-side per-second request counter for rate limiting. 服务器侧每秒请求计数（限频用）。 */
+	int32 MontageRequestsInWindow{0};
+	double MontageRequestWindowStart{0.0};
+
+	/** Instigator-side (client) book-keeping: outstanding predictions by request id → target. 发起端（客户端）待对账预测：请求序号 → 目标。 */
+	struct FPendingPrediction
+	{
+		TWeakObjectPtr<USigilCombatSystemComponent> Target;
+		double IssuedTime{0.0};
+	};
+	TMap<int32, FPendingPrediction> PendingPredictions;
+	int32 NextMontageRequestId{1};
+
+public:
 
 	/**
 	 * Gets the character's skeletal mesh component.

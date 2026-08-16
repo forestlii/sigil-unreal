@@ -32,13 +32,42 @@ public:
 	FName CharacterMeshLookupTag{TEXT("Main")};
 
 	/**
-	 * Server-side distance limit (in world units) between an instigator and the target of a predictable montage request.
-	 * 0 disables the check. Used by USigilCombatSystemComponent::CanPlayMontageOnTarget's default implementation.
-	 * 服务器侧校验：可预测蒙太奇请求的发起者与目标之间允许的最大距离（世界单位）。0 表示不检查。
-	 * 由 USigilCombatSystemComponent::CanPlayMontageOnTarget 的默认实现使用。
+	 * Opt-in for cross-target predictable montages: the maximum server-side distance (world units) between an
+	 * instigator and a *different* target. 0 (default) means the default authorization rejects every target other
+	 * than the instigator itself. Used by USigilCombatSystemComponent::CanPlayMontageOnTarget's default implementation.
+	 * 跨目标可预测蒙太奇的开关：发起者与**其它**目标之间在服务器侧允许的最大距离（世界单位）。
+	 * 0（默认）表示默认授权拒绝除自身外的所有目标。由 USigilCombatSystemComponent::CanPlayMontageOnTarget 的默认实现使用。
 	 */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Networking", meta=(ClampMin=0, Units="cm"))
 	float MaxPredictableMontageTargetDistance{0.0f};
+
+	/**
+	 * Lowest play rate a predictable montage request may carry (rejected below this).
+	 * 可预测蒙太奇请求允许的最低播放倍率（低于此值拒绝）。
+	 */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Networking", meta=(ClampMin=0.01))
+	float MinPredictableMontagePlayRate{0.1f};
+
+	/**
+	 * Highest play rate a predictable montage request may carry (rejected above this).
+	 * 可预测蒙太奇请求允许的最高播放倍率（高于此值拒绝）。
+	 */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Networking", meta=(ClampMin=0.1))
+	float MaxPredictableMontagePlayRate{4.0f};
+
+	/**
+	 * Highest root translation scale a predictable montage request may carry.
+	 * 可预测蒙太奇请求允许的最大根运动平移缩放。
+	 */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Networking", meta=(ClampMin=0))
+	float MaxPredictableMontageRootTranslationScale{10.0f};
+
+	/**
+	 * Server-side cap on montage requests accepted per instigating component per second (0 = unlimited).
+	 * 服务器侧每个发起组件每秒接受的蒙太奇请求上限（0 = 不限）。
+	 */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Networking", meta=(ClampMin=0))
+	int32 MaxPredictableMontageRequestsPerSecond{8};
 
 	/**
 	 * Disables affiliation checks for debugging (allows cross-team damage).

@@ -45,7 +45,14 @@ sigil.combat is a GAS-based multiplayer combat framework built directly on sigil
 
 ### Predictable montages
 
-`USigilCombatSystemComponent::PlayPredictableMontageForTarget` plays a hit-reaction montage on a target: the instigating client plays it locally right away (`PredictedMontageInfo`), sends `ServerPlayPredictableMontageForTarget`, and the server replicates `ReplicatedMontageInfo` (with trigger time) so other clients join at the right position (`OnRep_ReplicatedMontageInfo`). `FSigilPlayMontageRequest` carries montage, `PlayRate`, `StartSectionName`, `RootTranslationScale`, `StartTimeSeconds`.
+`USigilCombatSystemComponent::PlayPredictableMontageForTarget` plays a hit-reaction montage on a target: the instigating client plays it locally right away (`PredictedMontageInfo`), sends `ServerPlayPredictableMontageForTarget`, and the server replicates `ReplicatedMontageInfo` (with trigger time and the request id) so other clients join at the right position (`OnRep_ReplicatedMontageInfo`). `FSigilPlayMontageRequest` carries montage, `PlayRate`, `StartSectionName`, `RootTranslationScale`, `StartTimeSeconds`; `RequestId` is assigned automatically.
+
+Server-side trust boundary:
+
+- Every request is re-validated on the server: non-null montage, play rate within `USigilCombatSystemSettings::Min/MaxPredictableMontagePlayRate`, root translation scale within `[0, MaxPredictableMontageRootTranslationScale]`, start time/section inside the montage, and a **linear** montage (looping or non-linear section graphs are rejected — predictable playback derives clear time and late-join position from linear time).
+- Authorization goes through the `BlueprintNativeEvent` `CanPlayMontageOnTarget`. **The default only allows a component to target itself.** Cross-target playback (e.g. attacker → victim hit reaction) is opt-in: set `MaxPredictableMontageTargetDistance > 0` in Project Settings and the default then also allows same-world targets within that distance. Override the event for team / attack-flow rules.
+- Requests are rate-limited per instigating component (`MaxPredictableMontageRequestsPerSecond`, default 8).
+- Rejections are echoed back with `ClientMontageRequestRejected(RequestId)` and the client rolls back its prediction; acceptance is reconciled by request id, never by asset pointer.
 
 ### Teams, weapons, interfaces
 

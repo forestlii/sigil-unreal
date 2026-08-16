@@ -14,6 +14,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
+#include "GameFramework/Character.h"
 #include "Utility/SigilCombatFunctionLibrary.h"
 #include "SigilCombatSystemSettings.h"
 
@@ -102,6 +103,11 @@ USigilCombatFlow* USigilCombatSystemComponent::GetCombatFlow() const
 	return CombatFlow;
 }
 
+bool USigilCombatSystemComponent::IsCombatFlowReady() const
+{
+	return IsValid(CombatFlow) && CombatFlow->IsInitialized();
+}
+
 void USigilCombatSystemComponent::RegisterAttackResult(FSigilAttackResult& Payload)
 {
 	// Attack results are server-authoritative: they replicate down through the FastArray.
@@ -170,13 +176,14 @@ bool USigilCombatSystemComponent::IsMontageRequestValid(const USigilCombatSystem
 	{
 		return Reject(TEXT("montage is null"));
 	}
-	if (!FMath::IsFinite(Request.PlayRate) || Request.PlayRate <= KINDA_SMALL_NUMBER)
+	const USigilCombatSystemSettings* Settings = GetDefault<USigilCombatSystemSettings>();
+	if (!FMath::IsFinite(Request.PlayRate) || Request.PlayRate < Settings->MinPredictableMontagePlayRate || Request.PlayRate > Settings->MaxPredictableMontagePlayRate)
 	{
-		return Reject(TEXT("play rate must be a finite positive number"));
+		return Reject(TEXT("play rate is not finite or outside the configured min/max"));
 	}
-	if (!FMath::IsFinite(Request.RootTranslationScale))
+	if (!FMath::IsFinite(Request.RootTranslationScale) || Request.RootTranslationScale < 0.0f || Request.RootTranslationScale > Settings->MaxPredictableMontageRootTranslationScale)
 	{
-		return Reject(TEXT("root translation scale is not finite"));
+		return Reject(TEXT("root translation scale is not finite or outside [0, max]"));
 	}
 	const float MontageLength = Request.AnimMontage->GetPlayLength();
 	if (MontageLength <= KINDA_SMALL_NUMBER)
@@ -191,6 +198,33 @@ bool USigilCombatSystemComponent::IsMontageRequestValid(const USigilCombatSystem
 	{
 		return Reject(TEXT("start section does not exist in the montage"));
 	}
+	if (!IsMontageLinear(Request.AnimMontage))
+	{
+		return Reject(TEXT("montage has looping or non-linear sections; predictable playback supports linear montages only"));
+	}
+	return true;
+}
+
+bool USigilCombatSystemComponent::IsMontageLinear(const UAnimMontage* Montage)
+{
+	if (!Montage)
+	{
+		return false;
+	}
+	const int32 NumSections = Montage->CompositeSections.Num();
+	for (int32 Index = 0; Index < NumSections; ++Index)
+	{
+		const FName Next = Montage->CompositeSections[Index].NextSectionName;
+		if (Next == NAME_None)
+		{
+			continue; // section ends the montage
+		}
+		const int32 NextIndex = Montage->GetSectionIndex(Next);
+		if (NextIndex != Index + 1)
+		{
+			return false; // loops back, skips ahead, or references a missing section
+		}
+	}
 	return true;
 }
 
@@ -200,22 +234,20 @@ bool USigilCombatSystemComponent::CanPlayMontageOnTarget_Implementation(const US
 	{
 		return true;
 	}
+
+	// Cross-target playback is opt-in: without a configured distance limit every other target is rejected.
+	const float MaxDistance = GetDefault<USigilCombatSystemSettings>()->MaxPredictableMontageTargetDistance;
+	if (MaxDistance <= 0.0f)
+	{
+		return false;
+	}
 	if (!IsValid(TargetCSC) || TargetCSC->GetWorld() != GetWorld())
 	{
 		return false;
 	}
-
-	const float MaxDistance = GetDefault<USigilCombatSystemSettings>()->MaxPredictableMontageTargetDistance;
-	if (MaxDistance > 0.0f)
-	{
-		const AActor* Instigator = GetOwner();
-		const AActor* Target = TargetCSC->GetOwner();
-		if (!Instigator || !Target || FVector::DistSquared(Instigator->GetActorLocation(), Target->GetActorLocation()) > FMath::Square(MaxDistance))
-		{
-			return false;
-		}
-	}
-	return true;
+	const AActor* Instigator = GetOwner();
+	const AActor* Target = TargetCSC->GetOwner();
+	return Instigator && Target && FVector::DistSquared(Instigator->GetActorLocation(), Target->GetActorLocation()) <= FMath::Square(MaxDistance);
 }
 
 void USigilCombatSystemComponent::PlayPredictableMontageForTarget(USigilCombatSystemComponent* TargetCSC, FSigilPlayMontageRequest Request)
@@ -234,11 +266,27 @@ void USigilCombatSystemComponent::PlayPredictableMontageForTarget(USigilCombatSy
 			UE_LOG(LogSigilCombat, Warning, TEXT("%s is not allowed to play a montage on %s."), *GetNameSafe(GetOwner()), *GetNameSafe(TargetCSC->GetOwner()));
 			return;
 		}
+		Request.RequestId = NextMontageRequestId++;
 		TargetCSC->SetReplicatedMontage(Request);
 	}
 	else if (GetOwnerRole() == ROLE_AutonomousProxy)
 	{
-		TargetCSC->PlayPredictedMontage(Request);
+		Request.RequestId = NextMontageRequestId++;
+
+		// Prune stale book-keeping (predictions the server never answered explicitly, e.g. accepted ones).
+		const double Now = FPlatformTime::Seconds();
+		for (auto It = PendingPredictions.CreateIterator(); It; ++It)
+		{
+			if (Now - It->Value.IssuedTime > 10.0 || !It->Value.Target.IsValid())
+			{
+				It.RemoveCurrent();
+			}
+		}
+
+		if (TargetCSC->PlayPredictedMontage(Request))
+		{
+			PendingPredictions.Add(Request.RequestId, FPendingPrediction{TargetCSC, Now});
+		}
 		ServerPlayPredictableMontageForTarget(TargetCSC, Request);
 	}
 }
@@ -246,31 +294,61 @@ void USigilCombatSystemComponent::PlayPredictableMontageForTarget(USigilCombatSy
 
 void USigilCombatSystemComponent::ServerPlayPredictableMontageForTarget_Implementation(USigilCombatSystemComponent* TargetCSC, FSigilPlayMontageRequest Request)
 {
-	// Never trust the client: re-validate structure and authorization on the server. Rejections are logged (rate-limited), never asserted.
-	FString Reason;
-	if (!IsMontageRequestValid(TargetCSC, Request, &Reason))
+	// Never trust the client: re-validate structure, rate and authorization on the server.
+	// Rejections are logged (rate-limited) and echoed back so the client can roll back its prediction; never asserted.
+	auto Reject = [this, &Request](const FString& Why)
 	{
 		static double LastLogTime = -100.0;
 		const double Now = FPlatformTime::Seconds();
 		if (Now - LastLogTime > 1.0)
 		{
 			LastLogTime = Now;
-			UE_LOG(LogSigilCombat, Warning, TEXT("Server rejected montage request from %s: %s."), *GetNameSafe(GetOwner()), *Reason);
+			UE_LOG(LogSigilCombat, Warning, TEXT("Server rejected montage request %d from %s: %s."), Request.RequestId, *GetNameSafe(GetOwner()), *Why);
 		}
+		ClientMontageRequestRejected(Request.RequestId);
+	};
+
+	// Per-component request rate limit.
+	const int32 MaxPerSecond = GetDefault<USigilCombatSystemSettings>()->MaxPredictableMontageRequestsPerSecond;
+	if (MaxPerSecond > 0)
+	{
+		const double Now = FPlatformTime::Seconds();
+		if (Now - MontageRequestWindowStart >= 1.0)
+		{
+			MontageRequestWindowStart = Now;
+			MontageRequestsInWindow = 0;
+		}
+		if (++MontageRequestsInWindow > MaxPerSecond)
+		{
+			Reject(TEXT("rate limit exceeded"));
+			return;
+		}
+	}
+
+	FString Reason;
+	if (!IsMontageRequestValid(TargetCSC, Request, &Reason))
+	{
+		Reject(Reason);
 		return;
 	}
 	if (!CanPlayMontageOnTarget(TargetCSC, Request))
 	{
-		static double LastLogTime = -100.0;
-		const double Now = FPlatformTime::Seconds();
-		if (Now - LastLogTime > 1.0)
-		{
-			LastLogTime = Now;
-			UE_LOG(LogSigilCombat, Warning, TEXT("Server rejected montage request from %s targeting %s: not authorized."), *GetNameSafe(GetOwner()), *GetNameSafe(TargetCSC->GetOwner()));
-		}
+		Reject(FString::Printf(TEXT("not authorized to target %s"), *GetNameSafe(TargetCSC->GetOwner())));
 		return;
 	}
 	TargetCSC->SetReplicatedMontage(Request);
+}
+
+void USigilCombatSystemComponent::ClientMontageRequestRejected_Implementation(int32 RequestId)
+{
+	FPendingPrediction Pending;
+	if (PendingPredictions.RemoveAndCopyValue(RequestId, Pending))
+	{
+		if (USigilCombatSystemComponent* Target = Pending.Target.Get())
+		{
+			Target->CancelPredictedMontage(RequestId);
+		}
+	}
 }
 
 
@@ -293,6 +371,8 @@ void USigilCombatSystemComponent::SetReplicatedMontage(const FSigilPlayMontageRe
 	ReplicatedMontageInfo.TriggeredTime = GetSigilServerWorldTime(World);
 	ReplicatedMontageInfo.StartSectionName = Request.StartSectionName;
 	ReplicatedMontageInfo.StartTimeSeconds = StartPosition;
+	ReplicatedMontageInfo.RequestId = Request.RequestId;
+	ReplicatedMontageInfo.RootTranslationScale = Request.RootTranslationScale;
 
 	// Wall-clock duration of the remaining montage: (length - start) / rate. A higher rate plays faster and finishes sooner.
 	const float RemainingLength = FMath::Max(Request.AnimMontage->GetPlayLength() - StartPosition, 0.0f);
@@ -316,8 +396,23 @@ void USigilCombatSystemComponent::OnRep_ReplicatedMontageInfo()
 {
 	if (ReplicatedMontageInfo.AnimMontage == nullptr)
 	{
-		PredictedMontageInfo.AnimMontage = nullptr;
+		PredictedMontageInfo = FSigilPredictedMontageInfo();
 		return;
+	}
+
+	// Reconcile with a local prediction by request id (never by asset pointer: the same asset may be
+	// requested with different sections / rates / start times).
+	if (PredictedMontageInfo.RequestId != 0)
+	{
+		if (PredictedMontageInfo.RequestId == ReplicatedMontageInfo.RequestId)
+		{
+			// Server accepted exactly what we predicted; the montage is already playing locally.
+			PredictedMontageInfo = FSigilPredictedMontageInfo();
+			ApplyRootTranslationScale(ReplicatedMontageInfo.RootTranslationScale);
+			return;
+		}
+		// A different authoritative montage arrived: drop the prediction and follow the server.
+		PredictedMontageInfo = FSigilPredictedMontageInfo();
 	}
 
 	USkeletalMeshComponent* MeshComponent = GetCharacterMeshComponent();
@@ -335,44 +430,68 @@ void USigilCombatSystemComponent::OnRep_ReplicatedMontageInfo()
 	const float ElapsedWorldTime = FMath::Max(GetSigilServerWorldTime(GetWorld()) - ReplicatedMontageInfo.TriggeredTime, 0.0f);
 	const float MontageTime = FMath::Clamp(ReplicatedMontageInfo.StartTimeSeconds + ElapsedWorldTime * PlayRate, 0.0f, MontageLength);
 
-	//If local montage ahead of replicated montage
-	if (PredictedMontageInfo.AnimMontage != nullptr)
-	{
-		//And it's the same.
-		if (ReplicatedMontageInfo.AnimMontage == PredictedMontageInfo.AnimMontage)
-		{
-			PredictedMontageInfo.AnimMontage = nullptr;
-			return;
-		}
-		PredictedMontageInfo.AnimMontage = nullptr;
-	}
-
+	ApplyRootTranslationScale(ReplicatedMontageInfo.RootTranslationScale);
 	AnimInstance->Montage_Play(MontageToPlay, PlayRate, EMontagePlayReturnType::MontageLength, MontageTime);
 }
 
-void USigilCombatSystemComponent::PlayPredictedMontage(const FSigilPlayMontageRequest& Request)
+bool USigilCombatSystemComponent::PlayPredictedMontage(const FSigilPlayMontageRequest& Request)
 {
 	if (!IsMontageRequestValid(this, Request))
 	{
-		return;
+		return false;
+	}
+
+	USkeletalMeshComponent* MeshComponent = GetCharacterMeshComponent();
+	UAnimInstance* AnimInstance = MeshComponent ? MeshComponent->GetAnimInstance() : nullptr;
+	if (!AnimInstance)
+	{
+		return false;
+	}
+
+	ApplyRootTranslationScale(Request.RootTranslationScale);
+	const float Duration = AnimInstance->Montage_Play(Request.AnimMontage, Request.PlayRate, EMontagePlayReturnType::MontageLength, Request.StartTimeSeconds);
+	if (Duration <= 0.0f)
+	{
+		// Nothing is playing: do not record a prediction, or a later authoritative replication of the same asset would be swallowed.
+		return false;
+	}
+	if (Request.StartSectionName != NAME_None)
+	{
+		AnimInstance->Montage_JumpToSection(Request.StartSectionName, Request.AnimMontage);
 	}
 
 	PredictedMontageInfo.AnimMontage = Request.AnimMontage;
 	PredictedMontageInfo.PlayRate = Request.PlayRate;
 	PredictedMontageInfo.TriggeredTime = GetSigilServerWorldTime(GetWorld());
 	PredictedMontageInfo.StartSectionName = Request.StartSectionName;
+	PredictedMontageInfo.RequestId = Request.RequestId;
+	return true;
+}
 
-	USkeletalMeshComponent* MeshComponent = GetCharacterMeshComponent();
-	UAnimInstance* AnimInstance = MeshComponent ? MeshComponent->GetAnimInstance() : nullptr;
-	if (!AnimInstance)
+void USigilCombatSystemComponent::CancelPredictedMontage(int32 RequestId)
+{
+	if (RequestId == 0 || PredictedMontageInfo.RequestId != RequestId)
 	{
 		return;
 	}
-
-	const float Duration = AnimInstance->Montage_Play(Request.AnimMontage, Request.PlayRate, EMontagePlayReturnType::MontageLength, Request.StartTimeSeconds);
-	if (Duration > 0.0f && Request.StartSectionName != NAME_None)
+	if (USkeletalMeshComponent* MeshComponent = GetCharacterMeshComponent())
 	{
-		AnimInstance->Montage_JumpToSection(Request.StartSectionName, Request.AnimMontage);
+		if (UAnimInstance* AnimInstance = MeshComponent->GetAnimInstance())
+		{
+			if (PredictedMontageInfo.AnimMontage && AnimInstance->Montage_IsPlaying(PredictedMontageInfo.AnimMontage))
+			{
+				AnimInstance->Montage_Stop(PredictedMontageInfo.AnimMontage->BlendOut.GetBlendTime(), PredictedMontageInfo.AnimMontage);
+			}
+		}
+	}
+	PredictedMontageInfo = FSigilPredictedMontageInfo();
+}
+
+void USigilCombatSystemComponent::ApplyRootTranslationScale(float Scale) const
+{
+	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
+	{
+		Character->SetAnimRootMotionTranslationScale(FMath::Max(Scale, 0.0f));
 	}
 }
 

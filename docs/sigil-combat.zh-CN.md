@@ -45,7 +45,14 @@ sigil.combat 是直接构建在 sigil.gas 之上的 GAS 多人战斗框架，提
 
 ### 可预测蒙太奇
 
-`USigilCombatSystemComponent::PlayPredictableMontageForTarget` 在目标身上播受击蒙太奇：发起端客户端先本地立即播放（`PredictedMontageInfo`），同时走 `ServerPlayPredictableMontageForTarget`，服务器再复制带触发时间的 `ReplicatedMontageInfo`，其他客户端据此对齐进度播放（`OnRep_ReplicatedMontageInfo`）。`FSigilPlayMontageRequest` 携带蒙太奇、`PlayRate`、`StartSectionName`、`RootTranslationScale`、`StartTimeSeconds`。
+`USigilCombatSystemComponent::PlayPredictableMontageForTarget` 在目标身上播受击蒙太奇：发起端客户端先本地立即播放（`PredictedMontageInfo`），同时走 `ServerPlayPredictableMontageForTarget`，服务器再复制带触发时间与请求序号的 `ReplicatedMontageInfo`，其他客户端据此对齐进度播放（`OnRep_ReplicatedMontageInfo`）。`FSigilPlayMontageRequest` 携带蒙太奇、`PlayRate`、`StartSectionName`、`RootTranslationScale`、`StartTimeSeconds`；`RequestId` 自动分配。
+
+服务器侧信任边界：
+
+- 每个请求在服务器重新校验：蒙太奇非空、倍率在 `USigilCombatSystemSettings::Min/MaxPredictableMontagePlayRate` 内、根运动缩放在 `[0, MaxPredictableMontageRootTranslationScale]` 内、起始时间/Section 在蒙太奇内，且蒙太奇为**线性**（循环或非线性 Section 图会被拒绝——可预测播放按线性时间推导清理时机与延迟补播位置）。
+- 授权走 `BlueprintNativeEvent` `CanPlayMontageOnTarget`。**默认只允许组件作用于自身。** 跨目标播放（如攻击方→受击方的受击动作）需显式开启：在项目设置里把 `MaxPredictableMontageTargetDistance` 设为大于 0，默认实现随即允许同世界、在该距离内的目标。阵营 / 攻击流程规则请覆写该事件。
+- 每个发起组件有请求限频（`MaxPredictableMontageRequestsPerSecond`，默认 8）。
+- 拒绝会通过 `ClientMontageRequestRejected(RequestId)` 回传，客户端回滚预测；接受按请求序号对账，不按资产指针猜。
 
 ### 阵营、武器与角色接口
 
