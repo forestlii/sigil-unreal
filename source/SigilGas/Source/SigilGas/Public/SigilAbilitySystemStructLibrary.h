@@ -41,8 +41,18 @@ public:
 	bool IsValid() const { return !MainName.IsNone(); }
 
 	/**
-	 * Retrieves the combined group name.
-	 * 获取组合的组名称。
+	 * Separator between MainName and SubName inside a CurveTable row's group segment.
+	 * The engine's FAttributeSetInitter parses rows as `Group.SetName.Attribute` by splitting on '.',
+	 * so the group segment must not contain '.'; sub-groups are encoded as `Main->Sub` instead
+	 * (e.g. row `Hero->Warrior.SigilHealthSet.MaxHealth`).
+	 * CurveTable 行名中主组与子组之间的分隔符。引擎 FAttributeSetInitter 按 '.' 把行名拆成
+	 * `组.属性集.属性`，因此组名段不能含 '.'；子组用 `Main->Sub` 编码（例：`Hero->Warrior.SigilHealthSet.MaxHealth`）。
+	 */
+	static constexpr const TCHAR* SubNameSeparator = TEXT("->");
+
+	/**
+	 * Retrieves the combined group name as it appears in the CurveTable row (`Main` or `Main->Sub`).
+	 * 获取 CurveTable 行名里使用的组合组名（`Main` 或 `Main->Sub`）。
 	 * @return The combined name. 组合名称。
 	 */
 	FName GetName() const
@@ -50,7 +60,7 @@ public:
 		FName Ref = MainName;
 		if (!SubName.IsNone())
 		{
-			Ref = FName(*FString::Printf(TEXT("%s.%s"), *Ref.ToString(), *SubName.ToString()));
+			Ref = FName(*FString::Printf(TEXT("%s%s%s"), *Ref.ToString(), SubNameSeparator, *SubName.ToString()));
 		}
 		return Ref;
 	}

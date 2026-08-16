@@ -35,24 +35,25 @@ void FSigilAttributeGroupNameCustomization::CustomizeHeader(TSharedRef<IProperty
 		{
 			FString RowName = CurveRow.Key.ToString();
 
-			TArray<FString> RowParts; //[0]GroupName [1]SetName [2]AttribueName
+			// Row layout mirrors the engine's FAttributeSetInitter: `Group.SetName.Attribute`, split on '.'.
+			TArray<FString> RowParts; //[0]GroupName [1]SetName [2]AttributeName
 			RowName.ParseIntoArray(RowParts, TEXT("."));
 			if (RowParts.Num() != 3)
 			{
 				continue;
 			}
 
+			// Only the group segment may carry a sub-group, encoded as `Main->Sub` (see FSigilAttributeGroupName::SubNameSeparator).
 			TArray<FString> GroupParts; //[0]MainName [1]SubName
-			RowName.ParseIntoArray(GroupParts, TEXT("->"));
-			if (GroupParts.Num() != 2)
-			{
-				//Add class name as group.
-				FNameMap.FindOrAdd(FName(*RowParts[0]));
-			}
-			else if (GroupParts.Num() == 2)
+			RowParts[0].ParseIntoArray(GroupParts, FSigilAttributeGroupName::SubNameSeparator);
+			if (GroupParts.Num() == 2)
 			{
 				TArray<FName>& Rows = FNameMap.FindOrAdd(FName(*GroupParts[0]));
 				Rows.AddUnique(FName(*GroupParts[1]));
+			}
+			else
+			{
+				FNameMap.FindOrAdd(FName(*RowParts[0]));
 			}
 		}
 	}

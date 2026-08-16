@@ -56,7 +56,7 @@ sigil.gas 是 Sigil 套件的 GAS（Gameplay Ability System）基建层：在引
 
 - **变化回调分发** —— 在同一 Actor 上挂 `USigilAttributeSystemComponent`，Sigil 属性集会把回调转发给它：`OnPostAttributeChange`、`OnAttributeChanged`（服务端和客户端都触发）、`OnPostGameplayEffectExecute`，每个都有对应的 `Handle...` 蓝图原生事件供子类重写。做 UI / 表现响应不必子类化属性集。
 - **Tag ↔ 属性注册表** —— `USigilGameplayAttributesHelper` 维护全局 Tag→属性映射（`RegisterTagToAttribute`、`TagToAttribute`、`AttributeToTag`、`SetFloatAttribute`、百分比查询等）。
-- **数据驱动默认值** —— `USigilAbilitySystemGlobals` 扩展 `UAbilitySystemGlobals`：按 `FSigilAttributeGroupName`（`MainName` + 可选 `SubName`，拼成 `Main.Sub` 去查属性默认曲线表）执行 `InitAttributeSetDefaults` / `ApplyAttributeDefault`；并通过 `ISigilAbilitySystemGlobalsEventReceiver` 暴露全局的「效果应用前」事件。属性组初始化**要求**项目的 AbilitySystemGlobals 类是 `USigilAbilitySystemGlobals` 或其子类（见「配置」），否则只打警告日志、什么都不做。
+- **数据驱动默认值** —— `USigilAbilitySystemGlobals` 扩展 `UAbilitySystemGlobals`：按 `FSigilAttributeGroupName`（`MainName` + 可选 `SubName`）执行 `InitAttributeSetDefaults` / `ApplyAttributeDefault`。曲线表行名沿用引擎的 `组.属性集.属性` 三段格式；子组编码在组名段里写成 `Main->Sub`（如 `Hero->Warrior.SigilHealthSet.MaxHealth`），因为引擎按 `.` 拆行名。另通过 `ISigilAbilitySystemGlobalsEventReceiver` 暴露全局的「效果应用前」事件。属性组初始化**要求**项目的 AbilitySystemGlobals 类是 `USigilAbilitySystemGlobals` 或其子类（见「配置」），否则只打警告日志、什么都不做。
 - `SigilGasEditor` 编辑器模块为 `FSigilAttributeGroupName` 提供了属性面板定制。
 
 ### 四种现成的 ASC 宿主 Actor
