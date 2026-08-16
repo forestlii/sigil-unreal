@@ -308,6 +308,13 @@ protected:
 	FTimerHandle WaitEquipmentActorsTimer;
 
 	/**
+	 * World whose TimerManager owns WaitEquipmentActorsTimer. Captured at start so the timer can still be cleared
+	 * after OwningPawn is nulled (GetWorld() depends on the pawn).
+	 * 拥有 WaitEquipmentActorsTimer 的 World。启动时记录，这样即使 OwningPawn 被置空（GetWorld() 依赖它）也能清理计时器。
+	 */
+	TWeakObjectPtr<UWorld> WaitEquipmentActorsWorld;
+
+	/**
 	 * Number of wait ticks (0.2 s each) performed so far for the current wait; bounded by MaxWaitEquipmentActorsTicks.
 	 * 当前等待已执行的 tick 次数（每 0.2 秒一次），上限为 MaxWaitEquipmentActorsTicks。
 	 */

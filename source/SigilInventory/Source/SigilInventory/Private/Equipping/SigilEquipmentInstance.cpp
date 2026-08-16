@@ -59,6 +59,11 @@ void USigilEquipmentInstance::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 
 void USigilEquipmentInstance::ReceiveOwningPawn_Implementation(APawn* NewPawn)
 {
+	if (NewPawn == nullptr)
+	{
+		// Detaching from the pawn: nothing to wait for anymore, and GetWorld() is about to become unavailable.
+		StopWaitingForEquipmentActors();
+	}
 	OwningPawn = NewPawn;
 }
 
@@ -273,6 +278,7 @@ void USigilEquipmentInstance::TryWaitEquipmentActors()
 	if (UWorld* World = GetWorld())
 	{
 		WaitCounter = 0;
+		WaitEquipmentActorsWorld = World;
 		World->GetTimerManager().SetTimer(WaitEquipmentActorsTimer, FTimerDelegate::CreateUObject(this, &ThisClass::WaitEquipmentActors), 0.2f, true);
 	}
 }
@@ -281,12 +287,14 @@ void USigilEquipmentInstance::StopWaitingForEquipmentActors()
 {
 	if (WaitEquipmentActorsTimer.IsValid())
 	{
-		if (UWorld* World = GetWorld())
+		// Use the world that created the timer, not GetWorld(): the owning pawn may already have been detached.
+		if (UWorld* World = WaitEquipmentActorsWorld.Get())
 		{
 			World->GetTimerManager().ClearTimer(WaitEquipmentActorsTimer);
 		}
 		WaitEquipmentActorsTimer.Invalidate();
 	}
+	WaitEquipmentActorsWorld.Reset();
 	WaitCounter = 0;
 }
 
