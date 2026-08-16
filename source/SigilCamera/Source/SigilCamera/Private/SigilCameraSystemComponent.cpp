@@ -64,7 +64,9 @@ void USigilCameraSystemComponent::TickComponent(float DeltaTime, ELevelTick Tick
 			}
 		}
 
-		AssociatedCameraComponent->FieldOfView = CameraModeView.FieldOfView;
+		// One-frame FOV offset: consume it here and reset so callers must re-apply it every frame.
+		AssociatedCameraComponent->FieldOfView = CameraModeView.FieldOfView + FieldOfViewOffset;
+		FieldOfViewOffset = 0.0f;
 
 		AssociatedSpringArmComponent->TargetArmLength = CameraModeView.SpringArmLength;
 
@@ -169,16 +171,31 @@ void USigilCameraSystemComponent::DrawDebug(UCanvas* Canvas) const
 	DisplayDebugManager.DrawString(FString::Printf(TEXT("SigilCameraSystemComponent: %s"), *GetNameSafe(GetTargetActor())));
 
 	DisplayDebugManager.SetDrawColor(FColor::White);
-	DisplayDebugManager.DrawString(FString::Printf(TEXT("   Location: %s"), *AssociatedCameraComponent->GetComponentLocation().ToCompactString()));
-	DisplayDebugManager.DrawString(FString::Printf(TEXT("   Rotation: %s"), *AssociatedCameraComponent->GetComponentRotation().ToCompactString()));
-	DisplayDebugManager.DrawString(FString::Printf(TEXT("   SpringArmLength: %f"), AssociatedSpringArmComponent->TargetArmLength));
-	DisplayDebugManager.DrawString(FString::Printf(TEXT("   SpringArmSocketOffset: %s"), *AssociatedSpringArmComponent->SocketOffset.ToCompactString()));
-	DisplayDebugManager.DrawString(FString::Printf(TEXT("   SpringArmTargetOffset: %s"), *AssociatedSpringArmComponent->TargetOffset.ToCompactString()));
+	if (AssociatedCameraComponent)
+	{
+		DisplayDebugManager.DrawString(FString::Printf(TEXT("   Location: %s"), *AssociatedCameraComponent->GetComponentLocation().ToCompactString()));
+		DisplayDebugManager.DrawString(FString::Printf(TEXT("   Rotation: %s"), *AssociatedCameraComponent->GetComponentRotation().ToCompactString()));
+		DisplayDebugManager.DrawString(FString::Printf(TEXT("   FOV: %f"), AssociatedCameraComponent->FieldOfView));
+	}
+	else
+	{
+		DisplayDebugManager.DrawString(TEXT("   Camera: <not initialized - call Initialize(Camera, SpringArm)>"));
+	}
+	if (AssociatedSpringArmComponent)
+	{
+		DisplayDebugManager.DrawString(FString::Printf(TEXT("   SpringArmLength: %f"), AssociatedSpringArmComponent->TargetArmLength));
+		DisplayDebugManager.DrawString(FString::Printf(TEXT("   SpringArmSocketOffset: %s"), *AssociatedSpringArmComponent->SocketOffset.ToCompactString()));
+		DisplayDebugManager.DrawString(FString::Printf(TEXT("   SpringArmTargetOffset: %s"), *AssociatedSpringArmComponent->TargetOffset.ToCompactString()));
+	}
+	else
+	{
+		DisplayDebugManager.DrawString(TEXT("   SpringArm: <not initialized>"));
+	}
 
-	DisplayDebugManager.DrawString(FString::Printf(TEXT("   FOV: %f"), AssociatedCameraComponent->FieldOfView));
-
-	check(CameraModeStack);
-	CameraModeStack->DrawDebug(Canvas);
+	if (CameraModeStack)
+	{
+		CameraModeStack->DrawDebug(Canvas);
+	}
 }
 
 void USigilCameraSystemComponent::GetBlendInfo(float& OutWeightOfTopLayer, FGameplayTag& OutTagOfTopLayer) const

@@ -35,6 +35,16 @@ void USigilCameraMode_WithPenetrationAvoidance::UpdatePreventPenetration(float D
 	{
 		return;
 	}
+	if (PenetrationAvoidanceFeelers.IsEmpty())
+	{
+		static bool bWarnedOnce = false;
+		if (!bWarnedOnce)
+		{
+			bWarnedOnce = true;
+			UE_LOG(LogTemp, Warning, TEXT("%s: bPreventPenetration is enabled but PenetrationAvoidanceFeelers is empty; penetration avoidance is disabled."), *GetNameSafe(GetClass()));
+		}
+		return;
+	}
 
 	AActor* TargetActor = GetTargetActor();
 
