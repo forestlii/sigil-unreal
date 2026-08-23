@@ -24,6 +24,26 @@ sigil.gas 是 Sigil 套件的 GAS（Gameplay Ability System）基建层：在引
 
 `USigilAbilitySet` 是 Const 的 `UPrimaryDataAsset`，打包 `GrantedGameplayAbilities`、`GrantedGameplayEffects`、`GrantedAttributes` 三类授予项。用 `GiveToAbilitySystem`（或静态、仅服务器的 `GiveAbilitySetToAbilitySystem`）授予，之后凭返回的 `FSigilAbilitySet_GrantedHandles` 调 `TakeFromAbilitySystem` 一键收回。每条技能项含 `Ability`、`AbilityLevel`、`InputID`、`DynamicTags`。
 
+### 实验性的 Ability Entitlement 投影
+
+> **这是 Spike API，不是 Final L2 或生产承诺。** 它只用于验证服务器权威的投影模型；在另一次 Final L2 用证据正式接纳前，项目不得把它当成持久化存档 schema 或稳定集成合同。
+
+`USigilAbilitySystemComponent::ReconcileAbilityEntitlements` 把当前会话内的 `FSigilAbilityEntitlementSnapshot` 投影成运行时 AbilitySpec。每个稳定的 `EntitlementTag` 映射到一份已经加载的 `USigilAbilitySet`。这条实验路径：
+
+- 只接受 **ability-only** 的 AbilitySet；含 GameplayEffect 或 AttributeSet 时直接拒绝；
+- 绝不调用 `LoadSynchronous`；AbilitySet 或 Ability class 未预加载时 fail closed；
+- 修改 ASC 前完整预检 entitlement 唯一性、具体 Ability class、等级、动态 Tag 与不兼容 identity；
+- 规范化 grant identity 与完整期望快照：更高 Revision 可应用，同 Revision + 同 digest 为 no-op，同 Revision + 不同 digest 为冲突，低 Revision 为 stale；
+- 多个 entitlement contributor 可共享同一组运行时 grant，只有最后一个 contributor 消失时才移除；
+- 同一次 reconcile 中途授予失败时，补偿本批新建的 `FGameplayAbilitySpec` 句柄，并保持此前已接受投影不变；
+- 只拥有自己记录的句柄与 activation gate 贡献；`ResetAbilityEntitlementProjection` 不会删除默认 AbilitySet 或其他系统拥有的 grant；
+- `AbilityInputTagPressed` / `AbilityInputTagReleased` 只按 DynamicSpecSourceTag **精确匹配**；
+- `SetAbilityActivationGateSource` 以 `(GateTag, SourceId)` 提供幂等的激活门贡献。传给该 API 的精确 GateTag 必须专用于此 API：该 Tag 的整个 explicit count（包括原本可能来自 GameplayEffect、Ability 或直接 loose-tag 调用的贡献）都必须由此 API 独占；所有生产者只使用不同 `SourceId`，其他系统不得再授予或移除同一个精确 Tag。
+
+Snapshot Revision 只属于某一个 ASC projection epoch。游戏侧持久快照应只保存稳定 entitlement Tag，并为替换后的 ASC 重新构造一份全新的 Desired；禁止持久化 AbilitySpecHandle、ASC 指针、UObject 指针、contributor set 或会话 Revision。
+
+补偿保证有意保持窄边界：预检失败或新增 identity 的授予阶段失败时，本次创建的句柄会被清除，此前已接受的投影保持不变。GAS 可能在授予/移除时同步触发 Ability 的 `OnGive` / `OnRemove` 钩子；若钩子改变 ASC 上下文或已有投影自有 AbilitySpec，对账会以 `RuntimeStateMismatch` fail closed，保留所有权账本，并阻止继续对账，直到权威侧执行 `ResetAbilityEntitlementProjection`。本 Spike **不宣称**已经触发的生命周期钩子、任意 Blueprint 事件或外部副作用可以被事务回滚。
+
 ### Sigil 技能基类
 
 `USigilGameplayAbility`（Abstract）是推荐的技能基类：
@@ -136,6 +156,8 @@ sigil.gas 是 Sigil 套件的 GAS（Gameplay Ability System）基建层：在引
 | `USigilAbilitySystemComponent` | 扩展版 ASC：生命周期、技能集、激活组、Tag 关系、RPC 批处理、复制事件。 |
 | `USigilGameplayAbility` | 技能基类：激活组、附加成本、效果容器、可选 Tick、蓝图钩子。 |
 | `USigilAbilitySet` | 授予技能/效果/属性集的数据资产，凭 `FSigilAbilitySet_GrantedHandles` 收回。 |
+| `FSigilAbilityEntitlementSnapshot` | 实验性的会话内期望投影；把稳定 entitlement Tag 映射到已加载、ability-only 的 AbilitySet。 |
+| `FSigilAbilityReconcileResult` | 实验性 reconcile 的状态、已接受 Revision、canonical digest 与诊断错误。 |
 | `USigilAbilityCost` | 内联实例化、可蓝图化的附加激活成本（弹药、次数等）。 |
 | `ESigilAbilityActivationGroup` | `Independent` / `Exclusive_Replaceable` / `Exclusive_Blocking`。 |
 | `USigilAbilityTagRelationshipMapping` | 阻挡/取消/必需/禁止 Tag 关系的数据资产，含按 TagQuery 分层的规则。 |

@@ -15,6 +15,8 @@ class UGameplayEffect;
 class UGameplayAbility;
 class UGAbilitySystemComponent;
 class UObject;
+class USigilAbilitySystemComponent;
+struct FSigilAbilityEntitlementProjectionTestAccess;
 
 /**
  * Struct for granting gameplay abilities in an ability set.
@@ -203,6 +205,9 @@ public:
 	void TakeFromAbilitySystem(UAbilitySystemComponent* ASC);
 
 protected:
+	friend class USigilAbilitySystemComponent;
+	friend struct FSigilAbilityEntitlementProjectionTestAccess;
+
 	/**
 	 * Handles to granted abilities.
 	 * 已赋予的技能句柄。
@@ -271,6 +276,29 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "GGA|AbilitySet", BlueprintAuthorityOnly)
 	static void TakeAbilitySetFromAbilitySystem(UPARAM(ref) FSigilAbilitySet_GrantedHandles& GrantedHandles, UAbilitySystemComponent* ASC);
+
+private:
+	struct FAbilityOnlyGrantPlanEntry
+	{
+		TSubclassOf<UGameplayAbility> AbilityClass;
+		int32 AbilityLevel = 1;
+		int32 InputID = INDEX_NONE;
+		FGameplayTagContainer DynamicTags;
+		FString AbilityClassPath;
+		FString CanonicalEntry;
+	};
+
+	struct FAbilityOnlyGrantPlan
+	{
+		FString CanonicalIdentity;
+		TArray<FAbilityOnlyGrantPlanEntry> Entries;
+		TSet<FString> AbilityClassPaths;
+	};
+
+	bool BuildAbilityOnlyEntitlementGrantPlan(int32 OverrideLevel, FAbilityOnlyGrantPlan& OutPlan, FString& OutError) const;
+
+	friend class USigilAbilitySystemComponent;
+	friend struct FSigilAbilityEntitlementProjectionTestAccess;
 
 protected:
 	/**

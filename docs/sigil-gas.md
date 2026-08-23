@@ -24,6 +24,26 @@ sigil.gas is the Gameplay Ability System (GAS) infrastructure layer of the Sigil
 
 `USigilAbilitySet` is a const `UPrimaryDataAsset` bundling `GrantedGameplayAbilities`, `GrantedGameplayEffects`, and `GrantedAttributes`. Grant it with `GiveToAbilitySystem` (or the static, authority-only `GiveAbilitySetToAbilitySystem`) and revoke everything later through the returned `FSigilAbilitySet_GrantedHandles` (`TakeFromAbilitySystem`). Each ability entry carries `Ability`, `AbilityLevel`, `InputID`, and `DynamicTags`.
 
+### Experimental ability-entitlement projection
+
+> **Spike API, not a Final L2 or production commitment.** This surface exists to validate a server-authoritative projection model. Projects must not treat it as a durable save schema or a stable integration contract until a separate Final L2 decision accepts the evidence.
+
+`USigilAbilitySystemComponent::ReconcileAbilityEntitlements` projects a session-local `FSigilAbilityEntitlementSnapshot` into runtime ability specs. Each stable `EntitlementTag` maps to one already-loaded `USigilAbilitySet`. The experimental path:
+
+- accepts **ability-only** sets; effects and attribute sets are rejected;
+- never calls `LoadSynchronous` and fails closed when a referenced set or ability class is not already loaded;
+- performs full preflight before mutation, including unique entitlement tags, concrete ability classes, levels, dynamic tags, and incompatible identities;
+- canonicalizes grant identities and the desired snapshot so a higher revision applies, the same revision and digest is a no-op, the same revision with a different digest conflicts, and a lower revision is stale;
+- shares one runtime grant among multiple entitlement contributors and removes it only after the final contributor disappears;
+- compensates newly created `FGameplayAbilitySpec` handles when a grant in the same reconciliation fails, while leaving the previously accepted projection intact;
+- owns only its recorded handles and activation-gate contribution. `ResetAbilityEntitlementProjection` does not remove default sets or grants owned by another system;
+- routes `AbilityInputTagPressed` / `AbilityInputTagReleased` by an **exact** DynamicSpecSourceTag match; and
+- exposes idempotent `(GateTag, SourceId)` activation-gate contributions through `SetAbilityActivationGateSource`. Every exact gate tag passed to this API is dedicated to it: the entire explicit count, including contributions that could otherwise come from effects, abilities, or direct loose-tag calls, must be owned by this API. All producers use distinct `SourceId` values and no other system grants or removes the same exact tag.
+
+The snapshot revision is local to one ASC projection epoch. Persist stable entitlement tags in the game-owned durable snapshot, then construct a fresh desired snapshot for a replacement ASC; never persist ability spec handles, ASC pointers, UObject pointers, contributor sets, or the session revision.
+
+The compensation guarantee is intentionally narrow: preflight failures and failures while adding a new identity remove the handles created by that attempt and preserve the previously accepted projection. GAS can synchronously invoke ability `OnGive` / `OnRemove` hooks. If one of those hooks changes the ASC context or an existing projection-owned spec, reconciliation fails closed with `RuntimeStateMismatch`, retains ownership bookkeeping, and blocks further reconciliation until an authoritative `ResetAbilityEntitlementProjection`. This Spike does **not** claim that an already-fired lifecycle hook, arbitrary Blueprint event, or external side effect can be transactionally reversed.
+
 ### Sigil Gameplay Ability
 
 `USigilGameplayAbility` (abstract) is the base ability class:
@@ -136,6 +156,8 @@ sigil.gas is the Gameplay Ability System (GAS) infrastructure layer of the Sigil
 | `USigilAbilitySystemComponent` | Extended ASC: lifecycle, ability sets, activation groups, tag relationships, batched RPCs, replicated gameplay events. |
 | `USigilGameplayAbility` | Base ability: activation group, additional costs, effect containers, optional tick, Blueprint hooks. |
 | `USigilAbilitySet` | Data asset granting abilities/effects/attribute sets; revocable via `FSigilAbilitySet_GrantedHandles`. |
+| `FSigilAbilityEntitlementSnapshot` | Experimental, session-local desired ability projection; maps stable entitlement tags to already-loaded, ability-only sets. |
+| `FSigilAbilityReconcileResult` | Experimental reconciliation status, accepted revision, canonical digest, and diagnostic error. |
 | `USigilAbilityCost` | Instanced, Blueprintable extra activation cost (ammo, charges…). |
 | `ESigilAbilityActivationGroup` | `Independent` / `Exclusive_Replaceable` / `Exclusive_Blocking`. |
 | `USigilAbilityTagRelationshipMapping` | Data asset of block/cancel/required/blocked tag relationships, plus tag-query-layered rules. |

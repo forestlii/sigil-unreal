@@ -3,6 +3,7 @@
 #pragma once
 
 #include "AbilitySystemComponent.h"
+#include "Abilities/SigilAbilityEntitlementTypes.h"
 #include "SigilAbilitySet.h"
 #include "SigilAbilitySystemEnumLibrary.h"
 #include "SigilAbilitySystemStructLibrary.h"
@@ -219,6 +220,56 @@ private:
 	 */
 	UPROPERTY(VisibleInstanceOnly, Category = "GGA|Abilities")
 	bool bRegisteredToGlobalAbilitySystem{false};
+
+#pragma endregion
+
+#pragma region AbilityEntitlements
+public:
+	/** Reconciles an already-loaded, ability-only entitlement snapshot on the authoritative ASC. 在权威 ASC 上对账已加载、仅含 Ability 的 entitlement 快照。 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "GGA|Ability Entitlement")
+	FSigilAbilityReconcileResult ReconcileAbilityEntitlements(const FSigilAbilityEntitlementSnapshot& Desired);
+
+	/** Removes only the runtime grants and gate contributions owned by this entitlement projection. 只移除本投影拥有的运行时授予与激活门贡献。 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "GGA|Ability Entitlement")
+	void ResetAbilityEntitlementProjection();
+
+	/** Adds or removes one idempotent activation-gate source. 增减一个幂等的激活门来源。 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "GGA|Ability Entitlement")
+	void SetAbilityActivationGateSource(FGameplayTag GateTag, FName SourceId, bool bPresent);
+
+	/** Routes an exact dynamic spec source tag press to matching ability specs. 按精确动态来源 Tag 路由按下事件。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability Entitlement")
+	void AbilityInputTagPressed(FGameplayTag InputTag);
+
+	/** Routes an exact dynamic spec source tag release to matching ability specs. 按精确动态来源 Tag 路由释放事件。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability Entitlement")
+	void AbilityInputTagReleased(FGameplayTag InputTag);
+
+private:
+	struct FAbilityEntitlementRuntimeGrant
+	{
+		FSigilAbilitySet_GrantedHandles GrantedHandles;
+		TSet<FGameplayTag> Contributors;
+		TMap<FString, FString> ExpectedSpecCanonicalEntries;
+	};
+
+	TMap<FString, FAbilityEntitlementRuntimeGrant> AbilityEntitlementRuntimeGrants;
+	TMap<FGameplayTag, FString> AbilityEntitlementToIdentity;
+	TMap<FGameplayTag, TSet<FName>> AbilityActivationGateSources;
+	int64 AbilityEntitlementProjectionEpoch = 1;
+	int64 LastAcceptedAbilityEntitlementRevision = INDEX_NONE;
+	FString LastAcceptedAbilityEntitlementDigest;
+	bool bHasAcceptedAbilityEntitlementSnapshot = false;
+	bool bAbilityEntitlementReconcileInProgress = false;
+	bool bAbilityEntitlementResetInProgress = false;
+	bool bAbilityEntitlementProjectionNeedsReset = false;
+	bool bAbilityActivationGateMutationInProgress = false;
+
+#if WITH_DEV_AUTOMATION_TESTS
+	int32 AbilityEntitlementFailGrantOrdinalForTest = INDEX_NONE;
+#endif
+
+	friend struct FSigilAbilityEntitlementProjectionTestAccess;
 
 #pragma endregion
 
