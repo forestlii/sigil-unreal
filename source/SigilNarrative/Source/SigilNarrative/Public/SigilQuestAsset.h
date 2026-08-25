@@ -35,6 +35,9 @@ struct SIGILNARRATIVE_API FSigilQuestTaskDefinition
 	FName TaskId;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sigil|Narrative")
+	FText ObjectiveText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sigil|Narrative")
 	int32 RequiredCount = 1;
 };
 
@@ -88,6 +91,9 @@ class SIGILNARRATIVE_API USigilQuestAsset : public UDataAsset
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sigil|Narrative")
 	FName QuestId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sigil|Narrative")
+	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sigil|Narrative")
 	FName InitialStateId;
