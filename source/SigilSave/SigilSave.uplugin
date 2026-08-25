@@ -1,0 +1,21 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "sigil.save",
+	"Description": "Minimal synchronous JSON save support for the Sigil suite.",
+	"Category": "Sigil",
+	"CreatedBy": "Likeon",
+	"CreatedByURL": "https://github.com/forestlii",
+	"DocsURL": "https://github.com/forestlii/sigil-unreal",
+	"SupportURL": "https://github.com/forestlii/sigil-unreal/issues",
+	"EngineVersion": "5.8.0",
+	"CanContainContent": false,
+	"Modules": [
+		{
+			"Name": "SigilSave",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
