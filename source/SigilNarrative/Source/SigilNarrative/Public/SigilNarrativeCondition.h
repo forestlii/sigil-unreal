@@ -7,7 +7,7 @@
 #include "SigilNarrativeTypes.h"
 #include "SigilNarrativeCondition.generated.h"
 
-UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew, DefaultToInstanced, Const)
+UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew, DefaultToInstanced, Const, CollapseCategories)
 class SIGILNARRATIVE_API USigilNarrativeCondition : public UObject
 {
 	GENERATED_BODY()

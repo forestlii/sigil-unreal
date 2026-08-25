@@ -7,7 +7,7 @@
 #include "SigilNarrativeTypes.h"
 #include "SigilNarrativeEvent.generated.h"
 
-UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew, DefaultToInstanced)
+UCLASS(Abstract, Blueprintable, BlueprintType, EditInlineNew, DefaultToInstanced, CollapseCategories)
 class SIGILNARRATIVE_API USigilNarrativeEvent : public UObject
 {
 	GENERATED_BODY()
