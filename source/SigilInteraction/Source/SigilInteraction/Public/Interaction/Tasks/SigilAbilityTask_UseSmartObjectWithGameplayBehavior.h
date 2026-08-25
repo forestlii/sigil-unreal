@@ -45,6 +45,20 @@ public:
 	 */
 	void SetClaimHandle(const FSmartObjectClaimHandle& Handle) { ClaimedHandle = Handle; }
 
+	/**
+	 * Delegate for when the interaction succeeds.
+	 * 交互成功时的委托。
+	 */
+	UPROPERTY(BlueprintAssignable)
+	FGenericGameplayTaskDelegate OnSucceeded;
+
+	/**
+	 * Delegate for when the interaction fails.
+	 * 交互失败时的委托。
+	 */
+	UPROPERTY(BlueprintAssignable)
+	FGenericGameplayTaskDelegate OnFailed;
+
 protected:
 	/**
 	 * Activates the ability task.
@@ -82,20 +96,6 @@ protected:
 	 * @param State The slot state. 槽状态。
 	 */
 	void OnSlotInvalidated(const FSmartObjectClaimHandle& ClaimHandle, const ESmartObjectSlotState State);
-
-	/**
-	 * Delegate for when the interaction succeeds.
-	 * 交互成功时的委托。
-	 */
-	UPROPERTY(BlueprintAssignable)
-	FGenericGameplayTaskDelegate OnSucceeded;
-
-	/**
-	 * Delegate for when the interaction fails.
-	 * 交互失败时的委托。
-	 */
-	UPROPERTY(BlueprintAssignable)
-	FGenericGameplayTaskDelegate OnFailed;
 
 	/**
 	 * The gameplay behavior for the interaction.

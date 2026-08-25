@@ -51,26 +51,25 @@ bool USigilGameplayAbility_Interaction::TryClaimInteraction(int32 Index, FSmartO
 		return false;
 	}
 
-	if (InteractionInstances[Index].Definition == nullptr)
+	const FSigilInteractionOption CurrentOption = InteractionInstances[Index];
+	if (CurrentOption.Definition == nullptr)
 	{
 		SIGIL_INTERACTION_CLOG(Error, "Interaction at index(%d) has invalid definition!", Index)
 		return false;
 	}
 
-	if (InteractionInstances[Index].SlotState != ESmartObjectSlotState::Free)
+	if (CurrentOption.SlotState != ESmartObjectSlotState::Free)
 	{
-		SIGIL_INTERACTION_CLOG(Error, "Interaction(%s) was Claimed/Occupied!", *InteractionInstances[Index].Definition->Text.ToString())
+		SIGIL_INTERACTION_CLOG(Error, "Interaction(%s) was Claimed/Occupied!", *CurrentOption.Definition->Text.ToString())
 		return false;
 	}
-
-	const FSigilInteractionOption& CurrentOption = InteractionInstances[Index];
 
 	FSmartObjectClaimHandle NewlyClaimedHandle = USmartObjectBlueprintFunctionLibrary::MarkSmartObjectSlotAsClaimed(GetWorld(), CurrentOption.RequestResult.SlotHandle, GetAvatarActorFromActorInfo());
 
 	// A valid claimed handle can point to an object that is no longer part of the simulation
 	if (!Subsystem->IsClaimedSmartObjectValid(NewlyClaimedHandle))
 	{
-		SIGIL_INTERACTION_CLOG(Error, "Interaction(%s) refers to an object that is no longer available.!", *InteractionInstances[Index].Definition->Text.ToString())
+		SIGIL_INTERACTION_CLOG(Error, "Interaction(%s) refers to an object that is no longer available.!", *CurrentOption.Definition->Text.ToString())
 		return false;
 	}
 
