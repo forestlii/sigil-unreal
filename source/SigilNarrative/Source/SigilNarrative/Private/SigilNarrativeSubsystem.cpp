@@ -400,6 +400,166 @@ bool USigilNarrativeSubsystem::IsStoryBeatCompleted(const FName StoryId, const F
 	return RuntimeState && RuntimeState->CompletedBeatIds.Contains(BeatId);
 }
 
+bool USigilNarrativeSubsystem::RegisterPresentationHost(UObject* InHost)
+{
+	if (!InHost || !InHost->GetClass()->ImplementsInterface(USigilNarrativePresentationHost::StaticClass()))
+	{
+		return false;
+	}
+
+	UObject* CurrentHost = PresentationHost.Get();
+	if (CurrentHost && CurrentHost != InHost)
+	{
+		return false;
+	}
+
+	PresentationHost = InHost;
+	return true;
+}
+
+bool USigilNarrativeSubsystem::UnregisterPresentationHost(UObject* ExpectedHost)
+{
+	if (!ExpectedHost || PresentationHost.Get() != ExpectedHost)
+	{
+		return false;
+	}
+
+	if (HasActivePresentation())
+	{
+		CancelStoryPresentation(ActivePresentationHandle);
+	}
+	PresentationHost.Reset();
+	return true;
+}
+
+FSigilNarrativePresentationHandle USigilNarrativeSubsystem::BeginStoryPresentation(
+	const FName StoryId,
+	const FName BeatId,
+	UObject* ContextObject)
+{
+	FSigilNarrativePresentationHandle InvalidHandle;
+	UObject* HostObject = PresentationHost.Get();
+	if (HasActivePresentation()
+		|| !HostObject
+		|| !HostObject->GetClass()->ImplementsInterface(USigilNarrativePresentationHost::StaticClass()))
+	{
+		return InvalidHandle;
+	}
+
+	TObjectPtr<USigilStoryAsset> StoryAsset = nullptr;
+	TObjectPtr<USigilNarrativePresentationAsset> Presentation = nullptr;
+	{
+		const FSigilStoryRuntimeState* RuntimeState = StoryStates.Find(StoryId);
+		if (!RuntimeState
+			|| !RuntimeState->StoryAsset
+			|| RuntimeState->bCallbackInProgress
+			|| RuntimeState->ActiveBeatId != BeatId)
+		{
+			return InvalidHandle;
+		}
+
+		StoryAsset = RuntimeState->StoryAsset;
+		const FSigilStoryBeatDefinition* Beat = StoryAsset->FindBeat(BeatId);
+		if (!Beat || !Beat->Presentation)
+		{
+			return InvalidHandle;
+		}
+		Presentation = Beat->Presentation;
+	}
+
+	FSigilNarrativePresentationHandle CandidateHandle;
+	if (NextPresentationGeneration == MAX_int32)
+	{
+		return InvalidHandle;
+	}
+	CandidateHandle.Id = FGuid::NewGuid();
+	CandidateHandle.Generation = NextPresentationGeneration + 1;
+
+	if (!ISigilNarrativePresentationHost::Execute_CanBeginPresentation(
+		HostObject, Presentation, CandidateHandle, ContextObject))
+	{
+		return InvalidHandle;
+	}
+
+	const FSigilStoryRuntimeState* RuntimeState = StoryStates.Find(StoryId);
+	if (!RuntimeState
+		|| RuntimeState->StoryAsset != StoryAsset
+		|| RuntimeState->bCallbackInProgress
+		|| RuntimeState->ActiveBeatId != BeatId
+		|| HasActivePresentation()
+		|| PresentationHost.Get() != HostObject)
+	{
+		return InvalidHandle;
+	}
+
+	NextPresentationGeneration = CandidateHandle.Generation;
+	ActivePresentationHandle = CandidateHandle;
+	ActivePresentationStoryId = StoryId;
+	ActivePresentationBeatId = BeatId;
+	if (!ISigilNarrativePresentationHost::Execute_BeginPresentation(
+		HostObject, Presentation, CandidateHandle, ContextObject))
+	{
+		if (ActivePresentationHandle == CandidateHandle)
+		{
+			ActivePresentationHandle = {};
+			ActivePresentationStoryId = NAME_None;
+			ActivePresentationBeatId = NAME_None;
+		}
+		return InvalidHandle;
+	}
+
+	return CandidateHandle;
+}
+
+bool USigilNarrativeSubsystem::ResolveStoryPresentation(
+	const FSigilNarrativePresentationHandle Handle,
+	const ESigilNarrativePresentationResult Result,
+	UObject* ContextObject)
+{
+	if (!Handle.IsValid() || ActivePresentationHandle != Handle)
+	{
+		return false;
+	}
+
+	const FName StoryId = ActivePresentationStoryId;
+	const FName BeatId = ActivePresentationBeatId;
+	ActivePresentationHandle = {};
+	ActivePresentationStoryId = NAME_None;
+	ActivePresentationBeatId = NAME_None;
+
+	if (Result == ESigilNarrativePresentationResult::Completed
+		|| Result == ESigilNarrativePresentationResult::Skipped)
+	{
+		return CompleteStoryBeat(StoryId, BeatId, ContextObject);
+	}
+
+	return true;
+}
+
+bool USigilNarrativeSubsystem::CancelStoryPresentation(
+	const FSigilNarrativePresentationHandle Handle)
+{
+	if (!Handle.IsValid() || ActivePresentationHandle != Handle)
+	{
+		return false;
+	}
+
+	UObject* HostObject = PresentationHost.Get();
+	ActivePresentationHandle = {};
+	ActivePresentationStoryId = NAME_None;
+	ActivePresentationBeatId = NAME_None;
+	if (HostObject && HostObject->GetClass()->ImplementsInterface(USigilNarrativePresentationHost::StaticClass()))
+	{
+		ISigilNarrativePresentationHost::Execute_CancelPresentation(HostObject, Handle);
+	}
+	return true;
+}
+
+bool USigilNarrativeSubsystem::HasActivePresentation() const
+{
+	return ActivePresentationHandle.IsValid();
+}
+
 bool USigilNarrativeSubsystem::EnterQuestState(
 	const FName QuestId,
 	const FName StateId,

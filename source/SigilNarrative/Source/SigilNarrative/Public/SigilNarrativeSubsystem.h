@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "SigilNarrativePresentation.h"
 #include "SigilQuestAsset.h"
 #include "SigilStoryAsset.h"
 #include "Subsystems/GameInstanceSubsystem.h"
@@ -91,6 +92,30 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sigil|Narrative")
 	bool IsStoryBeatCompleted(FName StoryId, FName BeatId) const;
 
+	UFUNCTION(BlueprintCallable, Category = "Sigil|Narrative|Presentation", meta = (MustImplement = "/Script/SigilNarrative.SigilNarrativePresentationHost"))
+	bool RegisterPresentationHost(UObject* InHost);
+
+	UFUNCTION(BlueprintCallable, Category = "Sigil|Narrative|Presentation")
+	bool UnregisterPresentationHost(UObject* ExpectedHost);
+
+	UFUNCTION(BlueprintCallable, Category = "Sigil|Narrative|Presentation")
+	FSigilNarrativePresentationHandle BeginStoryPresentation(
+		FName StoryId,
+		FName BeatId,
+		UObject* ContextObject = nullptr);
+
+	UFUNCTION(BlueprintCallable, Category = "Sigil|Narrative|Presentation")
+	bool ResolveStoryPresentation(
+		FSigilNarrativePresentationHandle Handle,
+		ESigilNarrativePresentationResult Result,
+		UObject* ContextObject = nullptr);
+
+	UFUNCTION(BlueprintCallable, Category = "Sigil|Narrative|Presentation")
+	bool CancelStoryPresentation(FSigilNarrativePresentationHandle Handle);
+
+	UFUNCTION(BlueprintPure, Category = "Sigil|Narrative|Presentation")
+	bool HasActivePresentation() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Sigil|Narrative")
 	bool ExportSnapshotJson(FString& OutJson) const;
 
@@ -117,6 +142,20 @@ private:
 
 	UPROPERTY()
 	TMap<FName, FSigilStoryRuntimeState> StoryStates;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UObject> PresentationHost;
+
+	UPROPERTY(Transient)
+	FSigilNarrativePresentationHandle ActivePresentationHandle;
+
+	UPROPERTY(Transient)
+	FName ActivePresentationStoryId;
+
+	UPROPERTY(Transient)
+	FName ActivePresentationBeatId;
+
+	int32 NextPresentationGeneration = 0;
 
 	int32 ActiveDialogueCallbackCount = 0;
 };

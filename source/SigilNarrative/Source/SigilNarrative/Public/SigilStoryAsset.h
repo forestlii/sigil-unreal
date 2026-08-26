@@ -8,6 +8,7 @@
 
 class USigilNarrativeCondition;
 class USigilNarrativeEvent;
+class USigilNarrativePresentationAsset;
 
 USTRUCT(BlueprintType)
 struct SIGILNARRATIVE_API FSigilStoryBeatDefinition
@@ -25,6 +26,9 @@ struct SIGILNARRATIVE_API FSigilStoryBeatDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Instanced, Category = "Sigil|Narrative")
 	TArray<TObjectPtr<USigilNarrativeEvent>> CompleteEvents;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sigil|Narrative")
+	TObjectPtr<USigilNarrativePresentationAsset> Presentation = nullptr;
 };
 
 UCLASS(BlueprintType)
