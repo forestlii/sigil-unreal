@@ -2,14 +2,11 @@
 
 #include "SigilDialogueEditorToolkit.h"
 
+#include "SSigilDialogueEditor.h"
 #include "SigilDialogueAsset.h"
 
 #include "Framework/Docking/TabManager.h"
-#include "Styling/CoreStyle.h"
 #include "Widgets/Docking/SDockTab.h"
-#include "Widgets/Layout/SBorder.h"
-#include "Widgets/SBoxPanel.h"
-#include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "SigilNarrativeEditor"
 
@@ -87,41 +84,12 @@ FLinearColor FSigilDialogueEditorToolkit::GetWorldCentricTabColorScale() const
 TSharedRef<SDockTab> FSigilDialogueEditorToolkit::SpawnDialogueEditorTab(const FSpawnTabArgs& Args)
 {
 	check(Args.GetTabId().TabType == DialogueEditorTabId);
-
-	FText ValidationMessage;
-	const bool bDefinitionValid = EditedDialogueAsset.IsValid()
-		&& EditedDialogueAsset->ValidateDefinition(ValidationMessage);
-	const FText AssetName = EditedDialogueAsset.IsValid()
-		? FText::FromString(EditedDialogueAsset->GetName())
-		: LOCTEXT("MissingDialogueAsset", "Missing dialogue asset");
-	const FText StatusText = bDefinitionValid
-		? LOCTEXT("ValidDialogueDefinition", "Definition is valid")
-		: FText::Format(
-			LOCTEXT("InvalidDialogueDefinition", "Definition needs attention: {0}"),
-			ValidationMessage);
+	check(EditedDialogueAsset.IsValid());
 
 	return SNew(SDockTab)
 		.Label(LOCTEXT("DialogueEditorTab", "Dialogue"))
 		[
-			SNew(SBorder)
-			.Padding(16.0f)
-			[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				[
-					SNew(STextBlock)
-					.Text(AssetName)
-					.Font(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), 18))
-				]
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(0.0f, 8.0f, 0.0f, 0.0f)
-				[
-					SNew(STextBlock)
-					.Text(StatusText)
-				]
-			]
+			SNew(SSigilDialogueEditor, EditedDialogueAsset.Get())
 		];
 }
 

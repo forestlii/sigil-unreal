@@ -20,6 +20,7 @@ public class SigilNarrativeEditor : ModuleRules
 			{
 				"CoreUObject",
 				"Engine",
+				"InputCore",
 				"SigilNarrative",
 				"Slate",
 				"SlateCore",
