@@ -4,6 +4,7 @@
 
 #include "Misc/NotifyHook.h"
 #include "SigilDialogueAsset.h"
+#include "SigilDialoguePreviewModel.h"
 #include "UObject/StructOnScope.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Views/SListView.h"
@@ -11,6 +12,7 @@
 class FSigilDialogueEditorModel;
 class IPropertyHandle;
 class IStructureDetailsView;
+class SVerticalBox;
 
 class FDialogueNodeStructOnScope final : public FStructOnScope
 {
@@ -52,6 +54,7 @@ private:
 	void ShowNodeDetails(FName NodeId);
 	void ClearNodeDetails();
 	void HandleModelChanged();
+	void RefreshPreviewPanel();
 	void OnSearchTextChanged(const FText& SearchText);
 	void OnNodeSelectionChanged(TSharedPtr<FName> Item, ESelectInfo::Type SelectInfo);
 	TSharedRef<ITableRow> GenerateNodeRow(
@@ -62,6 +65,12 @@ private:
 	FReply DuplicateSelectedNode();
 	FReply DeleteSelectedNode();
 	FReply SetSelectedNodeAsEntry();
+	FReply StartPreview();
+	FReply AdvancePreview();
+	FReply ChoosePreviewOption(FName OptionId);
+	FReply SetPreviewConditionResult(
+		FSigilDialoguePreviewConditionKey Key,
+		ESigilDialoguePreviewConditionResult Result);
 
 	bool HasSelectedNode() const;
 	bool ShouldHideProperty(const TSharedRef<IPropertyHandle>& PropertyHandle) const;
@@ -74,6 +83,7 @@ private:
 	TSharedPtr<IStructureDetailsView> StructureDetailsView;
 	TSharedPtr<FDialogueNodeStructOnScope> SelectedNodeStruct;
 	TSharedPtr<SListView<TSharedPtr<FName>>> NodeListView;
+	TSharedPtr<SVerticalBox> PreviewContent;
 	TArray<TSharedPtr<FName>> NodeItems;
 	FDelegateHandle ModelChangedHandle;
 
@@ -83,5 +93,7 @@ private:
 	FName PreviousNodeId;
 	ESigilDialogueNodeType PreviousNodeType = ESigilDialogueNodeType::Line;
 	FText ErrorText;
+	FText PreviewMessage;
+	FSigilDialoguePreviewModel Preview;
 	bool bSuppressModelRefresh = false;
 };

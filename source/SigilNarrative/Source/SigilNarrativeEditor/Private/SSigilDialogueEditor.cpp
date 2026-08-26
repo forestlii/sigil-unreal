@@ -7,9 +7,13 @@
 #include "PropertyEditorModule.h"
 #include "PropertyHandle.h"
 #include "SigilDialogueEditorModel.h"
+#include "SigilNarrativeCondition.h"
+#include "SigilNarrativeEvent.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SScrollBox.h"
+#include "Widgets/Layout/SSeparator.h"
 #include "Widgets/Layout/SSplitter.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
 #include "Widgets/SBoxPanel.h"
@@ -176,7 +180,7 @@ void SSigilDialogueEditor::Construct(const FArguments& InArgs, USigilDialogueAss
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
-				.FillHeight(1.0f)
+				.FillHeight(0.56f)
 				[
 					StructureDetailsView->GetWidget().ToSharedRef()
 				]
@@ -197,12 +201,32 @@ void SSigilDialogueEditor::Construct(const FArguments& InArgs, USigilDialogueAss
 					.Text(this, &SSigilDialogueEditor::GetValidationText)
 					.AutoWrapText(true)
 				]
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.0f, 8.0f)
+				[
+					SNew(SSeparator)
+				]
+				+ SVerticalBox::Slot()
+				.FillHeight(0.44f)
+				[
+					SNew(SBorder)
+					.Padding(8.0f)
+					[
+						SNew(SScrollBox)
+						+ SScrollBox::Slot()
+						[
+							SAssignNew(PreviewContent, SVerticalBox)
+						]
+					]
+				]
 			]
 		]
 	];
 
 	SelectedNodeId = InAsset->EntryNodeId;
 	RefreshNodeList();
+	RefreshPreviewPanel();
 }
 
 SSigilDialogueEditor::~SSigilDialogueEditor()
@@ -354,10 +378,314 @@ void SSigilDialogueEditor::ClearNodeDetails()
 
 void SSigilDialogueEditor::HandleModelChanged()
 {
+	Preview.Invalidate();
+	PreviewMessage = LOCTEXT("PreviewInvalidated", "Asset changed. Restart the preview.");
+	RefreshPreviewPanel();
 	if (!bSuppressModelRefresh)
 	{
 		RefreshNodeList();
 	}
+}
+
+void SSigilDialogueEditor::RefreshPreviewPanel()
+{
+	if (!PreviewContent.IsValid())
+	{
+		return;
+	}
+
+	PreviewContent->ClearChildren();
+	PreviewContent->AddSlot()
+	.AutoHeight()
+	[
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot()
+		.FillWidth(1.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(STextBlock)
+			.Text(LOCTEXT("SafePreviewTitle", "Safe Preview (no runtime callbacks)"))
+		]
+		+ SHorizontalBox::Slot()
+		.AutoWidth()
+		[
+			SNew(SButton)
+			.Text(Preview.GetCurrentNodeId().IsNone()
+				? LOCTEXT("StartPreview", "Start")
+				: LOCTEXT("RestartPreview", "Restart"))
+			.OnClicked(this, &SSigilDialogueEditor::StartPreview)
+		]
+	];
+
+	const USigilDialogueAsset* DialogueAsset = Model.IsValid() ? Model->GetAsset() : nullptr;
+	FText ValidationError;
+	const bool bDefinitionValid = DialogueAsset && DialogueAsset->ValidateDefinition(ValidationError);
+	PreviewContent->AddSlot()
+	.AutoHeight()
+	.Padding(0.0f, 6.0f, 0.0f, 0.0f)
+	[
+		SNew(STextBlock)
+		.Text(bDefinitionValid
+			? LOCTEXT("PreviewDefinitionValid", "Definition: valid")
+			: FText::Format(
+				LOCTEXT("PreviewDefinitionInvalid", "Definition: {0}"),
+				ValidationError))
+		.AutoWrapText(true)
+	];
+
+	if (!PreviewMessage.IsEmpty())
+	{
+		PreviewContent->AddSlot()
+		.AutoHeight()
+		.Padding(0.0f, 4.0f, 0.0f, 0.0f)
+		[
+			SNew(STextBlock)
+			.Text(PreviewMessage)
+			.AutoWrapText(true)
+		];
+	}
+
+	if (!DialogueAsset || Preview.GetCurrentNodeId().IsNone())
+	{
+		PreviewContent->AddSlot()
+		.AutoHeight()
+		.Padding(0.0f, 8.0f, 0.0f, 0.0f)
+		[
+			SNew(STextBlock)
+			.Text(LOCTEXT("PreviewNotStarted", "Preview has not started."))
+		];
+		return;
+	}
+
+	const FSigilDialogueNode* CurrentNode = DialogueAsset->FindNode(Preview.GetCurrentNodeId());
+	if (!CurrentNode)
+	{
+		PreviewContent->AddSlot()
+		.AutoHeight()
+		.Padding(0.0f, 8.0f, 0.0f, 0.0f)
+		[
+			SNew(STextBlock)
+			.Text(LOCTEXT("PreviewCurrentNodeMissing", "Current preview node is unavailable."))
+		];
+		return;
+	}
+
+	PreviewContent->AddSlot()
+	.AutoHeight()
+	.Padding(0.0f, 8.0f, 0.0f, 0.0f)
+	[
+		SNew(STextBlock)
+		.Text(FText::Format(
+			LOCTEXT("PreviewCurrentNode", "Node: {0}   Speaker: {1}"),
+			FText::FromName(CurrentNode->NodeId),
+			CurrentNode->SpeakerId.IsNone()
+				? LOCTEXT("PreviewNoSpeaker", "-")
+				: FText::FromName(CurrentNode->SpeakerId)))
+	];
+	PreviewContent->AddSlot()
+	.AutoHeight()
+	.Padding(0.0f, 3.0f, 0.0f, 0.0f)
+	[
+		SNew(STextBlock)
+		.Text(CurrentNode->Text)
+		.AutoWrapText(true)
+	];
+
+	if (Preview.IsComplete())
+	{
+		PreviewContent->AddSlot()
+		.AutoHeight()
+		.Padding(0.0f, 6.0f, 0.0f, 0.0f)
+		[
+			SNew(STextBlock)
+			.Text(LOCTEXT("PreviewComplete", "Preview complete."))
+		];
+	}
+	else if (CurrentNode->NodeType == ESigilDialogueNodeType::Line)
+	{
+		PreviewContent->AddSlot()
+		.AutoHeight()
+		.Padding(0.0f, 6.0f, 0.0f, 0.0f)
+		[
+			SNew(SButton)
+			.Text(LOCTEXT("AdvancePreview", "Advance"))
+			.OnClicked(this, &SSigilDialogueEditor::AdvancePreview)
+		];
+	}
+	else if (CurrentNode->NodeType == ESigilDialogueNodeType::Choice)
+	{
+		for (const FSigilDialogueOption& Option : CurrentNode->Options)
+		{
+			const FName NodeId = CurrentNode->NodeId;
+			const FName OptionId = Option.OptionId;
+			FText ChooseReason;
+			const bool bCanChoose = Preview.CanChoose(OptionId, ChooseReason);
+
+			TSharedRef<SVerticalBox> OptionContent = SNew(SVerticalBox);
+			OptionContent->AddSlot()
+			.AutoHeight()
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot()
+				.FillWidth(1.0f)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(FText::Format(
+						LOCTEXT("PreviewOptionLabel", "{0}: {1}"),
+						FText::FromName(OptionId),
+						Option.Text))
+					.AutoWrapText(true)
+				]
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					SNew(SButton)
+					.Text(LOCTEXT("ChoosePreviewOption", "Choose"))
+					.IsEnabled(bCanChoose)
+					.OnClicked_Lambda([this, OptionId]()
+					{
+						return ChoosePreviewOption(OptionId);
+					})
+				]
+			];
+
+			for (int32 ConditionIndex = 0; ConditionIndex < Option.Conditions.Num(); ++ConditionIndex)
+			{
+				const USigilNarrativeCondition* Condition = Option.Conditions[ConditionIndex];
+				const FSigilDialoguePreviewConditionKey Key{NodeId, OptionId, ConditionIndex};
+				const ESigilDialoguePreviewConditionResult Result = Preview.GetConditionResult(Key);
+				FText ResultText = LOCTEXT("PreviewConditionUnset", "Unspecified");
+				if (Result == ESigilDialoguePreviewConditionResult::False)
+				{
+					ResultText = LOCTEXT("PreviewConditionIsFalse", "False");
+				}
+				else if (Result == ESigilDialoguePreviewConditionResult::True)
+				{
+					ResultText = LOCTEXT("PreviewConditionIsTrue", "True");
+				}
+
+				OptionContent->AddSlot()
+				.AutoHeight()
+				.Padding(12.0f, 5.0f, 0.0f, 0.0f)
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot()
+					.AutoHeight()
+					[
+						SNew(STextBlock)
+						.Text(FText::Format(
+							LOCTEXT("PreviewConditionLabel", "Condition {0} ({1}) — Current: {2}"),
+							FText::AsNumber(ConditionIndex + 1),
+							FText::FromString(Condition ? Condition->GetClass()->GetName() : TEXT("None")),
+							ResultText))
+					]
+					+ SVerticalBox::Slot()
+					.AutoHeight()
+					.Padding(0.0f, 3.0f, 0.0f, 0.0f)
+					[
+						SNew(SUniformGridPanel)
+						.SlotPadding(2.0f)
+						+ SUniformGridPanel::Slot(0, 0)
+						[
+							SNew(SButton)
+							.Text(LOCTEXT("SetConditionUnspecified", "Unspecified"))
+							.OnClicked_Lambda([this, Key]()
+							{
+								return SetPreviewConditionResult(
+									Key,
+									ESigilDialoguePreviewConditionResult::Unspecified);
+							})
+						]
+						+ SUniformGridPanel::Slot(1, 0)
+						[
+							SNew(SButton)
+							.Text(LOCTEXT("SetConditionFalse", "False"))
+							.OnClicked_Lambda([this, Key]()
+							{
+								return SetPreviewConditionResult(
+									Key,
+									ESigilDialoguePreviewConditionResult::False);
+							})
+						]
+						+ SUniformGridPanel::Slot(2, 0)
+						[
+							SNew(SButton)
+							.Text(LOCTEXT("SetConditionTrue", "True"))
+							.OnClicked_Lambda([this, Key]()
+							{
+								return SetPreviewConditionResult(
+									Key,
+									ESigilDialoguePreviewConditionResult::True);
+							})
+						]
+					]
+				];
+			}
+
+			if (!bCanChoose && !ChooseReason.IsEmpty())
+			{
+				OptionContent->AddSlot()
+				.AutoHeight()
+				.Padding(12.0f, 4.0f, 0.0f, 0.0f)
+				[
+					SNew(STextBlock)
+					.Text(ChooseReason)
+					.AutoWrapText(true)
+				];
+			}
+
+			PreviewContent->AddSlot()
+			.AutoHeight()
+			.Padding(0.0f, 6.0f, 0.0f, 0.0f)
+			[
+				SNew(SBorder)
+				.Padding(6.0f)
+				[
+					OptionContent
+				]
+			];
+		}
+	}
+
+	TArray<FString> VisitNames;
+	for (const FName NodeId : Preview.GetVisitHistory())
+	{
+		VisitNames.Add(NodeId.ToString());
+	}
+	PreviewContent->AddSlot()
+	.AutoHeight()
+	.Padding(0.0f, 8.0f, 0.0f, 0.0f)
+	[
+		SNew(STextBlock)
+		.Text(FText::Format(
+			LOCTEXT("PreviewVisitHistory", "Visited: {0}"),
+			FText::FromString(FString::Join(VisitNames, TEXT(" -> ")))))
+		.AutoWrapText(true)
+	];
+
+	TArray<FString> EventLines;
+	for (const FSigilDialoguePreviewEventRecord& Record : Preview.GetEventLog())
+	{
+		EventLines.Add(FString::Printf(
+			TEXT("%s / %s / Event %d / %s"),
+			*Record.NodeId.ToString(),
+			*Record.OptionId.ToString(),
+			Record.EventIndex + 1,
+			Record.EventClass ? *Record.EventClass->GetName() : TEXT("None")));
+	}
+	PreviewContent->AddSlot()
+	.AutoHeight()
+	.Padding(0.0f, 4.0f, 0.0f, 0.0f)
+	[
+		SNew(STextBlock)
+		.Text(FText::Format(
+			LOCTEXT("PreviewEventLog", "Events recorded only (not executed):\n{0}"),
+			FText::FromString(EventLines.IsEmpty()
+				? TEXT("-")
+				: FString::Join(EventLines, TEXT("\n")))))
+		.AutoWrapText(true)
+	];
 }
 
 void SSigilDialogueEditor::OnSearchTextChanged(const FText& SearchText)
@@ -460,6 +788,70 @@ FReply SSigilDialogueEditor::SetSelectedNodeAsEntry()
 		? FText::GetEmpty()
 		: LOCTEXT("SetEntryFailed", "The selected node no longer exists.");
 	RefreshNodeList();
+	return FReply::Handled();
+}
+
+FReply SSigilDialogueEditor::StartPreview()
+{
+	FText PreviewError;
+	const USigilDialogueAsset* DialogueAsset = Model.IsValid() ? Model->GetAsset() : nullptr;
+	if (Preview.Start(DialogueAsset, PreviewError))
+	{
+		PreviewMessage = Preview.IsComplete()
+			? LOCTEXT("PreviewStartedComplete", "Preview started at an End node and is complete.")
+			: LOCTEXT("PreviewStarted", "Preview started.");
+	}
+	else
+	{
+		PreviewMessage = PreviewError;
+	}
+	RefreshPreviewPanel();
+	return FReply::Handled();
+}
+
+FReply SSigilDialogueEditor::AdvancePreview()
+{
+	FText PreviewError;
+	if (Preview.Advance(PreviewError))
+	{
+		PreviewMessage = Preview.IsComplete()
+			? LOCTEXT("PreviewAdvancedComplete", "Advanced to End. Preview complete.")
+			: LOCTEXT("PreviewAdvanced", "Advanced to the next node.");
+	}
+	else
+	{
+		PreviewMessage = PreviewError;
+	}
+	RefreshPreviewPanel();
+	return FReply::Handled();
+}
+
+FReply SSigilDialogueEditor::ChoosePreviewOption(const FName OptionId)
+{
+	FText PreviewError;
+	if (Preview.Choose(OptionId, PreviewError))
+	{
+		PreviewMessage = Preview.IsComplete()
+			? LOCTEXT("PreviewChoiceComplete", "Choice reached End. Preview complete.")
+			: LOCTEXT("PreviewChoiceTaken", "Choice selected.");
+	}
+	else
+	{
+		PreviewMessage = PreviewError;
+	}
+	RefreshPreviewPanel();
+	return FReply::Handled();
+}
+
+FReply SSigilDialogueEditor::SetPreviewConditionResult(
+	const FSigilDialoguePreviewConditionKey Key,
+	const ESigilDialoguePreviewConditionResult Result)
+{
+	Preview.SetConditionResult(Key, Result);
+	PreviewMessage = LOCTEXT(
+		"PreviewConditionManualOnly",
+		"Condition result changed for preview only; no runtime callback was executed.");
+	RefreshPreviewPanel();
 	return FReply::Handled();
 }
 
