@@ -102,7 +102,7 @@ void SSigilDialogueEditor::Construct(const FArguments& InArgs, USigilDialogueAss
 	[
 		SNew(SSplitter)
 		+ SSplitter::Slot()
-		.Value(0.32f)
+		.Value(0.25f)
 		[
 			SNew(SBorder)
 			.Padding(8.0f)
@@ -173,14 +173,14 @@ void SSigilDialogueEditor::Construct(const FArguments& InArgs, USigilDialogueAss
 			]
 		]
 		+ SSplitter::Slot()
-		.Value(0.68f)
+		.Value(0.75f)
 		[
 			SNew(SBorder)
 			.Padding(8.0f)
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot()
-				.FillHeight(0.56f)
+				.FillHeight(0.60f)
 				[
 					StructureDetailsView->GetWidget().ToSharedRef()
 				]
@@ -208,7 +208,7 @@ void SSigilDialogueEditor::Construct(const FArguments& InArgs, USigilDialogueAss
 					SNew(SSeparator)
 				]
 				+ SVerticalBox::Slot()
-				.FillHeight(0.44f)
+				.FillHeight(0.40f)
 				[
 					SNew(SBorder)
 					.Padding(8.0f)
@@ -239,7 +239,10 @@ SSigilDialogueEditor::~SSigilDialogueEditor()
 
 void SSigilDialogueEditor::Refresh()
 {
+	Preview.Invalidate();
+	PreviewMessage = LOCTEXT("PreviewInvalidatedByUndo", "Asset changed. Restart the preview.");
 	RefreshNodeList();
+	RefreshPreviewPanel();
 }
 
 void SSigilDialogueEditor::NotifyPreChange(FProperty* PropertyAboutToChange)

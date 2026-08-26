@@ -2,15 +2,19 @@
 
 #pragma once
 
+#include "EditorUndoClient.h"
 #include "Toolkits/AssetEditorToolkit.h"
 
 class SDockTab;
+class SSigilDialogueEditor;
 class USigilDialogueAsset;
 class FSpawnTabArgs;
 
-class FSigilDialogueEditorToolkit final : public FAssetEditorToolkit
+class FSigilDialogueEditorToolkit final : public FAssetEditorToolkit, public FEditorUndoClient
 {
 public:
+	virtual ~FSigilDialogueEditorToolkit() override;
+
 	void InitDialogueEditor(
 		EToolkitMode::Type Mode,
 		const TSharedPtr<IToolkitHost>& InitToolkitHost,
@@ -23,6 +27,8 @@ public:
 	virtual FText GetBaseToolkitName() const override;
 	virtual FString GetWorldCentricTabPrefix() const override;
 	virtual FLinearColor GetWorldCentricTabColorScale() const override;
+	virtual void PostUndo(bool bSuccess) override;
+	virtual void PostRedo(bool bSuccess) override;
 
 private:
 	TSharedRef<SDockTab> SpawnDialogueEditorTab(const FSpawnTabArgs& Args);
@@ -30,4 +36,5 @@ private:
 	static const FName DialogueEditorTabId;
 
 	TWeakObjectPtr<USigilDialogueAsset> EditedDialogueAsset;
+	TSharedPtr<SSigilDialogueEditor> DialogueEditorWidget;
 };

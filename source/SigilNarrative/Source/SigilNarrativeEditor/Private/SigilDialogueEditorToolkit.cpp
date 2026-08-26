@@ -5,12 +5,21 @@
 #include "SSigilDialogueEditor.h"
 #include "SigilDialogueAsset.h"
 
+#include "Editor.h"
 #include "Framework/Docking/TabManager.h"
 #include "Widgets/Docking/SDockTab.h"
 
 #define LOCTEXT_NAMESPACE "SigilNarrativeEditor"
 
 const FName FSigilDialogueEditorToolkit::DialogueEditorTabId(TEXT("SigilDialogueEditor"));
+
+FSigilDialogueEditorToolkit::~FSigilDialogueEditorToolkit()
+{
+	if (GEditor)
+	{
+		GEditor->UnregisterForUndo(this);
+	}
+}
 
 void FSigilDialogueEditorToolkit::InitDialogueEditor(
 	const EToolkitMode::Type Mode,
@@ -39,6 +48,7 @@ void FSigilDialogueEditorToolkit::InitDialogueEditor(
 		true,
 		DialogueAsset);
 
+	GEditor->RegisterForUndo(this);
 	RegenerateMenusAndToolbars();
 }
 
@@ -81,6 +91,19 @@ FLinearColor FSigilDialogueEditorToolkit::GetWorldCentricTabColorScale() const
 	return FLinearColor(0.18f, 0.45f, 0.85f, 0.5f);
 }
 
+void FSigilDialogueEditorToolkit::PostUndo(const bool bSuccess)
+{
+	if (bSuccess && DialogueEditorWidget.IsValid())
+	{
+		DialogueEditorWidget->Refresh();
+	}
+}
+
+void FSigilDialogueEditorToolkit::PostRedo(const bool bSuccess)
+{
+	PostUndo(bSuccess);
+}
+
 TSharedRef<SDockTab> FSigilDialogueEditorToolkit::SpawnDialogueEditorTab(const FSpawnTabArgs& Args)
 {
 	check(Args.GetTabId().TabType == DialogueEditorTabId);
@@ -89,7 +112,7 @@ TSharedRef<SDockTab> FSigilDialogueEditorToolkit::SpawnDialogueEditorTab(const F
 	return SNew(SDockTab)
 		.Label(LOCTEXT("DialogueEditorTab", "Dialogue"))
 		[
-			SNew(SSigilDialogueEditor, EditedDialogueAsset.Get())
+			SAssignNew(DialogueEditorWidget, SSigilDialogueEditor, EditedDialogueAsset.Get())
 		];
 }
 
