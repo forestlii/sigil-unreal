@@ -16,6 +16,11 @@
 			"Name": "SigilNarrative",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "SigilNarrativeEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
 		}
 	]
 }
