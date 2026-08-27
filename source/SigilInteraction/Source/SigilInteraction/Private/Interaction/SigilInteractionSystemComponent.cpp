@@ -206,6 +206,8 @@ void USigilInteractionSystemComponent::OnInteractableActorsChanged_Implementatio
 {
 	if (!bInteracting)
 	{
+		AActor* PreviousInteractableActor = InteractableActor;
+
 		// update potential actor.
 		if (!IsValid(InteractableActor) || !InteractableActors.Contains(InteractableActor))
 		{
@@ -225,6 +227,11 @@ void USigilInteractionSystemComponent::OnInteractableActorsChanged_Implementatio
 			{
 				SetInteractableActor(InteractableActors[0]);
 			}
+		}
+
+		if (InteractableActor == PreviousInteractableActor && IsValid(InteractableActor))
+		{
+			RefreshOptionsForActor();
 		}
 	}
 }

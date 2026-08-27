@@ -3,6 +3,9 @@
 	"EngineAssociation": "5.8",
 	"Category": "",
 	"Description": "Host project for compiling and smoke-testing the Sigil plugin suite",
+	"AdditionalPluginDirectories": [
+		"../source"
+	],
 	"Modules": [
 		{
 			"Name": "Host",
@@ -45,6 +48,10 @@
 		},
 		{
 			"Name": "SigilEffects",
+			"Enabled": true
+		},
+		{
+			"Name": "SigilNarrative",
 			"Enabled": true
 		}
 	]
