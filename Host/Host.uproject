@@ -51,6 +51,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "SigilSave",
+			"Enabled": true
+		},
+		{
 			"Name": "SigilNarrative",
 			"Enabled": true
 		}
