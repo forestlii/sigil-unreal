@@ -11,6 +11,15 @@ Host/Plugins/
 .vs/
 .idea/
 
-# Internal working docs & session memory (not part of the open-source release)
+# Internal working docs & session memory; only per-plugin decision logs are versioned
 MD/
+!source/SigilSave/MD/
+!source/SigilSave/MD/devlog/
+!source/SigilSave/MD/devlog/decisions.md
+!source/SigilNarrative/MD/
+!source/SigilNarrative/MD/devlog/
+!source/SigilNarrative/MD/devlog/decisions.md
+!source/SigilInteraction/MD/
+!source/SigilInteraction/MD/devlog/
+!source/SigilInteraction/MD/devlog/decisions.md
 记忆.md
