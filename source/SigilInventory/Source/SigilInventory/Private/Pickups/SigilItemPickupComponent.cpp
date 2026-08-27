@@ -24,7 +24,8 @@ bool USigilItemPickupComponent::Pickup(USigilInventorySystemComponent* Picker)
 		SIGIL_INVENTORY_CLOG(Warning, "passed-in invalid picker.");
 		return false;
 	}
-	if (WorldItemComponent == nullptr && WorldItemComponent->GetItemInstance()->IsItemValid())
+	USigilItemInstance* WorldItemInstance = WorldItemComponent ? WorldItemComponent->GetItemInstance() : nullptr;
+	if (WorldItemInstance == nullptr || !WorldItemInstance->IsItemValid())
 	{
 		SIGIL_INVENTORY_CLOG(Warning, "doesn't have valid WordItem component attached or it has invalid item instance reference.");
 		return false;
@@ -81,7 +82,13 @@ bool USigilItemPickupComponent::TryAddToCollection(USigilInventorySystemComponen
 		return false;
 	}
 
-	Picker->AddItem(NewItemInfo);
+	const FSigilItemInfo AddedItemInfo = Picker->AddItem(NewItemInfo);
+	if (AddedItemInfo.Amount <= 0)
+	{
+		NotifyPickupFailed();
+		return false;
+	}
+
 	NotifyPickupSuccess();
 	return true;
 }
