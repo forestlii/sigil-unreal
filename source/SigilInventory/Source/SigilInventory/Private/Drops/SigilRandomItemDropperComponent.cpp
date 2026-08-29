@@ -36,11 +36,15 @@ TArray<FSigilItemInfo> USigilRandomItemDropperComponent::GetItemsToDropInternal(
 	{
 		//加权
 		ProbabilitySum += ItemStacks[i].Amount;
-		ItemInfos[i] = FSigilItemInfo(ProbabilitySum, ItemStacks[i]);
+		ItemInfos.Add(FSigilItemInfo(ProbabilitySum, ItemStacks[i]));
 	}
 
-	int32 RandomAmount = FMath::RandRange(MinAmount, MaxAmount + 1);
-	Results.Empty();
+	if (ItemInfos.IsEmpty() || ProbabilitySum <= 0)
+	{
+		return Results;
+	}
+
+	const int32 RandomAmount = FMath::RandRange(MinAmount, MaxAmount);
 
 	for (int i = 0; i < RandomAmount; i++)
 	{
@@ -65,30 +69,23 @@ TArray<FSigilItemInfo> USigilRandomItemDropperComponent::GetItemsToDropInternal(
 
 const FSigilItemInfo& USigilRandomItemDropperComponent::GetRandomItemInfo(const TArray<FSigilItemInfo>& ItemInfos, int32 ProbabilitySum) const
 {
-	int32 RandomProbabilityIdx = FMath::RandRange(0, ProbabilitySum);
+	const int32 RandomProbabilityIdx = FMath::RandRange(1, ProbabilitySum);
 
-	int32 min = 0;
-	int32 max = ItemInfos.Num() - 1;
-	int32 mid = 0;
+	int32 Min = 0;
+	int32 Max = ItemInfos.Num() - 1;
 
-	while (min <= max)
+	while (Min < Max)
 	{
-		mid = (min + max) / 2;
-		if (ItemInfos[mid].Amount == RandomProbabilityIdx)
+		const int32 Mid = Min + (Max - Min) / 2;
+		if (RandomProbabilityIdx <= ItemInfos[Mid].Amount)
 		{
-			++mid;
-			break;
+			Max = Mid;
 		}
-
-		if (RandomProbabilityIdx < ItemInfos[mid].Amount
-			&& (mid == 0 || RandomProbabilityIdx > ItemInfos[mid - 1].Amount)) { break; }
-
-		if (RandomProbabilityIdx < ItemInfos[mid].Amount) { max = mid - 1; }
 		else
 		{
-			min = mid + 1;
+			Min = Mid + 1;
 		}
 	}
 
-	return ItemInfos[mid];
+	return ItemInfos[Min];
 }

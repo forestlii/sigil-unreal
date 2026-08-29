@@ -61,31 +61,29 @@ USigilInventorySystemComponent* USigilInventoryPickupComponent::GetOwningInvento
 
 bool USigilInventoryPickupComponent::AddPickupToCollection(USigilItemCollection* DestCollection)
 {
-	TArray<FSigilItemInfo> PickupItems = Inventory->GetDefaultCollection()->GetAllItemInfos();
-	bool bAtLeastOneCanBeAdded = false;
-	for (int32 i = 0; i < PickupItems.Num(); i++)
+	USigilItemCollection* SourceCollection = Inventory->GetDefaultCollection();
+	const TArray<FSigilItemInfo> PickupItems = SourceCollection->GetAllItemInfos();
+	int32 TotalAdded = 0;
+	for (const FSigilItemInfo& PickupItem : PickupItems)
 	{
-		FSigilItemInfo ItemInfo = PickupItems[i];
-		FSigilItemInfo CanAddedItemInfo;
-		if (DestCollection->CanAddItem(ItemInfo, CanAddedItemInfo))
+		FSigilItemInfo ItemToAdd = PickupItem;
+		ItemToAdd.ItemCollection = nullptr;
+		const FSigilItemInfo AddedItem = DestCollection->AddItem(ItemToAdd);
+		if (AddedItem.Amount <= 0)
 		{
-			if (CanAddedItemInfo.Amount != 0)
-			{
-				bAtLeastOneCanBeAdded = true;
-			}
+			continue;
 		}
+
+		SourceCollection->RemoveItem(FSigilItemInfo(AddedItem.Amount, PickupItem));
+		TotalAdded += AddedItem.Amount;
 	}
-	if (bAtLeastOneCanBeAdded == false)
+
+	if (TotalAdded == 0)
 	{
 		NotifyPickupFailed();
 		return false;
 	}
 
-	for (int32 i = 0; i < PickupItems.Num(); i++)
-	{
-		DestCollection->AddItem(PickupItems[i]);
-	}
-	Inventory->GetDefaultCollection()->RemoveAll();
 	NotifyPickupSuccess();
 	return true;
 }

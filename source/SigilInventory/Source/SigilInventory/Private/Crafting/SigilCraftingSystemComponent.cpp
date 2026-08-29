@@ -51,7 +51,7 @@ bool USigilCraftingSystemComponent::RemoveItemIngredients(USigilInventorySystemC
 		if (Inventory->GetDefaultCollection()->RemoveItem(ItemInfoToRemove).Amount == ItemInfoToRemove.Amount) { continue; }
 		return false;
 	}
-	return false;
+	return true;
 }
 
 bool USigilCraftingSystemComponent::IsValidRecipe_Implementation(const USigilItemDefinition* RecipeDefinition) const
