@@ -47,6 +47,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	"SigilCombat.AttackResult.PendingEntryConsumesOnceAfterFlowReady",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilAttackResultReentrantDispatchTest,
+	"SigilCombat.AttackResult.ReentrantConsumeSeesPersistentEntryConsumed",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
 bool FSigilAttackResultImmediateDispatchTest::RunTest(const FString& Parameters)
 {
 	AActor* Owner = nullptr;
@@ -110,6 +115,43 @@ bool FSigilAttackResultPendingEntryTest::RunTest(const FString& Parameters)
 
 	CombatSystem->GetTestAttackResultContainer().ConsumePendingEntries();
 	TestEqual(TEXT("A consumed pending result should not dispatch again"), Processor->HandleCallCount, 1);
+	return true;
+}
+
+bool FSigilAttackResultReentrantDispatchTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>(GetTransientPackage(), TEXT("SigilAttackResultReentrantOwner"));
+	USigilAttackResultTestCombatSystemComponent* CombatSystem =
+		NewObject<USigilAttackResultTestCombatSystemComponent>(Owner);
+	USigilAttackResultTestCombatFlow* Flow = NewObject<USigilAttackResultTestCombatFlow>(Owner);
+	USigilAttackResultReentrantProcessor* Processor = NewObject<USigilAttackResultReentrantProcessor>(Flow);
+	if (!TestNotNull(TEXT("Reentrant owner should exist"), Owner)
+		|| !TestNotNull(TEXT("Reentrant combat system should exist"), CombatSystem)
+		|| !TestNotNull(TEXT("Reentrant combat flow should exist"), Flow)
+		|| !TestNotNull(TEXT("Reentrant processor should exist"), Processor))
+	{
+		return false;
+	}
+
+	Owner->AddInstanceComponent(CombatSystem);
+	Processor->SetCombatSystemForTest(CombatSystem);
+	Flow->AddTestProcessor(Processor);
+	CombatSystem->SetTestCombatFlow(Flow);
+	Flow->Initialize(Owner);
+	if (!TestTrue(TEXT("Reentrant combat flow should be ready after initialization"), CombatSystem->IsCombatFlowReady()))
+	{
+		return false;
+	}
+
+	FSigilAttackResult Result;
+	CombatSystem->GetTestAttackResultContainer().AddEntry(Result);
+	TestEqual(
+		TEXT("A processor that consumes pending entries reentrantly should still handle the result once"),
+		Processor->HandleCallCount,
+		1);
+
+	CombatSystem->GetTestAttackResultContainer().ConsumePendingEntries();
+	TestEqual(TEXT("The same stored entry should remain consumed after the callback"), Processor->HandleCallCount, 1);
 	return true;
 }
 

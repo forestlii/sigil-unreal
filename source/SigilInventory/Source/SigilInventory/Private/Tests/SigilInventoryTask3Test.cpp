@@ -5,6 +5,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Core/Collections/SigilItemCollection.h"
+#include "Core/Collections/SigilItemMultiStackCollection.h"
 #include "Core/Collections/SigilItemRestriction_StackSizeLimit.h"
 #include "GameFramework/Actor.h"
 #include "Items/SigilItemDefinition.h"
@@ -67,6 +68,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSigilInventoryPickupZeroTransferTest,
 	"SigilInventory.Pickup.PartialTransfer.ZeroActualTransferFails",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilInventoryPickupMultiStackConservationTest,
+	"SigilInventory.Pickup.PartialTransfer.MultiStackShortRemovalConservesQuantity",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -181,6 +187,55 @@ bool FSigilInventoryPickupZeroTransferTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A failed transfer should leave the source unchanged"), SourceCollection->GetItemAmount(SourceItem), 1);
 	TestEqual(TEXT("A failed transfer should leave the destination unchanged"), DestinationCollection->GetItemAmount(DestinationItem), 2);
 	TestTrue(TEXT("A zero-item transfer should not broadcast success"), Pickup->IsActive());
+	return true;
+}
+
+bool FSigilInventoryPickupMultiStackConservationTest::RunTest(const FString& Parameters)
+{
+	AActor* SourceOwner = NewObject<AActor>(GetTransientPackage());
+	AActor* DestinationOwner = NewObject<AActor>(GetTransientPackage());
+	USigilInventorySystemComponent* SourceInventory = NewObject<USigilInventorySystemComponent>(SourceOwner);
+	USigilInventorySystemComponent* DestinationInventory = NewObject<USigilInventorySystemComponent>(DestinationOwner);
+	USigilItemCollectionDefinition* SourceDefinition = NewObject<USigilItemCollectionDefinition>(GetTransientPackage());
+	USigilItemMultiStackCollectionDefinition* DestinationDefinition =
+		NewObject<USigilItemMultiStackCollectionDefinition>(GetTransientPackage());
+	USigilInventoryRemoveAmountLimitTestRestriction* RemoveLimit =
+		NewObject<USigilInventoryRemoveAmountLimitTestRestriction>(SourceDefinition);
+	USigilItemDefinition* ItemDefinition = NewObject<USigilItemDefinition>(GetTransientPackage());
+
+	RemoveLimit->SetMaxRemoveAmountForTest(20);
+	SourceDefinition->Restrictions.Add(RemoveLimit);
+	DestinationDefinition->DefaultStackSizeLimit = 10;
+
+	USigilItemCollection* SourceCollection = AddDefaultCollection(SourceInventory, SourceDefinition);
+	USigilItemCollection* DestinationCollection = AddDefaultCollection(DestinationInventory, DestinationDefinition);
+	USigilItemInstance* SourceItem = CreateItem(SourceOwner, ItemDefinition);
+	USigilItemInstance* DestinationItem = CreateItem(DestinationOwner, ItemDefinition);
+	USigilInventoryPickupTask3TestComponent* Pickup =
+		NewObject<USigilInventoryPickupTask3TestComponent>(SourceOwner);
+
+	if (!TestNotNull(TEXT("Source collection should exist"), SourceCollection)
+		|| !TestNotNull(TEXT("Multi-stack destination collection should exist"), DestinationCollection)
+		|| !TestNotNull(TEXT("Source item should exist"), SourceItem)
+		|| !TestNotNull(TEXT("Destination item should exist"), DestinationItem)
+		|| !TestNotNull(TEXT("Pickup should exist"), Pickup))
+	{
+		return false;
+	}
+
+	TestEqual(TEXT("Source fixture should contain twenty-five items"), SourceCollection->AddItem(SourceItem, 25).Amount, 25);
+	TestEqual(TEXT("Destination fixture should start with one compatible item"), DestinationCollection->AddItem(DestinationItem, 1).Amount, 1);
+	Pickup->SetInventoryForTest(SourceInventory);
+	Pickup->Activate(true);
+	Pickup->OnPickupSuccess.AddDynamic(Pickup, &UActorComponent::Deactivate);
+
+	TestTrue(TEXT("A transfer limited by source removal should still move the conserved amount"), Pickup->AddPickupToCollectionForTest(DestinationCollection));
+	const int32 DestinationAmount = DestinationCollection->GetItemAmount(SourceItem);
+	const int32 SourceAmount = SourceCollection->GetItemAmount(SourceItem);
+	TestEqual(TEXT("Destination should retain its fixture plus the twenty items actually removed from the source"), DestinationAmount, 21);
+	TestEqual(TEXT("Source should retain the five items its removal restriction rejected"), SourceAmount, 5);
+	TestEqual(TEXT("Pickup should preserve the original total quantity"), DestinationAmount + SourceAmount, 26);
+	TestFalse(TEXT("A conserved transfer should broadcast success"), Pickup->IsActive());
 	return true;
 }
 

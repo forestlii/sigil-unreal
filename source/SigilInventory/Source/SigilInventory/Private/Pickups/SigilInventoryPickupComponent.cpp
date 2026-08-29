@@ -10,6 +10,19 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SigilInventoryPickupComponent)
 
+namespace
+{
+int32 GetCollectionTotalAmount(const USigilItemCollection* Collection)
+{
+	int32 TotalAmount = 0;
+	for (const FSigilItemInfo& ItemInfo : Collection->GetAllItemInfos())
+	{
+		TotalAmount += ItemInfo.Amount;
+	}
+	return TotalAmount;
+}
+}
+
 void USigilInventoryPickupComponent::BeginPlay()
 {
 	if (!CollectionTag.IsValid())
@@ -68,14 +81,34 @@ bool USigilInventoryPickupComponent::AddPickupToCollection(USigilItemCollection*
 	{
 		FSigilItemInfo ItemToAdd = PickupItem;
 		ItemToAdd.ItemCollection = nullptr;
+		const int32 DestinationAmountBefore = GetCollectionTotalAmount(DestCollection);
 		const FSigilItemInfo AddedItem = DestCollection->AddItem(ItemToAdd);
-		if (AddedItem.Amount <= 0)
+		const int32 DestinationAmountAfterAdd = GetCollectionTotalAmount(DestCollection);
+		const int32 ActualAdded = FMath::Clamp(
+			DestinationAmountAfterAdd - DestinationAmountBefore,
+			0,
+			PickupItem.Amount);
+		if (ActualAdded <= 0)
 		{
 			continue;
 		}
 
-		SourceCollection->RemoveItem(FSigilItemInfo(AddedItem.Amount, PickupItem));
-		TotalAdded += AddedItem.Amount;
+		const int32 SourceAmountBefore = GetCollectionTotalAmount(SourceCollection);
+		SourceCollection->RemoveItem(FSigilItemInfo(ActualAdded, PickupItem));
+		const int32 ActualRemoved = FMath::Clamp(
+			SourceAmountBefore - GetCollectionTotalAmount(SourceCollection),
+			0,
+			ActualAdded);
+		if (ActualRemoved < ActualAdded)
+		{
+			DestCollection->RemoveItem(FSigilItemInfo(ActualAdded - ActualRemoved, AddedItem));
+		}
+
+		const int32 DestinationNetAdded = FMath::Clamp(
+			GetCollectionTotalAmount(DestCollection) - DestinationAmountBefore,
+			0,
+			ActualAdded);
+		TotalAdded += FMath::Min(ActualRemoved, DestinationNetAdded);
 	}
 
 	if (TotalAdded == 0)

@@ -28,20 +28,21 @@ Sigil 尚在 1.0 之前：次版本可能包含破坏性变更。每条列出公
 ### 修复
 
 - **GAS-01 — sigil.gas：**`USigilAbilityCost::CheckCost` 在可选相关 Tag 缺失时改用本次调用局部的空 Tag 容器，避免蓝图 Cost 事件解引用空指针。
-- **CBT-01 — sigil.combat：**Attack Result 的存储项仍在 Flow 回调前被消费并标脏，但回调收到的是未消费的值副本；延迟项会在 Flow 就绪后恰好分发一次。
+- **CBT-01 — sigil.combat：**`AddEntry` 会在 Flow 回调前把服务端存储项设为已消费并标脏，客户端 `ConsumeEntry` 则先把本地存储项设为已消费；回调收到未消费的值副本，延迟或重入消费都只会分发一次。
 - **INVC-01 — sigil.inventory：**反序列化缺失物品的存档时会以 Stack 与 Item 标识给出警告、跳过该栈并继续后续有效栈，不再向 Map 插入空项。
 - **INVC-02 — sigil.inventory：**装载配置的 Server RPC 改为仅调用一次既有本地 `LoadDefaultLoadouts()` 实现，不再经 RPC 包装器递归分发。
-- **INVG-01 — sigil.inventory：**拾取移除量现在跟随目标实际接收量；部分转移保留来源余量，实际转移为零时不会成功或广播成功。
+- **INVG-01 — sigil.inventory：**拾取改用目标集合的实际数量差，而不信任集合返回量；来源无法移除的差额会从目标回滚，来源余量得到保留，且仅有非零守恒转移才报告成功。
 - **INVG-02 — sigil.inventory：**制作仅在每种请求材料都成功移除后返回 `true`；既有的首次失败即停止与非事务语义保持不变。
 - **INVG-03 — sigil.inventory：**随机掉落安全构造累计权重；空或非正总权重返回空结果；掉落数量落在配置的闭区间内，末尾边界选择保持在有效范围内。
 - **CAM-01 — sigil.camera：**激活但为空的相机栈不再产出视图；组件会保留已有 Camera/SpringArm 状态和待应用 FOV offset，直到有效模式求值成功。
 
 ### 自动化覆盖
 
-- 本批共新增 15 项 Automation：`SigilGas.AbilityCost`（1 项）、`SigilCombat.AttackResult`（2 项）、`SigilInventory`（9 项：反序列化/装载 2 项、部分拾取 2 项、制作 2 项、随机掉落 3 项）及 `SigilCamera.Stack`（3 项）。最终 `SigilInventory` 过滤器执行 11 项，因为其中还包含 2 项既有拾取回归。
+- 本批共新增 17 项 Automation：`SigilGas.AbilityCost`（1 项）、`SigilCombat.AttackResult`（3 项）、`SigilInventory`（10 项：反序列化/装载 2 项、部分拾取 3 项、制作 2 项、随机掉落 3 项）及 `SigilCamera.Stack`（3 项）。最终 `SigilInventory` 过滤器执行 12 项，因为其中还包含 2 项既有拾取回归。
 - 对应聚焦改动的 HostEditor Win64 Development 构建已成功；这不表示已执行完整测试套件或 ProjectSpecterEditor 构建。
 
 ### 已知空白
 
 - 本批未修改 INVC-11 的多集合反序列化路由。
+- 本批未修改 INVC-12 的多栈 `AddInternal` 返回值语义；拾取路径改为直接测量目标数量，不再依赖该返回量。
 - 本批未执行 PIE、多人运行时、Win64 Cook、打包运行时或 ProjectSpecterEditor 验证。

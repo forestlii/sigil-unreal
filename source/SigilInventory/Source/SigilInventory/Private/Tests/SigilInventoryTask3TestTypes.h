@@ -2,10 +2,33 @@
 
 #pragma once
 
+#include "Core/Collections/SigilItemRestriction.h"
 #include "Crafting/SigilCraftingSystemComponent.h"
 #include "Drops/SigilRandomItemDropperComponent.h"
 #include "Pickups/SigilInventoryPickupComponent.h"
 #include "SigilInventoryTask3TestTypes.generated.h"
+
+UCLASS()
+class USigilInventoryRemoveAmountLimitTestRestriction final : public USigilItemRestriction
+{
+	GENERATED_BODY()
+
+public:
+	void SetMaxRemoveAmountForTest(const int32 InMaxRemoveAmount)
+	{
+		MaxRemoveAmount = InMaxRemoveAmount;
+	}
+
+protected:
+	virtual bool CanRemoveItemInternal_Implementation(FSigilItemInfo& ItemInfo) const override
+	{
+		ItemInfo.Amount = FMath::Min(ItemInfo.Amount, MaxRemoveAmount);
+		return ItemInfo.Amount > 0;
+	}
+
+private:
+	int32 MaxRemoveAmount = MAX_int32;
+};
 
 UCLASS()
 class USigilInventoryPickupTask3TestComponent final : public USigilInventoryPickupComponent

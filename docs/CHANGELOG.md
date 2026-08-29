@@ -28,20 +28,21 @@ Sigil is pre-1.0: minor versions may contain breaking changes. Each entry lists 
 ### Fixes
 
 - **GAS-01 — sigil.gas:** `USigilAbilityCost::CheckCost` now supplies a call-local empty tag container when optional relevant tags are absent, so the Blueprint cost event is not given a null dereference.
-- **CBT-01 — sigil.combat:** attack-result storage is still consumed and marked dirty before Flow callbacks, while callbacks receive an unconsumed value copy; deferred entries are then dispatched exactly once after Flow becomes available.
+- **CBT-01 — sigil.combat:** `AddEntry` marks server storage consumed and dirty before its Flow callback, while client `ConsumeEntry` first marks its local stored entry consumed; callbacks receive an unconsumed value copy, and deferred or reentrant consumption dispatches each entry exactly once.
 - **INVC-01 — sigil.inventory:** deserializing a save with a missing item now warns with the stack and item identifiers, skips that stack, and continues valid stacks without inserting a null map entry.
 - **INVC-02 — sigil.inventory:** the loadout Server RPC calls the existing local `LoadDefaultLoadouts()` implementation once instead of recursively dispatching through its RPC wrapper.
-- **INVG-01 — sigil.inventory:** pickup removal now follows the amount actually accepted by the destination; a partial transfer retains the source remainder, and a zero actual transfer does not succeed or broadcast success.
+- **INVG-01 — sigil.inventory:** pickup measures the destination's actual quantity delta instead of trusting a collection return value, rolls back any amount the source cannot remove, retains the source remainder, and reports success only for a conserved non-zero transfer.
 - **INVG-02 — sigil.inventory:** crafting returns `true` only after every requested ingredient removal succeeds; the existing first-failure stop and non-transactional semantics remain unchanged.
 - **INVG-03 — sigil.inventory:** random drops build cumulative weights safely, return empty for empty or non-positive totals, choose amounts in the inclusive configured range, and keep final-boundary selection in range.
 - **CAM-01 — sigil.camera:** an active empty camera stack returns no view; its component leaves the existing Camera/SpringArm state and pending FOV offset untouched until a valid mode evaluates.
 
 ### Automated coverage
 
-- This batch added 15 Automation tests: `SigilGas.AbilityCost` (1), `SigilCombat.AttackResult` (2), `SigilInventory` (9: 2 serialization/loadout, 2 partial-pickup, 2 crafting, and 3 random-drop cases), and `SigilCamera.Stack` (3). The final `SigilInventory` filter executed 11 tests because it also includes 2 existing pickup regressions.
+- This batch added 17 Automation tests: `SigilGas.AbilityCost` (1), `SigilCombat.AttackResult` (3), `SigilInventory` (10: 2 serialization/loadout, 3 partial-pickup, 2 crafting, and 3 random-drop cases), and `SigilCamera.Stack` (3). The final `SigilInventory` filter executed 12 tests because it also includes 2 existing pickup regressions.
 - The corresponding HostEditor Win64 Development builds succeeded for the focused changes. This is not a full-suite or ProjectSpecterEditor build claim.
 
 ### Known gaps
 
 - INVC-11 multi-collection deserialization routing was not changed by this batch.
+- INVC-12 multi-stack `AddInternal` return-value semantics were not changed; the pickup path now measures destination quantity directly instead of relying on that return amount.
 - PIE, multiplayer runtime, Win64 Cook, packaged runtime, and ProjectSpecterEditor validation were not executed by this batch.

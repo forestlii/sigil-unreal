@@ -26,10 +26,10 @@
 
 - 阶段: 审查批次 A 修复
 - 面临的选择: 预检查通过后直接移除全部来源物品，或只移除目标集合实际接受的数量。
-- 定了什么: 每个来源项只调用一次目标 `AddItem`，不把已保留的来源余量从 overflow 路径再返回；只移除实际加入量，累计加入量大于零才成功并广播。
-- 否掉了什么 + 为什么: 否掉重做集合 overflow 合同、公开 API 或拾取事务；本修复只维护来源余量与实际转移量的一致性。
+- 定了什么: 每个来源项只调用一次目标 `AddItem`，并以目标集合总量的前后差确认实际加入量，不依赖多栈集合当前不准确的返回数量；若来源实际移除量更少，则从目标回滚差额。只有两侧守恒的净转移量大于零才成功并广播，`ItemCollection = nullptr` 继续阻止 overflow 路径重复返还来源余量。
+- 否掉了什么 + 为什么: 否掉重做集合 overflow 合同、`INVC-12` 的多栈返回值合同、公开 API 或拾取事务；本修复只在拾取边界维护来源余量与目标净增量的一致性。
 - 复用层🔑: ② 引擎相关
-- 来源: Finding `INVG-01`；Sigil commit `b58976d`；`SigilInventory.Pickup.PartialTransfer` Automation（2/2 通过，见审查批次 A Task 3 报告）。
+- 来源: Finding `INVG-01`；Sigil commit `b58976d` 及最终整分支复审修正；`SigilInventory.Pickup.PartialTransfer` Automation（3/3 通过）。
 
 ### [2026-08-30] INVG-02 成功移除全部材料后返回成功
 

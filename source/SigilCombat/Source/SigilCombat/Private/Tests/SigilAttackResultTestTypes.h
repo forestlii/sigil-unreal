@@ -42,6 +42,34 @@ protected:
 };
 
 UCLASS()
+class USigilAttackResultReentrantProcessor final : public USigilAttackResultProcessor
+{
+	GENERATED_BODY()
+
+public:
+	void SetCombatSystemForTest(USigilAttackResultTestCombatSystemComponent* InCombatSystem)
+	{
+		CombatSystem = InCombatSystem;
+	}
+
+	mutable int32 HandleCallCount = 0;
+
+protected:
+	virtual void HandleIncomingAttackResult_Implementation(const FSigilAttackResult& AttackResult) const override
+	{
+		++HandleCallCount;
+		if (CombatSystem)
+		{
+			CombatSystem->GetTestAttackResultContainer().ConsumePendingEntries();
+		}
+	}
+
+private:
+	UPROPERTY()
+	TObjectPtr<USigilAttackResultTestCombatSystemComponent> CombatSystem;
+};
+
+UCLASS()
 class USigilAttackResultTestCombatFlow final : public USigilCombatFlow
 {
 	GENERATED_BODY()
