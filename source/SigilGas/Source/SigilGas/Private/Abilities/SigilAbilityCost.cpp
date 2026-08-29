@@ -6,7 +6,9 @@
 bool USigilAbilityCost::CheckCost(const UGameplayAbility* Ability, const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
                                  FGameplayTagContainer* OptionalRelevantTags) const
 {
-	return BlueprintCheckCost(Ability, Handle, *ActorInfo, *OptionalRelevantTags);
+	FGameplayTagContainer EmptyRelevantTags;
+	const FGameplayTagContainer& RelevantTags = OptionalRelevantTags ? *OptionalRelevantTags : EmptyRelevantTags;
+	return BlueprintCheckCost(Ability, Handle, *ActorInfo, RelevantTags);
 }
 
 void USigilAbilityCost::ApplyCost(const UGameplayAbility* Ability, const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,

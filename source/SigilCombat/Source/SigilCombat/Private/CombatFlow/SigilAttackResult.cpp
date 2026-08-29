@@ -45,7 +45,8 @@ void FSigilAttackResultContainer::AddEntry(FSigilAttackResult& NewEntry)
 	// a processor may call RegisterAttackResult again, which can reallocate or trim Results and invalidate AddedEntry.
 	AddedEntry.bConsumed = (Flow != nullptr);
 	MarkItemDirty(AddedEntry);
-	const FSigilAttackResult DispatchCopy = AddedEntry;
+	FSigilAttackResult DispatchCopy = AddedEntry;
+	DispatchCopy.bConsumed = false;
 
 	if (Flow)
 	{
@@ -73,7 +74,8 @@ void FSigilAttackResultContainer::ConsumeEntry(int32 Index)
 
 	// Mark first, dispatch a copy: the flow may mutate this container re-entrantly.
 	Results[Index].bConsumed = true;
-	const FSigilAttackResult DispatchCopy = Results[Index];
+	FSigilAttackResult DispatchCopy = Results[Index];
+	DispatchCopy.bConsumed = false;
 	Flow->HandleAttackResult(DispatchCopy);
 }
 
