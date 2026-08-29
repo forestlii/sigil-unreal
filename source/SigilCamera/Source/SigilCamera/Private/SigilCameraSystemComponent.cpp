@@ -53,7 +53,10 @@ void USigilCameraSystemComponent::TickComponent(float DeltaTime, ELevelTick Tick
 	{
 		UpdateCameraModes();
 		FSigilCameraModeView CameraModeView;
-		CameraModeStack->EvaluateStack(DeltaTime, CameraModeView);
+		if (!CameraModeStack->EvaluateStack(DeltaTime, CameraModeView))
+		{
+			return;
+		}
 
 		// Keep player controller in sync with the latest view.
 		if (APawn* TargetPawn = Cast<APawn>(GetTargetActor()))

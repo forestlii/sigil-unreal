@@ -115,7 +115,7 @@ void USigilCameraModeStack::PushCameraMode(TSubclassOf<USigilCameraMode> CameraM
 
 bool USigilCameraModeStack::EvaluateStack(float DeltaTime, FSigilCameraModeView& OutCameraModeView)
 {
-	if (!bIsActive)
+	if (!bIsActive || CameraModeStack.IsEmpty())
 	{
 		return false;
 	}
