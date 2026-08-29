@@ -795,7 +795,7 @@ void USigilInventorySystemComponent::LoadDefaultLoadouts()
 
 void USigilInventorySystemComponent::ServerLoadDefaultLoadouts_Implementation()
 {
-	ServerLoadDefaultLoadouts();
+	LoadDefaultLoadouts();
 }
 
 void USigilInventorySystemComponent::OnInventorySystemInitialized_Implementation()

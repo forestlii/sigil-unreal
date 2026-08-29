@@ -249,8 +249,19 @@ void USigilInventoryFactory::DeserializeCollection_Implementation(USigilInventor
 
 	for (const FSigilStackRecord& StackRecord : Record.StackRecords)
 	{
+		USigilItemInstance* const* Item = ItemsMap.Find(StackRecord.ItemId);
+		if (Item == nullptr || !IsValid(*Item))
+		{
+			SIGIL_INVENTORY_LOG(
+				Warning,
+				"Skipping stack %s because ItemId %s is missing from deserialized inventory.",
+				*StackRecord.Id.ToString(EGuidFormats::DigitsWithHyphens),
+				*StackRecord.ItemId.ToString(EGuidFormats::DigitsWithHyphens));
+			continue;
+		}
+
 		FSigilItemInfo Info;
-		Info.Item = ItemsMap[StackRecord.ItemId];
+		Info.Item = *Item;
 		Info.Amount = StackRecord.Amount;
 		Info.ItemCollection = NewCollection;
 		InventorySystem->AddItem(Info);

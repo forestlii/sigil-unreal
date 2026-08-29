@@ -97,6 +97,10 @@ bool FSigilItemPickupFailedAddTest::RunTest(const FString& Parameters)
 	}
 
 	GameInstance->AddToRoot();
+	AddExpectedError(
+		TEXT("SigilGameUISubsystem::Initialize Failed, Missing GameUIPolicyClass in SigilUISettings"),
+		EAutomationExpectedErrorFlags::Contains,
+		1);
 	GameInstance->InitializeStandalone(
 		MakeUniqueObjectName(nullptr, UWorld::StaticClass(), TEXT("SigilInventoryPickupTestWorld")),
 		GetTransientPackage());
