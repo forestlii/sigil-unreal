@@ -27,9 +27,21 @@ Sigil 尚在 1.0 之前：次版本可能包含破坏性变更。每条列出公
 
 ### 修复
 
-详见 2026-08-17 两轮审查批次的 `fix(...)` 提交：蒙太奇 RPC 校验 / 限频 / 回滚协议、AttackResult FastArray 标脏与重入、计时器生命周期、GamePhase 判空、相机 BlendInfo / FOV Offset / 穿模规避、模态失败生命周期、Movement 倍率安全与线程安全，以及两个非编辑器构建修复。
+- **GAS-01 — sigil.gas：**`USigilAbilityCost::CheckCost` 在可选相关 Tag 缺失时改用本次调用局部的空 Tag 容器，避免蓝图 Cost 事件解引用空指针。
+- **CBT-01 — sigil.combat：**Attack Result 的存储项仍在 Flow 回调前被消费并标脏，但回调收到的是未消费的值副本；延迟项会在 Flow 就绪后恰好分发一次。
+- **INVC-01 — sigil.inventory：**反序列化缺失物品的存档时会以 Stack 与 Item 标识给出警告、跳过该栈并继续后续有效栈，不再向 Map 插入空项。
+- **INVC-02 — sigil.inventory：**装载配置的 Server RPC 改为仅调用一次既有本地 `LoadDefaultLoadouts()` 实现，不再经 RPC 包装器递归分发。
+- **INVG-01 — sigil.inventory：**拾取移除量现在跟随目标实际接收量；部分转移保留来源余量，实际转移为零时不会成功或广播成功。
+- **INVG-02 — sigil.inventory：**制作仅在每种请求材料都成功移除后返回 `true`；既有的首次失败即停止与非事务语义保持不变。
+- **INVG-03 — sigil.inventory：**随机掉落安全构造累计权重；空或非正总权重返回空结果；掉落数量落在配置的闭区间内，末尾边界选择保持在有效范围内。
+- **CAM-01 — sigil.camera：**激活但为空的相机栈不再产出视图；组件会保留已有 Camera/SpringArm 状态和待应用 FOV offset，直到有效模式求值成功。
+
+### 自动化覆盖
+
+- 本批共新增 15 项 Automation：`SigilGas.AbilityCost`（1 项）、`SigilCombat.AttackResult`（2 项）、`SigilInventory`（9 项：反序列化/装载 2 项、部分拾取 2 项、制作 2 项、随机掉落 3 项）及 `SigilCamera.Stack`（3 项）。最终 `SigilInventory` 过滤器执行 11 项，因为其中还包含 2 项既有拾取回归。
+- 对应聚焦改动的 HostEditor Win64 Development 构建已成功；这不表示已执行完整测试套件或 ProjectSpecterEditor 构建。
 
 ### 已知空白
 
-- 尚无自动化测试（计划：FastArray、蒙太奇协议、属性组、UI 时序、Movement 速度、相机栈）。
-- 运行时 / 联机行为经过推演与编译，未在 PIE 或多客户端会话中实测。
+- 本批未修改 INVC-11 的多集合反序列化路由。
+- 本批未执行 PIE、多人运行时、Win64 Cook、打包运行时或 ProjectSpecterEditor 验证。
