@@ -12,3 +12,8 @@
 - 否掉了什么 + 为什么: 否掉新增默认模式、自动 Push、项目镜头规则或公开 API/反射/复制/序列化改动；这些都超出防止空栈覆盖的最小修复。
 - 复用层🔑: ② 引擎相关
 - 来源: Finding `CAM-01`；Sigil commit `c385770`；`SigilCamera.Stack` Automation（3/3 通过，见审查批次 A Task 4 报告）。
+
+### [2026-08-30] 审查批次 A 最终验证
+
+- 最终证据: `HostEditor Win64 Development` 构建成功；完整 `Automation RunTests Sigil` 执行 51 项且 51/51 成功；隔离的 ProjectSpecter `37b1a774` + Sigil `59f3375` 组合通过 `ProjectSpecterEditor Win64 Development` 构建。
+- 验证边界: 以上是编译与 Automation 证据，不代表 PIE、多人运行时、Win64 Cook 或打包运行时已验证；ControlRotation 的本地玩家集成路径仍未做直接运行时断言。

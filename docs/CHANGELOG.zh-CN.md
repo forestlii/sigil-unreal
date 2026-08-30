@@ -39,11 +39,11 @@ Sigil 尚在 1.0 之前：次版本可能包含破坏性变更。每条列出公
 ### 自动化覆盖
 
 - 本批共新增 19 项 Automation：`SigilGas.AbilityCost`（1 项）、`SigilCombat.AttackResult`（3 项）、`SigilInventory`（12 项：反序列化/装载 2 项、部分拾取 5 项、制作 2 项、随机掉落 3 项）及 `SigilCamera.Stack`（3 项）。最终 `SigilInventory` 过滤器执行 14 项，因为其中还包含 2 项既有拾取回归。
-- 对应聚焦改动的 HostEditor Win64 Development 构建已成功；这不表示已执行完整测试套件或 ProjectSpecterEditor 构建。
+- 最终 fresh 验证已通过 `HostEditor Win64 Development` 构建、`Automation RunTests Sigil` 选中的全部 51 项测试，以及 ProjectSpecter `37b1a774` + Sigil `59f3375` 隔离组合的 `ProjectSpecterEditor Win64 Development` 构建。这些是编译与 Automation 结果，不代表玩法运行时验证。
 
 ### 已知空白
 
 - 本批未修改 INVC-11 的多集合反序列化路由。
 - 本批未修改 INVC-12 的多栈 `AddInternal` 返回值语义；拾取路径改为直接测量目标同逻辑道具的数量，不再依赖该返回量。
 - 本批未引入跨集合事务或锁。任意 Blueprint 重入若修改同一逻辑道具，或来源 restriction 在预检后动态拒绝恢复，仍是非原子的，不属于 INVG-01 的保证范围。
-- 本批未执行 PIE、多人运行时、Win64 Cook、打包运行时或 ProjectSpecterEditor 验证。
+- 本批未执行 PIE、多人运行时、Win64 Cook 或打包运行时验证。

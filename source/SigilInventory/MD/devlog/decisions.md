@@ -48,3 +48,8 @@
 - 否掉了什么 + 为什么: 否掉改变有放回抽样、重复实例合并结果或新增配置/公开 API；这些既有行为不属于本 finding。
 - 复用层🔑: ② 引擎相关
 - 来源: Finding `INVG-03`；Sigil commit `b58976d`；`SigilInventory.Drop.Random` Automation（3/3 通过，见审查批次 A Task 3 报告）。
+
+### [2026-08-30] 审查批次 A 最终验证
+
+- 最终证据: `HostEditor Win64 Development` 构建成功；完整 `Automation RunTests Sigil` 执行 51 项且 51/51 成功；隔离的 ProjectSpecter `37b1a774` + Sigil `59f3375` 组合通过 `ProjectSpecterEditor Win64 Development` 构建。
+- 验证边界: 以上是编译与 Automation 证据，不代表 PIE、多人运行时、Win64 Cook 或打包运行时已验证；INVC-11、INVC-12 与已记录的非原子 Blueprint 重入边界仍未解决。

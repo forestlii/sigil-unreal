@@ -12,3 +12,8 @@
 - 否掉了什么 + 为什么: 否掉改变 FastArray 复制字段、序列化布局或 Flow 的公开合同；本修复只校正回调看到的值，不改变持久化消费语义。
 - 复用层🔑: ② 引擎相关
 - 来源: Finding `CBT-01`；Sigil commit `e3870be` 及最终整分支复审修正；`SigilCombat.AttackResult` Automation（3/3 通过）。
+
+### [2026-08-30] 审查批次 A 最终验证
+
+- 最终证据: `HostEditor Win64 Development` 构建成功；完整 `Automation RunTests Sigil` 执行 51 项且 51/51 成功；隔离的 ProjectSpecter `37b1a774` + Sigil `59f3375` 组合通过 `ProjectSpecterEditor Win64 Development` 构建。
+- 验证边界: 以上是编译与 Automation 证据，不代表 PIE、多人运行时、Win64 Cook 或打包运行时已验证。
