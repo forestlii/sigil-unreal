@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Core/Collections/SigilItemCollection.h"
 #include "Core/Collections/SigilItemRestriction.h"
 #include "Crafting/SigilCraftingSystemComponent.h"
 #include "Drops/SigilRandomItemDropperComponent.h"
@@ -28,6 +29,52 @@ protected:
 
 private:
 	int32 MaxRemoveAmount = MAX_int32;
+};
+
+UCLASS()
+class USigilInventoryPickupSynchronousMutationTestCollection final : public USigilItemCollection
+{
+	GENERATED_BODY()
+
+public:
+	void ConfigureSynchronousAddForTest(
+		USigilItemInstance* InUnrelatedItem,
+		const int32 InUnrelatedAmount)
+	{
+		UnrelatedItem = InUnrelatedItem;
+		UnrelatedAmount = InUnrelatedAmount;
+		bAddUnrelatedItem = true;
+	}
+
+	virtual FSigilItemInfo AddItem(const FSigilItemInfo& ItemInfo) override
+	{
+		const FSigilItemInfo AddedItem = Super::AddItem(ItemInfo);
+		if (bAddUnrelatedItem)
+		{
+			bAddUnrelatedItem = false;
+			Super::AddItem(FSigilItemInfo(UnrelatedItem, UnrelatedAmount));
+		}
+		return AddedItem;
+	}
+
+private:
+	UPROPERTY()
+	TObjectPtr<USigilItemInstance> UnrelatedItem;
+
+	int32 UnrelatedAmount = 0;
+	bool bAddUnrelatedItem = false;
+};
+
+UCLASS()
+class USigilInventoryPickupSynchronousMutationTestCollectionDefinition final : public USigilItemCollectionDefinition
+{
+	GENERATED_BODY()
+
+public:
+	virtual TSubclassOf<USigilItemCollection> GetCollectionInstanceClass() const override
+	{
+		return USigilInventoryPickupSynchronousMutationTestCollection::StaticClass();
+	}
 };
 
 UCLASS()

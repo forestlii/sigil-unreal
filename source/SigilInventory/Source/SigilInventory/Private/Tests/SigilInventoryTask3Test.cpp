@@ -76,6 +76,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilInventoryPickupTargetRemoveRestrictionTest,
+	"SigilInventory.Pickup.PartialTransfer.TargetRemoveRestrictionDoesNotInflateTransfer",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilInventoryPickupUnrelatedMutationTest,
+	"SigilInventory.Pickup.PartialTransfer.UnrelatedSynchronousMutationDoesNotAffectTransfer",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSigilCraftingRemoveIngredientsSuccessTest,
 	"SigilInventory.Crafting.RemoveIngredients.AllRemovedReturnsTrue",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -236,6 +246,113 @@ bool FSigilInventoryPickupMultiStackConservationTest::RunTest(const FString& Par
 	TestEqual(TEXT("Source should retain the five items its removal restriction rejected"), SourceAmount, 5);
 	TestEqual(TEXT("Pickup should preserve the original total quantity"), DestinationAmount + SourceAmount, 26);
 	TestFalse(TEXT("A conserved transfer should broadcast success"), Pickup->IsActive());
+	return true;
+}
+
+bool FSigilInventoryPickupTargetRemoveRestrictionTest::RunTest(const FString& Parameters)
+{
+	AActor* SourceOwner = NewObject<AActor>(GetTransientPackage());
+	AActor* DestinationOwner = NewObject<AActor>(GetTransientPackage());
+	USigilInventorySystemComponent* SourceInventory = NewObject<USigilInventorySystemComponent>(SourceOwner);
+	USigilInventorySystemComponent* DestinationInventory = NewObject<USigilInventorySystemComponent>(DestinationOwner);
+	USigilItemCollectionDefinition* SourceDefinition = NewObject<USigilItemCollectionDefinition>(GetTransientPackage());
+	USigilItemCollectionDefinition* DestinationDefinition = NewObject<USigilItemCollectionDefinition>(GetTransientPackage());
+	USigilInventoryRemoveAmountLimitTestRestriction* SourceRemoveLimit =
+		NewObject<USigilInventoryRemoveAmountLimitTestRestriction>(SourceDefinition);
+	USigilInventoryRemoveAmountLimitTestRestriction* DestinationRemoveLimit =
+		NewObject<USigilInventoryRemoveAmountLimitTestRestriction>(DestinationDefinition);
+	USigilItemDefinition* ItemDefinition = NewObject<USigilItemDefinition>(GetTransientPackage());
+
+	SourceRemoveLimit->SetMaxRemoveAmountForTest(20);
+	DestinationRemoveLimit->SetMaxRemoveAmountForTest(0);
+	SourceDefinition->Restrictions.Add(SourceRemoveLimit);
+	DestinationDefinition->Restrictions.Add(DestinationRemoveLimit);
+
+	USigilItemCollection* SourceCollection = AddDefaultCollection(SourceInventory, SourceDefinition);
+	USigilItemCollection* DestinationCollection = AddDefaultCollection(DestinationInventory, DestinationDefinition);
+	USigilItemInstance* SourceItem = CreateItem(SourceOwner, ItemDefinition);
+	USigilItemInstance* DestinationItem = CreateItem(DestinationOwner, ItemDefinition);
+	USigilInventoryPickupTask3TestComponent* Pickup =
+		NewObject<USigilInventoryPickupTask3TestComponent>(SourceOwner);
+
+	if (!TestNotNull(TEXT("Source collection should exist"), SourceCollection)
+		|| !TestNotNull(TEXT("Destination collection should exist"), DestinationCollection)
+		|| !TestNotNull(TEXT("Pickup should exist"), Pickup))
+	{
+		return false;
+	}
+
+	TestEqual(TEXT("Source fixture should contain twenty-five items"), SourceCollection->AddItem(SourceItem, 25).Amount, 25);
+	TestEqual(TEXT("Destination fixture should start with one compatible item"), DestinationCollection->AddItem(DestinationItem, 1).Amount, 1);
+	Pickup->SetInventoryForTest(SourceInventory);
+	Pickup->Activate(true);
+	Pickup->OnPickupSuccess.AddDynamic(Pickup, &UActorComponent::Deactivate);
+
+	TestTrue(TEXT("A source-limited transfer should succeed without target rollback"), Pickup->AddPickupToCollectionForTest(DestinationCollection));
+	const int32 DestinationAmount = DestinationCollection->GetItemAmount(SourceItem);
+	const int32 SourceAmount = SourceCollection->GetItemAmount(SourceItem);
+	TestEqual(TEXT("Destination should receive only the twenty items allowed from the source"), DestinationAmount, 21);
+	TestEqual(TEXT("Source should retain the five items rejected by its removal restriction"), SourceAmount, 5);
+	TestEqual(TEXT("A target remove restriction should not inflate the logical item total"), DestinationAmount + SourceAmount, 26);
+	TestFalse(TEXT("A conserved source-first transfer should broadcast success"), Pickup->IsActive());
+	return true;
+}
+
+bool FSigilInventoryPickupUnrelatedMutationTest::RunTest(const FString& Parameters)
+{
+	AActor* SourceOwner = NewObject<AActor>(GetTransientPackage());
+	AActor* DestinationOwner = NewObject<AActor>(GetTransientPackage());
+	USigilInventorySystemComponent* SourceInventory = NewObject<USigilInventorySystemComponent>(SourceOwner);
+	USigilInventorySystemComponent* DestinationInventory = NewObject<USigilInventorySystemComponent>(DestinationOwner);
+	USigilItemCollectionDefinition* SourceDefinition = NewObject<USigilItemCollectionDefinition>(GetTransientPackage());
+	USigilInventoryPickupSynchronousMutationTestCollectionDefinition* DestinationDefinition =
+		NewObject<USigilInventoryPickupSynchronousMutationTestCollectionDefinition>(GetTransientPackage());
+	USigilItemRestriction_StackSizeLimit* StackLimit =
+		NewObject<USigilItemRestriction_StackSizeLimit>(DestinationDefinition);
+	USigilItemDefinition* PickedItemDefinition = NewObject<USigilItemDefinition>(GetTransientPackage());
+	USigilItemDefinition* UnrelatedItemDefinition = NewObject<USigilItemDefinition>(GetTransientPackage());
+
+	if (!TestTrue(TEXT("Destination stack limit should be configured"), SetDefaultStackSizeLimit(StackLimit, 5)))
+	{
+		return false;
+	}
+	DestinationDefinition->Restrictions.Add(StackLimit);
+
+	USigilItemCollection* SourceCollection = AddDefaultCollection(SourceInventory, SourceDefinition);
+	USigilInventoryPickupSynchronousMutationTestCollection* DestinationCollection =
+		Cast<USigilInventoryPickupSynchronousMutationTestCollection>(
+			AddDefaultCollection(DestinationInventory, DestinationDefinition));
+	USigilItemInstance* SourceItem = CreateItem(SourceOwner, PickedItemDefinition);
+	USigilItemInstance* DestinationItem = CreateItem(DestinationOwner, PickedItemDefinition);
+	USigilItemInstance* UnrelatedItem = CreateItem(DestinationOwner, UnrelatedItemDefinition);
+	USigilInventoryPickupTask3TestComponent* Pickup =
+		NewObject<USigilInventoryPickupTask3TestComponent>(SourceOwner);
+
+	if (!TestNotNull(TEXT("Source collection should exist"), SourceCollection)
+		|| !TestNotNull(TEXT("Synchronous-mutation destination should exist"), DestinationCollection)
+		|| !TestNotNull(TEXT("Pickup should exist"), Pickup))
+	{
+		return false;
+	}
+
+	TestEqual(TEXT("Source fixture should contain five picked items"), SourceCollection->AddItem(SourceItem, 5).Amount, 5);
+	TestEqual(
+		TEXT("Destination fixture should contain three compatible items"),
+		DestinationCollection->AddItem(FSigilItemInfo(DestinationItem, 3)).Amount,
+		3);
+	DestinationCollection->ConfigureSynchronousAddForTest(UnrelatedItem, 3);
+	Pickup->SetInventoryForTest(SourceInventory);
+	Pickup->Activate(true);
+	Pickup->OnPickupSuccess.AddDynamic(Pickup, &UActorComponent::Deactivate);
+
+	TestTrue(TEXT("A partial transfer should succeed despite unrelated synchronous mutation"), Pickup->AddPickupToCollectionForTest(DestinationCollection));
+	const int32 DestinationPickedAmount = DestinationCollection->GetItemAmount(SourceItem);
+	const int32 SourcePickedAmount = SourceCollection->GetItemAmount(SourceItem);
+	TestEqual(TEXT("Destination should receive only its two-item capacity for the picked item"), DestinationPickedAmount, 5);
+	TestEqual(TEXT("Unrelated mutation should not increase the picked amount removed from the source"), SourcePickedAmount, 3);
+	TestEqual(TEXT("The picked logical item total should remain conserved"), DestinationPickedAmount + SourcePickedAmount, 8);
+	TestEqual(TEXT("The synchronous unrelated item mutation should still occur"), DestinationCollection->GetItemAmount(UnrelatedItem), 3);
+	TestFalse(TEXT("A conserved transfer with unrelated mutation should broadcast success"), Pickup->IsActive());
 	return true;
 }
 
