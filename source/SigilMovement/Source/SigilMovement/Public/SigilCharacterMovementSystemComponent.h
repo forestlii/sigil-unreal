@@ -9,6 +9,13 @@ class USigilCharacterMovementSetting_Default;
 class USigilCharacterRotationSetting_Default;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSimpleSignature);
 
+UENUM(BlueprintType)
+enum class ESigilMovementRuntimeInitializationMode : uint8
+{
+	Strict,
+	DeferredUntilConfigured
+};
+
 
 /**
  *  SigilMovementComponent
@@ -22,6 +29,18 @@ public:
 	explicit USigilCharacterMovementSystemComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem|Initialization")
+	void SetRuntimeInitializationMode(ESigilMovementRuntimeInitializationMode NewMode);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem|Initialization")
+	ESigilMovementRuntimeInitializationMode GetRuntimeInitializationMode() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem|Initialization")
+	bool IsConfiguredRuntimeActive() const;
+
+	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem|Initialization")
+	bool TryActivateConfiguredRuntime();
 
 	UCharacterMovementComponent* GetCharacterMovement() const { return CharacterMovement; };
 	
@@ -71,6 +90,7 @@ protected:
 	 * This is where GMS primarily change CMC.
 	 */
 	virtual void ApplyMovementSetting() override;
+	virtual void OnMovementSetChanged_Implementation(const FGameplayTag& PreviousMovementSet) override;
 
 	virtual void RefreshInput(float DeltaTime) override;
 
@@ -158,4 +178,14 @@ public:
 	virtual FSigilPredictGroundMovementPivotLocationParams GetPredictGroundMovementPivotLocationParams() const override;
 	virtual FSigilPredictGroundMovementStopLocationParams GetPredictGroundMovementStopLocationParams() const override;
 #pragma endregion
+
+private:
+	void StartConfiguredRuntime();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings|Initialization", meta=(AllowPrivateAccess="true"))
+	ESigilMovementRuntimeInitializationMode RuntimeInitializationMode{
+		ESigilMovementRuntimeInitializationMode::Strict};
+
+	UPROPERTY(Transient)
+	bool bConfiguredRuntimeActive{false};
 };

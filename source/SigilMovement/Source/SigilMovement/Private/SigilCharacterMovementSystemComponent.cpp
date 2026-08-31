@@ -51,6 +51,43 @@ void USigilCharacterMovementSystemComponent::GetLifetimeReplicatedProps(TArray<F
 	Parameters.Condition = COND_SkipOwner;
 }
 
+void USigilCharacterMovementSystemComponent::SetRuntimeInitializationMode(
+	const ESigilMovementRuntimeInitializationMode NewMode)
+{
+	RuntimeInitializationMode = NewMode;
+}
+
+ESigilMovementRuntimeInitializationMode USigilCharacterMovementSystemComponent::GetRuntimeInitializationMode() const
+{
+	return RuntimeInitializationMode;
+}
+
+bool USigilCharacterMovementSystemComponent::IsConfiguredRuntimeActive() const
+{
+	return bConfiguredRuntimeActive;
+}
+
+bool USigilCharacterMovementSystemComponent::TryActivateConfiguredRuntime()
+{
+	if (bConfiguredRuntimeActive)
+	{
+		return true;
+	}
+
+	AnimationInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!IsValid(AnimationInstance)
+		|| !IsValid(OwnerPawn)
+		|| OwnerPawn->bUseControllerRotationPitch
+		|| OwnerPawn->bUseControllerRotationYaw
+		|| OwnerPawn->bUseControllerRotationRoll)
+	{
+		return false;
+	}
+
+	StartConfiguredRuntime();
+	return bConfiguredRuntimeActive;
+}
+
 void USigilCharacterMovementSystemComponent::InitializeComponent()
 {
 	Super::InitializeComponent();
@@ -98,22 +135,44 @@ void USigilCharacterMovementSystemComponent::InitializeComponent()
 
 void USigilCharacterMovementSystemComponent::BeginPlay()
 {
-	ensure(IsValid(AnimationInstance));
-
-	ensureMsgf(!OwnerPawn->bUseControllerRotationPitch && !OwnerPawn->bUseControllerRotationYaw && !OwnerPawn->bUseControllerRotationRoll,
-	           TEXT("These settings are not allowed and must be turned off!"));
-
-
 	Super::BeginPlay();
 
-	OwnerCharacter->MovementModeChangedDelegate.AddDynamic(this, &ThisClass::OnCharacterMovementModeChanged);
-	OnCharacterMovementModeChanged(OwnerCharacter, OwnerCharacter->GetCharacterMovement()->GetGroundMovementMode(), 0);
+	if (RuntimeInitializationMode == ESigilMovementRuntimeInitializationMode::DeferredUntilConfigured)
+	{
+		return;
+	}
+
+	ensure(IsValid(AnimationInstance));
+	ensureMsgf(
+		!OwnerPawn->bUseControllerRotationPitch
+		&& !OwnerPawn->bUseControllerRotationYaw
+		&& !OwnerPawn->bUseControllerRotationRoll,
+		TEXT("These settings are not allowed and must be turned off!"));
+
+	StartConfiguredRuntime();
+}
+
+void USigilCharacterMovementSystemComponent::StartConfiguredRuntime()
+{
+	if (bConfiguredRuntimeActive)
+	{
+		return;
+	}
+
+	OwnerCharacter->MovementModeChangedDelegate.AddUniqueDynamic(
+		this,
+		&ThisClass::OnCharacterMovementModeChanged);
+	OnCharacterMovementModeChanged(
+		OwnerCharacter,
+		OwnerCharacter->GetCharacterMovement()->GetGroundMovementMode(),
+		0);
 
 	// Update states to use the initial desired values.
 
 	RefreshRotationMode();
 
 	RefreshMovementSetSetting();
+	bConfiguredRuntimeActive = true;
 
 	// InitiallyLoadMovementSets();
 }
@@ -124,6 +183,7 @@ void USigilCharacterMovementSystemComponent::EndPlay(const EEndPlayReason::Type 
 	{
 		OwnerCharacter->MovementModeChangedDelegate.RemoveDynamic(this, &ThisClass::OnCharacterMovementModeChanged);
 	}
+	bConfiguredRuntimeActive = false;
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -135,6 +195,13 @@ void USigilCharacterMovementSystemComponent::PreReplication(IRepChangedPropertyT
 void USigilCharacterMovementSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("USigilMovementSystemComponent::Tick()"), STAT_USigilMovementSystemComponent_Tick, STATGROUP_GMS)
+
+	if (RuntimeInitializationMode == ESigilMovementRuntimeInitializationMode::DeferredUntilConfigured
+		&& !bConfiguredRuntimeActive)
+	{
+		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+		return;
+	}
 
 	if (!IsValid(GetMovementDefinition()) || !IsValid(AnimationInstance) || !IsValid(ControlSetting))
 	{
@@ -224,6 +291,19 @@ void USigilCharacterMovementSystemComponent::ApplyMovementSetting()
 		ControlSetting->BroadcastJumpStates(ControlSetting->JumpStates);
 		ControlSetting->BroadcastMovementStates(ControlSetting->MovementStates);
 	}
+}
+
+void USigilCharacterMovementSystemComponent::OnMovementSetChanged_Implementation(
+	const FGameplayTag& PreviousMovementSet)
+{
+	if (RuntimeInitializationMode == ESigilMovementRuntimeInitializationMode::DeferredUntilConfigured
+		&& !bConfiguredRuntimeActive)
+	{
+		OnMovementSetChangedEvent.Broadcast(PreviousMovementSet);
+		return;
+	}
+
+	Super::OnMovementSetChanged_Implementation(PreviousMovementSet);
 }
 
 void USigilCharacterMovementSystemComponent::RefreshInput(float DeltaTime)
