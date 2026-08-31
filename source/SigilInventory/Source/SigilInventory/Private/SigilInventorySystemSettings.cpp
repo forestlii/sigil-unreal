@@ -50,6 +50,9 @@ const USigilItemDefinitionSchema* USigilInventorySystemSettings::GetItemDefiniti
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("No valid schema found for asset %s"), *AssetPath);
+	if (!ItemDefinitionSchemaMap.IsEmpty() || DefaultItemDefinitionSchema.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No valid schema found for asset %s"), *AssetPath);
+	}
 	return nullptr;
 }
