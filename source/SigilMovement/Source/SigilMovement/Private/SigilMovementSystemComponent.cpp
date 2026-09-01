@@ -699,13 +699,6 @@ void USigilMovementSystemComponent::RefreshMovementState()
 		return;
 	}
 
-	if (MovementState == DesiredMovementState)
-	{
-		return;
-	}
-
-	ApplyMovementSetting();
-
 	SetMovementState(CalculateActualMovementState());
 }
 
