@@ -169,6 +169,10 @@ bool USigilCharacterMovementSystemComponent::TryActivateConfiguredRuntime()
 	{
 		return true;
 	}
+	if (!IsValid(AnimGraphSetting))
+	{
+		return false;
+	}
 
 	if (!ApplyRotationAuthority(RotationAuthority))
 	{

@@ -2,6 +2,7 @@
 
 #include "Tests/SigilMovementTestTypes.h"
 
+#include "Misc/DataValidation.h"
 #include "Settings/SigilSettingObjectLibrary.h"
 
 void USigilMovementDeferredTestComponent::ConfigureStartupTest(
@@ -11,6 +12,14 @@ void USigilMovementDeferredTestComponent::ConfigureStartupTest(
 	MovementSet = InMovementSet;
 	MovementDefinitions = {InDefinition};
 }
+
+#if WITH_EDITORONLY_DATA
+EDataValidationResult USigilMovementDeferredTestComponent::ValidateForTest(
+	FDataValidationContext& Context) const
+{
+	return IsDataValid(Context);
+}
+#endif
 
 ASigilMovementDeferredTestCharacter::ASigilMovementDeferredTestCharacter()
 {

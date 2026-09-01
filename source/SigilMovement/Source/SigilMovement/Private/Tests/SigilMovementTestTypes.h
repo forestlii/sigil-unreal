@@ -8,6 +8,7 @@
 #include "SigilMovementTestTypes.generated.h"
 
 class USigilMovementDefinition;
+class FDataValidationContext;
 
 UCLASS(Transient)
 class USigilMovementDeferredTestComponent final
@@ -19,6 +20,10 @@ public:
 	void ConfigureStartupTest(
 		const FGameplayTag& InMovementSet,
 		TSoftObjectPtr<const USigilMovementDefinition> InDefinition);
+
+#if WITH_EDITORONLY_DATA
+	EDataValidationResult ValidateForTest(FDataValidationContext& Context) const;
+#endif
 };
 
 UCLASS(Transient, NotPlaceable)

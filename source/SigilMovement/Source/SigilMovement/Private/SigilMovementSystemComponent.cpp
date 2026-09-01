@@ -1,6 +1,7 @@
 ﻿// Copyright (c) 2026 Likeon. All Rights Reserved.
 
 #include "SigilMovementSystemComponent.h"
+#include "SigilCharacterMovementSystemComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "GameplayTagAssetInterface.h"
@@ -976,7 +977,12 @@ void USigilMovementSystemComponent::SetEnableRotate(bool bEnable)
 #if WITH_EDITORONLY_DATA
 EDataValidationResult USigilMovementSystemComponent::IsDataValid(class FDataValidationContext& Context) const
 {
-	if (!IsValid(AnimGraphSetting))
+	const USigilCharacterMovementSystemComponent* CharacterMovementSystem =
+		Cast<USigilCharacterMovementSystemComponent>(this);
+	const bool bAllowsMissingAnimGraph = CharacterMovementSystem
+		&& CharacterMovementSystem->GetRuntimeInitializationMode()
+			== ESigilMovementRuntimeInitializationMode::DeferredUntilConfigured;
+	if (!IsValid(AnimGraphSetting) && !bAllowsMissingAnimGraph)
 	{
 		Context.AddError(FText::FromString("AnimGraphSetting is required!"));
 		return EDataValidationResult::Invalid;

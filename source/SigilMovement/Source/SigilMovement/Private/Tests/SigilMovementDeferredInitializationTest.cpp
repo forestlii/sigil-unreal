@@ -6,6 +6,7 @@
 
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Misc/DataValidation.h"
 #include "Misc/ScopeExit.h"
 #include "NativeGameplayTags.h"
 #include "SigilCharacterMovementSystemComponent.h"
@@ -85,7 +86,7 @@ bool FSigilMovementDeferredInitializationTest::RunTest(const FString& Parameters
 		Character->DispatchBeginPlay();
 	}
 
-	USigilCharacterMovementSystemComponent* Component = Character->GetMovementSystem();
+	USigilMovementDeferredTestComponent* Component = Character->GetMovementSystem();
 	if (!TestNotNull(TEXT("Deferred movement component should exist"), Component))
 	{
 		return false;
@@ -94,6 +95,17 @@ bool FSigilMovementDeferredInitializationTest::RunTest(const FString& Parameters
 		TEXT("Test character should use deferred initialization"),
 		Component->GetRuntimeInitializationMode(),
 		ESigilMovementRuntimeInitializationMode::DeferredUntilConfigured);
+#if WITH_EDITORONLY_DATA
+	FDataValidationContext ValidationContext;
+	TestNotEqual(
+		TEXT("Deferred movement without an animation graph should not fail data validation"),
+		Component->ValidateForTest(ValidationContext),
+		EDataValidationResult::Invalid);
+	TestEqual(
+		TEXT("Deferred movement without an animation graph should add no validation errors"),
+		ValidationContext.GetNumErrors(),
+		0U);
+#endif
 	Component->SetMovementSet(SigilMovementDeferredTestSet.GetTag());
 	TestEqual(
 		TEXT("Deferred component should store movement set without configured definitions"),
