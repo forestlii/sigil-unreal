@@ -11,6 +11,7 @@
 #include "SigilMovementSystemComponent.generated.h"
 
 class USigilMainAnimInstance;
+class USigilSecondaryAnimInstance;
 class USigilMovementControlSetting_Default;
 class USigilAnimGraphSetting;
 class USigilMovementSystemComponentSettings;
@@ -36,6 +37,7 @@ class SIGILMOVEMENT_API USigilMovementSystemComponent : public UActorComponent
 	GENERATED_BODY()
 
 	friend USigilMainAnimInstance;
+	friend class USigilSecondaryAnimInstance;
 
 public:
 

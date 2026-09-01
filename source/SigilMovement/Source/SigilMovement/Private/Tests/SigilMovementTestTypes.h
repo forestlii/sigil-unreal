@@ -21,9 +21,25 @@ public:
 		const FGameplayTag& InMovementSet,
 		TSoftObjectPtr<const USigilMovementDefinition> InDefinition);
 
+	void ConfigureMovementStatesForTest(
+		const TArray<FSigilMovementStateSetting>& InStates,
+		FGameplayTag InDesiredState,
+		float InSpeed);
+	void SetLocomotionSpeedForTest(float InSpeed);
+	void RefreshMovementStateForTest();
+	UAnimInstance* GetMainAnimInstanceForTest() const;
+	int32 GetMovementStateChangeCountForTest() const;
+
 #if WITH_EDITORONLY_DATA
 	EDataValidationResult ValidateForTest(FDataValidationContext& Context) const;
 #endif
+
+protected:
+	virtual void OnMovementStateChanged_Implementation(
+		const FGameplayTag& PreviousMovementState) override;
+
+private:
+	int32 MovementStateChangeCountForTest{0};
 };
 
 UCLASS(Transient, NotPlaceable)
