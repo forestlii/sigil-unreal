@@ -16,6 +16,15 @@ enum class ESigilMovementRuntimeInitializationMode : uint8
 	DeferredUntilConfigured
 };
 
+UENUM(BlueprintType)
+enum class ESigilMovementRotationAuthority : uint8
+{
+	SigilMovement,
+	Controller,
+	MovementDirection,
+	External
+};
+
 
 /**
  *  SigilMovementComponent
@@ -41,6 +50,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem|Initialization")
 	bool TryActivateConfiguredRuntime();
+
+	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem|Rotation")
+	bool SetRotationAuthority(ESigilMovementRotationAuthority NewAuthority);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem|Rotation")
+	ESigilMovementRotationAuthority GetRotationAuthority() const;
 
 	UCharacterMovementComponent* GetCharacterMovement() const { return CharacterMovement; };
 	
@@ -180,12 +195,22 @@ public:
 #pragma endregion
 
 private:
+	static bool IsSupportedRotationAuthority(
+		ESigilMovementRotationAuthority Authority);
+	bool ApplyRotationAuthority(ESigilMovementRotationAuthority Authority);
 	void StartConfiguredRuntime();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings|Initialization", meta=(AllowPrivateAccess="true"))
 	ESigilMovementRuntimeInitializationMode RuntimeInitializationMode{
 		ESigilMovementRuntimeInitializationMode::Strict};
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings|Rotation", meta=(AllowPrivateAccess="true"))
+	ESigilMovementRotationAuthority RotationAuthority{
+		ESigilMovementRotationAuthority::SigilMovement};
+
 	UPROPERTY(Transient)
 	bool bConfiguredRuntimeActive{false};
+
+	UPROPERTY(Transient)
+	bool bRotationAuthorityLocked{false};
 };

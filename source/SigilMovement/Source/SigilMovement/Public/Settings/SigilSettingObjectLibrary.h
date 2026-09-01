@@ -97,6 +97,11 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Control", Meta = (ClampMin = 0, ForceUnits = "cm/s"))
 	float MovingSpeedThreshold{50.0f};
+
+	/** Whether the owning character can crouch. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GroundedControl")
+	bool bCanCrouch{false};
+
 	/**
 	 * Camera Look Speed Scale , Default Value = 1.f.
 	 * 摄像机移动速率, 分X, Y轴, 默认是1

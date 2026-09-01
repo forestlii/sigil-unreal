@@ -503,6 +503,16 @@ void USigilMovementSystemComponent::RefreshMovementSetSetting()
 		{
 			MovementDefinitions[i].LoadSynchronous();
 		}
+		if (!MovementDefinitions[i].IsValid())
+		{
+			UE_LOG(
+				LogSigilMovement,
+				Warning,
+				TEXT("Unable to load movement definition '%s' on actor '%s'."),
+				*MovementDefinitions[i].ToSoftObjectPath().ToString(),
+				*GetOwner()->GetName());
+			continue;
+		}
 		if (MovementDefinitions[i]->MovementSets.Contains(MovementSet))
 		{
 			MovementDefinition = MovementDefinitions[i].Get();
@@ -604,6 +614,8 @@ void USigilMovementSystemComponent::SetDesiredMovement(const FGameplayTag& NewDe
 	DesiredMovementState = NewDesiredMovement;
 
 	MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, DesiredMovementState, this)
+
+	ApplyMovementSetting();
 
 	if (bSendRpc)
 	{

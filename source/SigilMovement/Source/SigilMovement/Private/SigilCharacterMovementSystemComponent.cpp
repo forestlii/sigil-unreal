@@ -67,6 +67,102 @@ bool USigilCharacterMovementSystemComponent::IsConfiguredRuntimeActive() const
 	return bConfiguredRuntimeActive;
 }
 
+bool USigilCharacterMovementSystemComponent::SetRotationAuthority(
+	const ESigilMovementRotationAuthority NewAuthority)
+{
+	if (!IsSupportedRotationAuthority(NewAuthority))
+	{
+		return false;
+	}
+
+	if (bRotationAuthorityLocked)
+	{
+		return RotationAuthority == NewAuthority;
+	}
+
+	if (!IsValid(OwnerCharacter))
+	{
+		RotationAuthority = NewAuthority;
+		return true;
+	}
+
+	if (!ApplyRotationAuthority(NewAuthority))
+	{
+		return false;
+	}
+
+	RotationAuthority = NewAuthority;
+	return true;
+}
+
+ESigilMovementRotationAuthority USigilCharacterMovementSystemComponent::GetRotationAuthority() const
+{
+	return RotationAuthority;
+}
+
+bool USigilCharacterMovementSystemComponent::IsSupportedRotationAuthority(
+	const ESigilMovementRotationAuthority Authority)
+{
+	switch (Authority)
+	{
+	case ESigilMovementRotationAuthority::SigilMovement:
+	case ESigilMovementRotationAuthority::Controller:
+	case ESigilMovementRotationAuthority::MovementDirection:
+	case ESigilMovementRotationAuthority::External:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool USigilCharacterMovementSystemComponent::ApplyRotationAuthority(
+	const ESigilMovementRotationAuthority Authority)
+{
+	if (!IsValid(OwnerPawn) || !IsValid(OwnerCharacter) || !IsValid(CharacterMovement))
+	{
+		return false;
+	}
+
+	switch (Authority)
+	{
+	case ESigilMovementRotationAuthority::SigilMovement:
+		OwnerPawn->bUseControllerRotationPitch = false;
+		OwnerPawn->bUseControllerRotationYaw = false;
+		OwnerPawn->bUseControllerRotationRoll = false;
+		CharacterMovement->bOrientRotationToMovement = false;
+		CharacterMovement->bUseControllerDesiredRotation = false;
+		SetEnableRotate(true);
+		break;
+
+	case ESigilMovementRotationAuthority::Controller:
+		OwnerPawn->bUseControllerRotationPitch = false;
+		OwnerPawn->bUseControllerRotationYaw = true;
+		OwnerPawn->bUseControllerRotationRoll = false;
+		CharacterMovement->bOrientRotationToMovement = false;
+		CharacterMovement->bUseControllerDesiredRotation = false;
+		SetEnableRotate(false);
+		break;
+
+	case ESigilMovementRotationAuthority::MovementDirection:
+		OwnerPawn->bUseControllerRotationPitch = false;
+		OwnerPawn->bUseControllerRotationYaw = false;
+		OwnerPawn->bUseControllerRotationRoll = false;
+		CharacterMovement->bOrientRotationToMovement = true;
+		CharacterMovement->bUseControllerDesiredRotation = false;
+		SetEnableRotate(false);
+		break;
+
+	case ESigilMovementRotationAuthority::External:
+		SetEnableRotate(false);
+		break;
+
+	default:
+		return false;
+	}
+
+	return true;
+}
+
 bool USigilCharacterMovementSystemComponent::TryActivateConfiguredRuntime()
 {
 	if (bConfiguredRuntimeActive)
@@ -74,12 +170,21 @@ bool USigilCharacterMovementSystemComponent::TryActivateConfiguredRuntime()
 		return true;
 	}
 
+	if (!ApplyRotationAuthority(RotationAuthority))
+	{
+		return false;
+	}
+
 	AnimationInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-	if (!IsValid(AnimationInstance)
-		|| !IsValid(OwnerPawn)
-		|| OwnerPawn->bUseControllerRotationPitch
-		|| OwnerPawn->bUseControllerRotationYaw
-		|| OwnerPawn->bUseControllerRotationRoll)
+	if (!IsValid(AnimationInstance))
+	{
+		return false;
+	}
+
+	if (RotationAuthority == ESigilMovementRotationAuthority::SigilMovement
+		&& (OwnerPawn->bUseControllerRotationPitch
+			|| OwnerPawn->bUseControllerRotationYaw
+			|| OwnerPawn->bUseControllerRotationRoll))
 	{
 		return false;
 	}
@@ -97,6 +202,7 @@ void USigilCharacterMovementSystemComponent::InitializeComponent()
 	if (OwnerCharacter)
 	{
 		CharacterMovement = Cast<UCharacterMovementComponent>(OwnerCharacter->GetMovementComponent());
+		ApplyRotationAuthority(RotationAuthority);
 		// Set some default values here to ensure that the animation instance and the
 		// camera component can read the most up-to-date values during their initialization.
 
@@ -136,18 +242,29 @@ void USigilCharacterMovementSystemComponent::InitializeComponent()
 void USigilCharacterMovementSystemComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	const bool bRotationAuthorityApplied =
+		ApplyRotationAuthority(RotationAuthority);
+	bRotationAuthorityLocked = true;
+	ensure(bRotationAuthorityApplied);
 
 	if (RuntimeInitializationMode == ESigilMovementRuntimeInitializationMode::DeferredUntilConfigured)
 	{
+		if (!MovementDefinitions.IsEmpty())
+		{
+			RefreshMovementSetSetting();
+		}
 		return;
 	}
 
 	ensure(IsValid(AnimationInstance));
-	ensureMsgf(
-		!OwnerPawn->bUseControllerRotationPitch
-		&& !OwnerPawn->bUseControllerRotationYaw
-		&& !OwnerPawn->bUseControllerRotationRoll,
-		TEXT("These settings are not allowed and must be turned off!"));
+	if (RotationAuthority == ESigilMovementRotationAuthority::SigilMovement)
+	{
+		ensureMsgf(
+			!OwnerPawn->bUseControllerRotationPitch
+			&& !OwnerPawn->bUseControllerRotationYaw
+			&& !OwnerPawn->bUseControllerRotationRoll,
+			TEXT("Controller rotation must be disabled while SigilMovement owns rotation."));
+	}
 
 	StartConfiguredRuntime();
 }
@@ -276,7 +393,9 @@ void USigilCharacterMovementSystemComponent::OnCharacterMovementModeChanged(ACha
 
 void USigilCharacterMovementSystemComponent::ApplyMovementSetting()
 {
-	if (bAllowRefreshCharacterMovementSettings && IsValid(ControlSetting))
+	if (bAllowRefreshCharacterMovementSettings
+		&& IsValid(ControlSetting)
+		&& IsValid(CharacterMovement))
 	{
 		FSigilMovementStateSetting TempMS;
 		if (!ControlSetting->GetStateByTag(DesiredMovementState, TempMS))
@@ -287,7 +406,9 @@ void USigilCharacterMovementSystemComponent::ApplyMovementSetting()
 		CharacterMovement->MaxWalkSpeed = TempMS.Speed;
 		CharacterMovement->MaxAcceleration = TempMS.Acceleration;
 		CharacterMovement->BrakingDecelerationWalking = TempMS.BrakingDeceleration;
-		CharacterMovement->MaxWalkSpeedCrouched = TempMS.Speed;
+		CharacterMovement->MaxWalkSpeedCrouched = TempMS.CrouchedSpeed;
+		CharacterMovement->GetNavAgentPropertiesRef().bCanCrouch =
+			ControlSetting->bCanCrouch;
 		ControlSetting->BroadcastJumpStates(ControlSetting->JumpStates);
 		ControlSetting->BroadcastMovementStates(ControlSetting->MovementStates);
 	}
@@ -297,7 +418,8 @@ void USigilCharacterMovementSystemComponent::OnMovementSetChanged_Implementation
 	const FGameplayTag& PreviousMovementSet)
 {
 	if (RuntimeInitializationMode == ESigilMovementRuntimeInitializationMode::DeferredUntilConfigured
-		&& !bConfiguredRuntimeActive)
+		&& !bConfiguredRuntimeActive
+		&& MovementDefinitions.IsEmpty())
 	{
 		OnMovementSetChangedEvent.Broadcast(PreviousMovementSet);
 		return;

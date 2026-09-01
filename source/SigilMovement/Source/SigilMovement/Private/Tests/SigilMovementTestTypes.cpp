@@ -2,12 +2,20 @@
 
 #include "Tests/SigilMovementTestTypes.h"
 
-#include "SigilCharacterMovementSystemComponent.h"
+#include "Settings/SigilSettingObjectLibrary.h"
+
+void USigilMovementDeferredTestComponent::ConfigureStartupTest(
+	const FGameplayTag& InMovementSet,
+	TSoftObjectPtr<const USigilMovementDefinition> InDefinition)
+{
+	MovementSet = InMovementSet;
+	MovementDefinitions = {InDefinition};
+}
 
 ASigilMovementDeferredTestCharacter::ASigilMovementDeferredTestCharacter()
 {
 	bUseControllerRotationYaw = true;
-	MovementSystem = CreateDefaultSubobject<USigilCharacterMovementSystemComponent>(TEXT("MovementSystem"));
+	MovementSystem = CreateDefaultSubobject<USigilMovementDeferredTestComponent>(TEXT("MovementSystem"));
 	MovementSystem->SetRuntimeInitializationMode(
 		ESigilMovementRuntimeInitializationMode::DeferredUntilConfigured);
 }

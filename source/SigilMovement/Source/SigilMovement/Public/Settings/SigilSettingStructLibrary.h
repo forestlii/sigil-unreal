@@ -345,6 +345,11 @@ struct FSigilMovementStateSetting
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS", Meta = (ClampMin = 0, ForceUnits = "cm/s"))
 	float Speed{375.0f};
+
+	/** Crouched speed for this state. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GMS", Meta = (ClampMin = 0, ForceUnits = "cm/s"))
+	float CrouchedSpeed{0.0f};
+
 	/**
 	 * The Strafe Speed of this movement state.
 	 * 此运动状态侧向的速度。

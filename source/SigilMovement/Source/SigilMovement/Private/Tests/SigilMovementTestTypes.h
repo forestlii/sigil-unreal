@@ -4,9 +4,22 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "SigilCharacterMovementSystemComponent.h"
 #include "SigilMovementTestTypes.generated.h"
 
-class USigilCharacterMovementSystemComponent;
+class USigilMovementDefinition;
+
+UCLASS(Transient)
+class USigilMovementDeferredTestComponent final
+	: public USigilCharacterMovementSystemComponent
+{
+	GENERATED_BODY()
+
+public:
+	void ConfigureStartupTest(
+		const FGameplayTag& InMovementSet,
+		TSoftObjectPtr<const USigilMovementDefinition> InDefinition);
+};
 
 UCLASS(Transient, NotPlaceable)
 class ASigilMovementDeferredTestCharacter final : public ACharacter
@@ -16,12 +29,12 @@ class ASigilMovementDeferredTestCharacter final : public ACharacter
 public:
 	ASigilMovementDeferredTestCharacter();
 
-	USigilCharacterMovementSystemComponent* GetMovementSystem() const
+	USigilMovementDeferredTestComponent* GetMovementSystem() const
 	{
 		return MovementSystem;
 	}
 
 private:
 	UPROPERTY()
-	TObjectPtr<USigilCharacterMovementSystemComponent> MovementSystem;
+	TObjectPtr<USigilMovementDeferredTestComponent> MovementSystem;
 };

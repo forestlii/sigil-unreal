@@ -103,7 +103,7 @@ bool FSigilMovementDeferredInitializationTest::RunTest(const FString& Parameters
 		TEXT("Deferred component should remain inactive without locomotion configuration"),
 		Component->IsConfiguredRuntimeActive());
 	TestFalse(
-		TEXT("Activation should fail without an animation instance while controller yaw is enabled"),
+		TEXT("Activation should fail without an animation instance"),
 		Component->TryActivateConfiguredRuntime());
 	TestFalse(
 		TEXT("Failed activation should not change the active state"),
