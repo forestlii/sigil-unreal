@@ -42,3 +42,13 @@
 - 踩坑 / 反思: 审计处方：枪械射速**不要**用 Cooldown GE（不可预测、高延迟下射速变慢，GASDocumentation README 1572），本机制只给技能冷却用。`TempCooldownTags` 是 `mutable` 成员而非 `UPROPERTY(Transient)`，因为返回指针的容器不需要 GC 跟踪。
 - 复用层🔑: ② 引擎相关
 - 来源: 审计 §2 C2；GASDocumentation README `1398-1516`（本轮已读实现段）；Automation `SigilGas.Ability.SharedCooldown`。
+
+### [2026-09-11] C3：GameplayCueManager 子类默认按需加载 Cue，用 Config 开关而非硬编码
+
+- 阶段: 迭代
+- 面临的选择: 照 GASShooter 硬编码 `ShouldAsyncLoadRuntimeObjectLibraries() { return false; }`，或做成可配置。
+- 定了什么: 新增 `USigilGameplayCueManager`（`UCLASS(Config=Game)`），`UPROPERTY(Config) bAsyncLoadRuntimeObjectLibraries` 默认 false，覆写返回该值。消费项目在 `DefaultGame.ini` 的 `[/Script/GameplayAbilities.AbilitySystemGlobals]` 设 `GlobalGameplayCueManagerClass=/Script/SigilGas.SigilGameplayCueManager` 启用；要恢复引擎"启动时全量异步加载"只需 ini 里把该布尔设 True。Host 工程未配置该 ini（Host 没有 Config 目录、也没有 Cue 资产），只验证类行为。
+- 否掉了什么 + 为什么: 否掉硬编码 false——大项目地图内 Cue 少时按需加载省内存，但小项目 / 首次触发卡顿敏感的场景可能想保留预加载，一行 ini 比改代码便宜。否掉抄 `GSEngineSubsystem::InitGlobalData`——UE5.6 起引擎 `GetAbilitySystemGlobals()` 首次调用自动 `InitGlobalData()`（审计 §4.2）。
+- 复用层🔑: ② 引擎相关
+- 来源: 审计 §2 C3；GASShooter `GSGameplayCueManager.h:22-26`；GASDocumentation README `2429-2454`；Automation `SigilGas.CueManager.LoadsRuntimeObjectLibrariesOnDemand`。
+
