@@ -231,8 +231,10 @@ protected:
 	void K2_OnRemoveAbility();
 
 	/**
-	 * Called when the avatar is set for the ability.
-	 * 技能的化身设置时调用。
+	 * Called when the avatar is set for the ability. Also retries TryActivateAbilityOnSpawn so passive abilities
+	 * (Sigil.Ability.Trait.ActivationOnSpawn) granted before the avatar arrived still activate.
+	 * 技能的化身设置时调用。同时重试 TryActivateAbilityOnSpawn，让化身晚到之前授予的被动技能
+	 * （Sigil.Ability.Trait.ActivationOnSpawn）仍能激活。
 	 * @param ActorInfo The actor info. 演员信息。
 	 * @param Spec The ability spec. 技能规格。
 	 */

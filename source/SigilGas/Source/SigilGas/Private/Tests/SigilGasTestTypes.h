@@ -68,6 +68,19 @@ class USigilGasTestPlainObject final : public UObject
 };
 
 /**
+ * Server-only passive ability tagged Sigil.Ability.Trait.ActivationOnSpawn that stays active once activated.
+ * 带 Sigil.Ability.Trait.ActivationOnSpawn 标签、激活后保持激活的仅服务器被动技能。
+ */
+UCLASS(Transient)
+class USigilGasTestPassiveAbility final : public USigilGasTestAbility
+{
+	GENERATED_BODY()
+
+public:
+	USigilGasTestPassiveAbility();
+};
+
+/**
  * Shared cooldown effect whose duration is a SetByCaller on Sigil.SetByCaller.CooldownDuration and which grants no tags itself.
  * 时长为 SetByCaller（Sigil.SetByCaller.CooldownDuration）、自身不授予任何标签的共享冷却效果。
  */

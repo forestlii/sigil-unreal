@@ -52,3 +52,11 @@
 - 复用层🔑: ② 引擎相关
 - 来源: 审计 §2 C3；GASShooter `GSGameplayCueManager.h:22-26`；GASDocumentation README `2429-2454`；Automation `SigilGas.CueManager.LoadsRuntimeObjectLibrariesOnDemand`。
 
+### [2026-09-11] C4：被动技能在 GA 的 OnAvatarSet 重试激活，保留 ASC 侧既有重试
+
+- 阶段: 迭代
+- 面临的选择: 审计称"`OnAvatarSet` 只转发 K2，Avatar 晚到时被动静默失效"；核实后发现该前提对 Sigil ASC 不成立——`USigilAbilitySystemComponent::InitAbilityActorInfo` 在 AvatarChanged 时已遍历技能调 `TryActivateAbilityOnSpawn`。选择：什么都不做 / 只改 GA / 改 GA 并删 ASC 循环。
+- 定了什么: 在 `USigilGameplayAbility::OnAvatarSet` 末尾调用 `TryActivateAbilityOnSpawn(ActorInfo, Spec)`（GASShooter 做法），ASC 侧循环保留。引擎 5.8 `InitAbilityActorInfo` 在 AvatarChanged 时先对每个 Spec 的实例 / CDO 调 `OnAvatarSet`（`AbilitySystemComponent_Abilities.cpp:182-200`，本轮已核实），随后才轮到 Sigil ASC 的循环；`TryActivateAbilityOnSpawn` 以 `!Spec.IsActive()` 守卫，两次尝试不会重复激活（测试断言激活计数为 1）。
+- 否掉了什么 + 为什么: 否掉"什么都不做"——GA 自带重试让被动技能不依赖 ASC 是否为 Sigil 子类，行为更自洽；否掉删 ASC 循环——它同时服务实现了 `ISigilGameplayAbilityInterface` 的非 Sigil GA，删掉属改公开语义。
+- 复用层🔑: ② 引擎相关
+- 来源: 审计 §2 C4；GASShooter `GSGameplayAbility.cpp:36-45`；引擎 `AbilitySystemComponent_Abilities.cpp:165-200`；Automation `SigilGas.Ability.PassiveActivatesWhenAvatarArrives`。

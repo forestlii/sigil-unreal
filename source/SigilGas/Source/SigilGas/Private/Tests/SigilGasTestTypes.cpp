@@ -61,3 +61,9 @@ USigilGasTestFixedCooldownAbility::USigilGasTestFixedCooldownAbility()
 {
 	CooldownGameplayEffectClass = USigilGasTestFixedCooldownEffect::StaticClass();
 }
+USigilGasTestPassiveAbility::USigilGasTestPassiveAbility()
+{
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+	bEndImmediately = false;
+	SetAssetTags(FGameplayTagContainer(SigilAbilityTraitTags::ActivationOnSpawn));
+}

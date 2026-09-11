@@ -343,6 +343,11 @@ void USigilGameplayAbility::OnAvatarSet(const FGameplayAbilityActorInfo* ActorIn
 {
 	Super::OnAvatarSet(ActorInfo, Spec);
 	K2_OnAvatarSet();
+
+	// Passive abilities granted before the avatar existed get another chance here (GASShooter GSGameplayAbility::OnAvatarSet,
+	// Copyright 2020 Dan Kestranek, MIT). TryActivateAbilityOnSpawn skips specs that are already active, so this cannot
+	// double-activate when the ASC also retries from InitAbilityActorInfo.
+	TryActivateAbilityOnSpawn(ActorInfo, Spec);
 }
 
 bool USigilGameplayAbility::ShouldActivateAbility(ENetRole Role) const
