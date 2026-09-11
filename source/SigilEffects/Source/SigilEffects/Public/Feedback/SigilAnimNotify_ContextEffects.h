@@ -5,6 +5,7 @@
 #include "Animation/AnimNotifies/AnimNotify.h"
 #include "Chaos/ChaosEngineInterface.h"
 #include "GameplayTagContainer.h"
+#include "SigilContextEffectsEnumLibrary.h"
 #include "SigilContextEffectsStructLibrary.h"
 #include "Engine/EngineTypes.h"
 #include "SigilAnimNotify_ContextEffects.generated.h"
@@ -117,6 +118,44 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AnimNotify", meta = (DisplayName = "Effect", ExposeOnSpawn = true))
 	FGameplayTag Effect;
+
+	/**
+	 * Which camera perspective this notify plays for. Resolved through ISigilViewPerspectiveInterface on the owning pawn
+	 * (or its components / owner chain) plus local control; outside game worlds (animation editor preview) it always plays.
+	 * Rule adapted from GASShooter GSAnimNotify_PlaySoundForPerspective (Copyright 2020 Dan Kestranek, MIT).
+	 * 本通知在哪种视角下播放。通过拥有者 Pawn（或其组件 / 拥有链）上的 ISigilViewPerspectiveInterface 与本地控制判定；
+	 * 非游戏世界（动画编辑器预览）总是播放。规则改编自 GASShooter GSAnimNotify_PlaySoundForPerspective。
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AnimNotify", meta = (ExposeOnSpawn = true))
+	ESigilContextEffectsPerspectiveFilter PerspectiveFilter = ESigilContextEffectsPerspectiveFilter::Any;
+
+	/**
+	 * Pure decision table behind PerspectiveFilter.
+	 * PerspectiveFilter 背后的纯判定表。
+	 * @param Filter The filter. 过滤模式。
+	 * @param bIsLocallyControlled Whether the owning pawn is locally controlled. 拥有者 Pawn 是否本地控制。
+	 * @param bHasPerspectiveProvider Whether an ISigilViewPerspectiveInterface implementer was found. 是否找到视角接口实现者。
+	 * @param bIsFirstPerson What the provider reported (ignored without a provider). 实现者汇报的视角（无实现者时忽略）。
+	 * @return True if the notify should play. 应播放则返回 true。
+	 */
+	static bool ShouldPlayForPerspectiveFilter(ESigilContextEffectsPerspectiveFilter Filter, bool bIsLocallyControlled, bool bHasPerspectiveProvider, bool bIsFirstPerson);
+
+	/**
+	 * Walks the owner chain of OwningActor (actor, its components, then GetOwner()) to find the controlling pawn and an
+	 * ISigilViewPerspectiveInterface implementer.
+	 * 沿 OwningActor 的拥有链（Actor、其组件、再 GetOwner()）查找控制 Pawn 与 ISigilViewPerspectiveInterface 实现者。
+	 * @param OwningActor The actor the notify fired on. 触发通知的 Actor。
+	 * @param bOutLocallyControlled True if a pawn was found and is locally controlled. 找到 Pawn 且其本地控制时为 true。
+	 * @param bOutHasPerspectiveProvider True if an implementer was found. 找到实现者时为 true。
+	 * @param bOutFirstPerson The implementer's answer, false without one. 实现者的答案，无实现者时为 false。
+	 */
+	static void ResolvePerspective(const AActor* OwningActor, bool& bOutLocallyControlled, bool& bOutHasPerspectiveProvider, bool& bOutFirstPerson);
+
+	/**
+	 * Applies PerspectiveFilter to the notify's owning actor. Non-game worlds always play.
+	 * 对通知的拥有者 Actor 应用 PerspectiveFilter；非游戏世界总是播放。
+	 */
+	bool ShouldPlayForPerspective(const AActor* OwningActor) const;
 
 	/**
 	 * Location offset for effect spawning (socket if attached, mesh if not).
