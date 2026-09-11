@@ -14,3 +14,12 @@
 - 否掉了什么 + 为什么: 否掉在 SigilGas 里引用 `ISigilWeaponInterface` / `USigilEquipmentInstance`——依赖图只允许 combat→gas，SigilInventory 与 GAS 零耦合是刻意设计（`docs/sigil-inventory.zh-CN.md`），装备实例的桥接留给消费项目在 `OnEquipmentBeginPlay` 里做。否掉"未实现接口时放行"——"require" 语义应严格，误配时宁可拒绝并给出失败标签。
 - 复用层🔑: ② 引擎相关
 - 来源: 审计 §2 A2；GASShooter `GSGameplayAbility.h:64-66`、`.cpp:180-191`；Automation `SigilGas.Ability.RequireSourceObjectActive`。
+
+### [2026-09-11] A7：按类 + SourceObject 查技能句柄放函数库，不放 ASC
+
+- 阶段: 迭代
+- 面临的选择: 照 GASShooter 把 `FindAbilitySpecHandleForClass` 加在 ASC 上，或放进 `USigilAbilitySystemFunctionLibrary`。
+- 定了什么: 加在函数库：`FindAbilitySpecHandleForClass(ASC, AbilityClass, OptionalSourceObject)`，精确类匹配 + 可选 SourceObject 过滤，用公开的 `GetActivatableAbilities()` 遍历（5.8 已公开，无需 `ABILITYLIST_SCOPE_LOCK`），无匹配返回无效句柄。
+- 否掉了什么 + 为什么: 否掉挂在 ASC 上——Sigil 现有"按 Tag / Query 找技能"全在函数库（`FindAbilityWithTags` 等），保持同一入口；否掉子类匹配（`IsChildOf`）——GS 原语义是精确类，装备授予/回收场景需要精确定位。
+- 复用层🔑: ② 引擎相关
+- 来源: 审计 §2 A7；GASShooter `GSAbilitySystemComponent.cpp:140-156`；Automation `SigilGas.Library.FindAbilitySpecHandleForClass`。
