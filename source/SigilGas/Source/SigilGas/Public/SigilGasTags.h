@@ -30,3 +30,9 @@ namespace SigilStateTags
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interacting)
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(InteractingRemoval)
 }
+
+namespace SigilSetByCallerTags
+{
+	/** Default SetByCaller data tag USigilGameplayAbility writes its CooldownDuration into on a shared cooldown effect. */
+	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(CooldownDuration)
+}

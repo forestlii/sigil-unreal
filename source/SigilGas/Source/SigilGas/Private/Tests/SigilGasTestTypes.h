@@ -6,8 +6,15 @@
 #include "Abilities/SigilAbilitySourceInterface.h"
 #include "Abilities/SigilGameplayAbility.h"
 #include "GameFramework/Actor.h"
+#include "GameplayEffect.h"
+#include "NativeGameplayTags.h"
 #include "SigilAbilitySystemComponent.h"
 #include "SigilGasTestTypes.generated.h"
+
+namespace SigilGasTestTags
+{
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(SharedCooldown)
+}
 
 /**
  * Minimal avatar/owner actor carrying a Sigil ability system component for automation tests.
@@ -58,6 +65,58 @@ UCLASS(Transient)
 class USigilGasTestPlainObject final : public UObject
 {
 	GENERATED_BODY()
+};
+
+/**
+ * Shared cooldown effect whose duration is a SetByCaller on Sigil.SetByCaller.CooldownDuration and which grants no tags itself.
+ * 时长为 SetByCaller（Sigil.SetByCaller.CooldownDuration）、自身不授予任何标签的共享冷却效果。
+ */
+UCLASS(Transient)
+class USigilGasTestSharedCooldownEffect final : public UGameplayEffect
+{
+	GENERATED_BODY()
+
+public:
+	USigilGasTestSharedCooldownEffect();
+};
+
+/**
+ * Cooldown effect with a fixed 2 second duration (engine path, no SetByCaller).
+ * 固定 2 秒时长的冷却效果（引擎路径，无 SetByCaller）。
+ */
+UCLASS(Transient)
+class USigilGasTestFixedCooldownEffect final : public UGameplayEffect
+{
+	GENERATED_BODY()
+
+public:
+	USigilGasTestFixedCooldownEffect();
+};
+
+/**
+ * Ability using the shared cooldown effect with its own cooldown tag and a 3 second SetByCaller duration.
+ * 使用共享冷却效果、带自有冷却标签和 3 秒 SetByCaller 时长的技能。
+ */
+UCLASS(Transient)
+class USigilGasTestSharedCooldownAbility final : public USigilGasTestAbility
+{
+	GENERATED_BODY()
+
+public:
+	USigilGasTestSharedCooldownAbility();
+};
+
+/**
+ * Ability using the fixed-duration cooldown effect without any Sigil cooldown configuration (engine path).
+ * 使用固定时长冷却效果、不配置任何 Sigil 冷却字段的技能（引擎路径）。
+ */
+UCLASS(Transient)
+class USigilGasTestFixedCooldownAbility final : public USigilGasTestAbility
+{
+	GENERATED_BODY()
+
+public:
+	USigilGasTestFixedCooldownAbility();
 };
 
 /**

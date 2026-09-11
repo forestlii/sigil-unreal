@@ -27,4 +27,9 @@ namespace SigilStateTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InteractingRemoval, "Sigil.State.InteractingRemoval", "Pending removals of the interacting state; compared against Sigil.State.Interacting counts.");
 }
 
+namespace SigilSetByCallerTags
+{
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(CooldownDuration, "Sigil.SetByCaller.CooldownDuration", "SetByCaller data tag for the duration of a shared cooldown GameplayEffect; written by USigilGameplayAbility::ApplyCooldown from CooldownDuration.");
+}
+
 

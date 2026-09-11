@@ -7,6 +7,7 @@
 #include "SigilAbilitySystemStructLibrary.h"
 #include "SigilGameplayAbilityInterface.h"
 #include "Tickable.h"
+#include "ScalableFloat.h"
 #include "Abilities/GameplayAbility.h"
 #include "SigilGameplayAbility.generated.h"
 
@@ -424,7 +425,48 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability")
 	bool bRequireSourceObjectActive;
 
+	/**
+	 * Extra cooldown tags for a shared cooldown GameplayEffect. They are injected into the cooldown spec's DynamicGrantedTags
+	 * and included in GetCooldownTags(), so one generic cooldown GE can be reused by many abilities (GASDocumentation 4.5.15).
+	 * Leave empty to keep the plain per-ability cooldown GE behaviour.
+	 * 共享冷却 GameplayEffect 的附加冷却标签：注入冷却 Spec 的 DynamicGrantedTags 并纳入 GetCooldownTags()，
+	 * 让一个通用冷却 GE 被多个技能复用（GASDocumentation 4.5.15）。留空则保持"每技能一个冷却 GE"的原行为。
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cooldown")
+	FGameplayTagContainer CooldownTags;
+
+	/**
+	 * Cooldown duration written as a SetByCaller magnitude (tag CooldownDurationSetByCallerTag) on the cooldown spec when > 0.
+	 * The shared cooldown GE must use a SetByCaller duration with the same data tag.
+	 * 大于 0 时以 SetByCaller 量值（标签 CooldownDurationSetByCallerTag）写入冷却 Spec；共享冷却 GE 的时长须用同一数据标签的 SetByCaller。
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cooldown")
+	FScalableFloat CooldownDuration;
+
+	/**
+	 * SetByCaller data tag that CooldownDuration is written into. Defaults to Sigil.SetByCaller.CooldownDuration.
+	 * CooldownDuration 写入的 SetByCaller 数据标签，默认 Sigil.SetByCaller.CooldownDuration。
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cooldown")
+	FGameplayTag CooldownDurationSetByCallerTag;
+
+private:
+	/** Scratch container returned by GetCooldownTags(): union of the cooldown GE's granted tags and CooldownTags. */
+	mutable FGameplayTagContainer TempCooldownTags;
+
 public:
+	/**
+	 * Returns the union of the cooldown GameplayEffect's granted tags and this ability's CooldownTags.
+	 * 返回冷却 GameplayEffect 的授予标签与本技能 CooldownTags 的并集。
+	 */
+	virtual const FGameplayTagContainer* GetCooldownTags() const override;
+
+	/**
+	 * Applies the cooldown GameplayEffect, injecting CooldownTags and the SetByCaller CooldownDuration when configured;
+	 * otherwise behaves exactly like the engine implementation.
+	 * 应用冷却 GameplayEffect；配置了 CooldownTags / CooldownDuration 时注入它们，否则与引擎实现完全一致。
+	 */
+	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
 	/**
 	 * Returns true if the given source object implements ISigilAbilitySourceInterface and reports active.
 	 * 给定来源对象实现了 ISigilAbilitySourceInterface 且汇报激活时返回 true。

@@ -33,3 +33,12 @@
 - 踩坑 / 反思: Minimal 复制模式的 ASC 上客户端收不到冷却 GE，`OnCooldownBegin` 不会触发（审计已提示）；写进头文件注释，未做绕过。
 - 复用层🔑: ② 引擎相关
 - 来源: 审计 §2 C1；GASDocumentation `AsyncTaskCooldownChanged.h/.cpp`、`AsyncTaskEffectStackChanged.h/.cpp`，README `1555-1564,3113-3126`；Automation `SigilGas.AsyncTask.CooldownChanged`、`SigilGas.AsyncTask.EffectStackChanged`。
+### [2026-09-11] C2：共享冷却 GE 走 SetByCaller，未配置时完全走引擎原路径
+
+- 阶段: 迭代
+- 面临的选择: GASDocumentation 4.5.15 的两种复用冷却 GE 方案——① SetByCaller 时长，② MMC 读技能上的时长；以及是否无条件走新路径。
+- 定了什么: `USigilGameplayAbility` 新增 `CooldownTags`（FGameplayTagContainer）、`CooldownDuration`（FScalableFloat）、`CooldownDurationSetByCallerTag`（默认新原生标签 `Sigil.SetByCaller.CooldownDuration`）；覆写 `GetCooldownTags()` 返回"冷却 GE 授予标签 ∪ CooldownTags"，覆写 `ApplyCooldown()`：**仅当** `CooldownTags` 非空或 `CooldownDuration > 0` 时才自建 Spec 注入 `DynamicGrantedTags` / SetByCaller 量值；两者都未配置则原样调用 `Super::ApplyCooldown`，既有技能行为逐字节不变。
+- 否掉了什么 + 为什么: 否掉 MMC 方案——多一个资产类且依赖 `GetAbilityInstance_NotReplicated`，SetByCaller 更直接；否掉"无条件走新路径"——会给未配置 SetByCaller 的旧冷却 GE 塞无用量值，且违反"不改公开 API 语义"的约束。
+- 踩坑 / 反思: 审计处方：枪械射速**不要**用 Cooldown GE（不可预测、高延迟下射速变慢，GASDocumentation README 1572），本机制只给技能冷却用。`TempCooldownTags` 是 `mutable` 成员而非 `UPROPERTY(Transient)`，因为返回指针的容器不需要 GC 跟踪。
+- 复用层🔑: ② 引擎相关
+- 来源: 审计 §2 C2；GASDocumentation README `1398-1516`（本轮已读实现段）；Automation `SigilGas.Ability.SharedCooldown`。

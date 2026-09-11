@@ -42,6 +42,7 @@ USigilGameplayAbility::USigilGameplayAbility(const FObjectInitializer& ObjectIni
 
 	bEnableTick = false;
 	bRequireSourceObjectActive = false;
+	CooldownDurationSetByCallerTag = SigilSetByCallerTags::CooldownDuration;
 }
 
 void USigilGameplayAbility::Tick(float DeltaTime)
@@ -248,6 +249,56 @@ bool USigilGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle 
 	}
 
 	return true;
+}
+
+const FGameplayTagContainer* USigilGameplayAbility::GetCooldownTags() const
+{
+	// GASDocumentation 4.5.15 (Copyright 2020 Dan Kestranek, MIT): union of the cooldown GE's tags and the ability's own cooldown tags.
+	const FGameplayTagContainer* ParentTags = Super::GetCooldownTags();
+	if (CooldownTags.IsEmpty())
+	{
+		return ParentTags;
+	}
+
+	// TempCooldownTags lives on the CDO for non-instanced calls, so rebuild it every time in case CooldownTags changed.
+	TempCooldownTags.Reset();
+	if (ParentTags)
+	{
+		TempCooldownTags.AppendTags(*ParentTags);
+	}
+	TempCooldownTags.AppendTags(CooldownTags);
+	return &TempCooldownTags;
+}
+
+void USigilGameplayAbility::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+	const UGameplayEffect* CooldownGE = GetCooldownGameplayEffect();
+	if (!CooldownGE)
+	{
+		return;
+	}
+
+	const float Level = GetAbilityLevel(Handle, ActorInfo);
+	const float Duration = CooldownDuration.GetValueAtLevel(Level);
+	const bool bWriteDuration = Duration > 0.f && CooldownDurationSetByCallerTag.IsValid();
+	if (CooldownTags.IsEmpty() && !bWriteDuration)
+	{
+		// Nothing to inject: keep the engine behaviour unchanged.
+		Super::ApplyCooldown(Handle, ActorInfo, ActivationInfo);
+		return;
+	}
+
+	// GASDocumentation 4.5.15 technique 1 (Copyright 2020 Dan Kestranek, MIT): shared cooldown GE + SetByCaller duration.
+	const FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(Handle, ActorInfo, ActivationInfo, CooldownGE->GetClass(), Level);
+	if (FGameplayEffectSpec* Spec = SpecHandle.Data.Get())
+	{
+		Spec->DynamicGrantedTags.AppendTags(CooldownTags);
+		if (bWriteDuration)
+		{
+			Spec->SetSetByCallerMagnitude(CooldownDurationSetByCallerTag, Duration);
+		}
+		ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, SpecHandle);
+	}
 }
 
 bool USigilGameplayAbility::IsAbilitySourceActive(const UObject* SourceObject)
