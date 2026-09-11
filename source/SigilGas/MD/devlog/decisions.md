@@ -60,3 +60,11 @@
 - 否掉了什么 + 为什么: 否掉"什么都不做"——GA 自带重试让被动技能不依赖 ASC 是否为 Sigil 子类，行为更自洽；否掉删 ASC 循环——它同时服务实现了 `ISigilGameplayAbilityInterface` 的非 Sigil GA，删掉属改公开语义。
 - 复用层🔑: ② 引擎相关
 - 来源: 审计 §2 C4；GASShooter `GSGameplayAbility.cpp:36-45`；引擎 `AbilitySystemComponent_Abilities.cpp:165-200`；Automation `SigilGas.Ability.PassiveActivatesWhenAvatarArrives`。
+### [2026-09-11] §3.3：TargetActor 散布随时间衰减按世界时间惰性结算，默认关闭
+
+- 阶段: 迭代
+- 面临的选择: 审计指出 GASShooter 与 Sigil 共有的坑——`CurrentTargetingSpread` 只累加、靠外部 `ResetSpread()` 归零。选择：在 Tick 里每帧衰减 / 按世界时间惰性结算 / 交给 GA 自己管。
+- 定了什么: `ASigilAbilityTargetActor_Trace` 新增 `TargetingSpreadDecayRate`（度/秒，默认 0 = 关）与 `TargetingSpreadDecayDelay`（秒）。`AddTargetingSpread()`（原 `AimWithPlayerController` 里的累加行）先结算衰减再累加并记时间戳；`UpdateTargetingSpreadDecay()` / `GetCurrentTargetingSpread()` 用 `LastIncreaseTime + Delay` 与 `LastDecayTime` 的较大者作起点按世界时间结算，`GetCurrentSpread()` 读衰减后的值；Tick 里也结算一次。`ResetSpread()` 一并清零新字段与时间戳（沿用它"清零一切"的既有语义）。
+- 否掉了什么 + 为什么: 否掉"只在 Tick 衰减"——即时确认模式 Tick 从不运行（Start→Confirm→Stop 一帧内完成），衰减会永远不发生；否掉改 `LineTrace::Configure` 签名塞新参数——两个 `BlueprintReadWrite` 字段直接设即可，不动既有蓝图节点引脚。随机种子仍是 `FMath::Rand()`（审计另一条"不可复现"未在本轮处理）。
+- 复用层🔑: ② 引擎相关
+- 来源: 审计 §3.3；`SigilAbilityTargetActor_Trace.cpp` 原 L252；Automation `SigilGas.TargetActor.SpreadDecaysOverTime`。
