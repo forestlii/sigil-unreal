@@ -411,6 +411,31 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ability")
 	bool bEnableTick;
 
+	/**
+	 * If true, the ability can only activate while its SourceObject reports active through ISigilAbilitySourceInterface
+	 * (for example: the weapon that granted the ability is the one currently equipped). A missing SourceObject, or one
+	 * that does not implement the interface, fails activation with Sigil.Ability.ActivateFail.SourceObjectInactive.
+	 * Adapted from GASShooter's bSourceObjectMustEqualCurrentWeaponToActivate (Copyright 2020 Dan Kestranek, MIT),
+	 * but resolved through an interface instead of casting to a concrete character class.
+	 * 为 true 时，只有 SourceObject 通过 ISigilAbilitySourceInterface 汇报激活才允许激活本技能
+	 * （例如授予本技能的武器正是当前装备的武器）。SourceObject 缺失或未实现接口时，
+	 * 以 Sigil.Ability.ActivateFail.SourceObjectInactive 失败。
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability")
+	bool bRequireSourceObjectActive;
+
+public:
+	/**
+	 * Returns true if the given source object implements ISigilAbilitySourceInterface and reports active.
+	 * 给定来源对象实现了 ISigilAbilitySourceInterface 且汇报激活时返回 true。
+	 * @param SourceObject The ability spec's SourceObject. 技能规格的 SourceObject。
+	 * @return True if active. 激活则返回 true。
+	 */
+	UFUNCTION(BlueprintPure, Category = "GGA|Ability|Source")
+	static bool IsAbilitySourceActive(const UObject* SourceObject);
+
+protected:
+
 #pragma region Net
 public:
 	/**

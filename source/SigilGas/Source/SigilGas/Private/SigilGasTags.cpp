@@ -11,6 +11,7 @@ namespace SigilAbilityActivateFailTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(TagsMissing, "Sigil.Ability.ActivateFail.TagsMissing", "Ability failed to activate because tags are missing.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Networking, "Sigil.Ability.ActivateFail.Networking", "Ability failed to activate because it did not pass the network checks.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(ActivationGroup, "Sigil.Ability.ActivateFail.ActivationGroup", "Ability failed to activate because of its activation group.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(SourceObjectInactive, "Sigil.Ability.ActivateFail.SourceObjectInactive", "Ability failed to activate because its SourceObject is missing or reports inactive through ISigilAbilitySourceInterface.");
 }
 
 namespace SigilAbilityTraitTags

@@ -6,6 +6,7 @@
 #include "AbilitySystemLog.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "Abilities/SigilAbilityCost.h"
+#include "Abilities/SigilAbilitySourceInterface.h"
 #include "Stats/Stats2.h"
 #include "SigilAbilitySystemComponent.h"
 #include "SigilGasTags.h"
@@ -40,6 +41,7 @@ USigilGameplayAbility::USigilGameplayAbility(const FObjectInitializer& ObjectIni
 	bReplicateInputDirectly = false;
 
 	bEnableTick = false;
+	bRequireSourceObjectActive = false;
 }
 
 void USigilGameplayAbility::Tick(float DeltaTime)
@@ -219,6 +221,16 @@ bool USigilGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle 
 		return false;
 	}
 
+	// Source gate (GASShooter's bSourceObjectMustEqualCurrentWeaponToActivate, resolved through an interface).
+	if (bRequireSourceObjectActive && !IsAbilitySourceActive(GetSourceObject(Handle, ActorInfo)))
+	{
+		if (OptionalRelevantTags)
+		{
+			OptionalRelevantTags->AddTag(SigilAbilityActivateFailTags::SourceObjectInactive);
+		}
+		return false;
+	}
+
 	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
 	{
 		return false;
@@ -236,6 +248,16 @@ bool USigilGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle 
 	}
 
 	return true;
+}
+
+bool USigilGameplayAbility::IsAbilitySourceActive(const UObject* SourceObject)
+{
+	if (!IsValid(SourceObject) || !SourceObject->Implements<USigilAbilitySourceInterface>())
+	{
+		return false;
+	}
+
+	return ISigilAbilitySourceInterface::Execute_IsAbilitySourceActive(SourceObject);
 }
 
 void USigilGameplayAbility::SetCanBeCanceled(bool bCanBeCanceled)

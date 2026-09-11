@@ -15,6 +15,7 @@ namespace SigilAbilityActivateFailTags
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TagsMissing);
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Networking);
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivationGroup);
+	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(SourceObjectInactive);
 }
 
 namespace SigilAbilityTraitTags
