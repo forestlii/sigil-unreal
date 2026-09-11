@@ -8,7 +8,11 @@
 #include "SigilAbilityTagRelationshipMapping.h"
 #include "SigilGlobalAbilitySystem.h"
 #include "SigilGasLogChannels.h"
+#include "Abilities/SigilGameplayAbility.h"
 #include "Abilities/SigilGameplayAbilityInterface.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Runtime/Launch/Resources/Version.h"
 
@@ -73,6 +77,9 @@ void USigilAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AA
 
 	if (AvatarChanged)
 	{
+		// Secondary-mesh montage bookkeeping belongs to the previous avatar's meshes.
+		LocalMeshMontages.Reset();
+
 		RegisterToGlobalAbilitySystem();
 
 		ABILITYLIST_SCOPE_LOCK();
@@ -430,6 +437,16 @@ void USigilAbilitySystemComponent::NotifyAbilityEnded(FGameplayAbilitySpecHandle
 		RemoveAbilityFromActivationGroup(AbilityInterface->GetActivationGroup(), Ability);
 	}
 
+	// Secondary meshes only: the engine keeps its own main-mesh bookkeeping until the montage blends out.
+	for (FSigilLocalMeshMontage& Entry : LocalMeshMontages)
+	{
+		if (Entry.AnimatingAbility.Get() == Ability)
+		{
+			NotifyAbilityMeshMontage(Ability, Entry.Mesh, nullptr);
+			Entry.AnimatingAbility = nullptr;
+		}
+	}
+
 	AbilityEndedEvent.Broadcast(Handle, Ability, bWasCancelled);
 }
 
@@ -587,4 +604,291 @@ void USigilAbilitySystemComponent::GetAbilityTargetData(const FGameplayAbilitySp
 		OutTargetDataHandle = ReplicatedData->TargetData;
 	}
 }
+#pragma endregion
+#pragma region MeshMontage
+
+bool USigilAbilitySystemComponent::IsAvatarMainMesh(const USkeletalMeshComponent* InMesh) const
+{
+	return InMesh && AbilityActorInfo.IsValid() && AbilityActorInfo->SkeletalMeshComponent.Get() == InMesh;
+}
+
+FSigilLocalMeshMontage* USigilAbilitySystemComponent::FindLocalMeshMontage(const USkeletalMeshComponent* InMesh)
+{
+	return LocalMeshMontages.FindByPredicate([InMesh](const FSigilLocalMeshMontage& Entry) { return Entry.Mesh == InMesh; });
+}
+
+const FSigilLocalMeshMontage* USigilAbilitySystemComponent::FindLocalMeshMontage(const USkeletalMeshComponent* InMesh) const
+{
+	return LocalMeshMontages.FindByPredicate([InMesh](const FSigilLocalMeshMontage& Entry) { return Entry.Mesh == InMesh; });
+}
+
+FSigilLocalMeshMontage& USigilAbilitySystemComponent::FindOrAddLocalMeshMontage(USkeletalMeshComponent* InMesh)
+{
+	if (FSigilLocalMeshMontage* Existing = FindLocalMeshMontage(InMesh))
+	{
+		return *Existing;
+	}
+
+	FSigilLocalMeshMontage& Entry = LocalMeshMontages.AddDefaulted_GetRef();
+	Entry.Mesh = InMesh;
+	return Entry;
+}
+
+UAnimInstance* USigilAbilitySystemComponent::GetSecondaryMeshAnimInstance(const USkeletalMeshComponent* InMesh) const
+{
+	if (!IsValid(InMesh) || !AbilityActorInfo.IsValid())
+	{
+		return nullptr;
+	}
+
+	// The mesh must belong to the avatar, directly or through an owned actor (weapon / equipment actor).
+	const AActor* Avatar = AbilityActorInfo->AvatarActor.Get();
+	bool bOwnedByAvatar = false;
+	constexpr int32 MaxDepth = 8;
+	const AActor* Current = InMesh->GetOwner();
+	for (int32 Depth = 0; Current && Depth < MaxDepth; ++Depth, Current = Current->GetOwner())
+	{
+		if (Current == Avatar)
+		{
+			bOwnedByAvatar = true;
+			break;
+		}
+	}
+
+	return bOwnedByAvatar ? InMesh->GetAnimInstance() : nullptr;
+}
+
+void USigilAbilitySystemComponent::NotifyAbilityMeshMontage(UGameplayAbility* Ability, USkeletalMeshComponent* InMesh, UAnimMontage* Montage) const
+{
+	if (USigilGameplayAbility* SigilAbility = Cast<USigilGameplayAbility>(Ability))
+	{
+		SigilAbility->SetCurrentMontageForMesh(InMesh, Montage);
+	}
+}
+
+float USigilAbilitySystemComponent::PlayMontageForMesh(UGameplayAbility* InAnimatingAbility, USkeletalMeshComponent* InMesh, FGameplayAbilityActivationInfo ActivationInfo, UAnimMontage* NewAnimMontage,
+                                                       float InPlayRate, FName StartSectionName, float StartTimeSeconds)
+{
+	if (!IsValid(InMesh) || !NewAnimMontage)
+	{
+		return -1.f;
+	}
+
+	if (IsAvatarMainMesh(InMesh))
+	{
+		// Engine path: replication, prediction and the ability's CurrentMontage are handled there.
+		return PlayMontage(InAnimatingAbility, ActivationInfo, NewAnimMontage, InPlayRate, StartSectionName, StartTimeSeconds);
+	}
+
+	// Secondary meshes (first person body, arms, weapon) are cosmetic for the local viewer only.
+	if (!AbilityActorInfo.IsValid() || !AbilityActorInfo->IsLocallyControlled())
+	{
+		return -1.f;
+	}
+
+	UAnimInstance* AnimInstance = GetSecondaryMeshAnimInstance(InMesh);
+	if (!AnimInstance)
+	{
+		UE_LOG(LogSigilAbilitySystem, Verbose, TEXT("PlayMontageForMesh: mesh [%s] has no anim instance or is not owned by avatar [%s]."), *GetNameSafe(InMesh),
+		       *GetNameSafe(AbilityActorInfo->AvatarActor.Get()));
+		return -1.f;
+	}
+
+	const float Duration = AnimInstance->Montage_Play(NewAnimMontage, InPlayRate, EMontagePlayReturnType::MontageLength, StartTimeSeconds);
+	if (Duration <= 0.f)
+	{
+		return Duration;
+	}
+
+	FSigilLocalMeshMontage& Entry = FindOrAddLocalMeshMontage(InMesh);
+	if (UGameplayAbility* Previous = Entry.AnimatingAbility.Get())
+	{
+		if (Previous != InAnimatingAbility)
+		{
+			// The previous ability already received the montage's interrupted callback; it is expected to end itself.
+			NotifyAbilityMeshMontage(Previous, InMesh, nullptr);
+		}
+	}
+
+	Entry.AnimMontage = NewAnimMontage;
+	Entry.AnimatingAbility = InAnimatingAbility;
+	NotifyAbilityMeshMontage(InAnimatingAbility, InMesh, NewAnimMontage);
+
+	if (StartSectionName != NAME_None)
+	{
+		AnimInstance->Montage_JumpToSection(StartSectionName, NewAnimMontage);
+	}
+
+	return Duration;
+}
+
+void USigilAbilitySystemComponent::CurrentMontageStopForMesh(USkeletalMeshComponent* InMesh, float OverrideBlendOutTime)
+{
+	if (IsAvatarMainMesh(InMesh))
+	{
+		CurrentMontageStop(OverrideBlendOutTime);
+		return;
+	}
+
+	const FSigilLocalMeshMontage* Entry = FindLocalMeshMontage(InMesh);
+	UAnimInstance* AnimInstance = GetSecondaryMeshAnimInstance(InMesh);
+	UAnimMontage* MontageToStop = Entry ? Entry->AnimMontage.Get() : nullptr;
+	if (AnimInstance && MontageToStop && !AnimInstance->Montage_GetIsStopped(MontageToStop))
+	{
+		const float BlendOutTime = (OverrideBlendOutTime >= 0.0f ? OverrideBlendOutTime : MontageToStop->BlendOut.GetBlendTime());
+		AnimInstance->Montage_Stop(BlendOutTime, MontageToStop);
+	}
+}
+
+void USigilAbilitySystemComponent::StopAllCurrentMontages(float OverrideBlendOutTime)
+{
+	CurrentMontageStop(OverrideBlendOutTime);
+
+	// Copy the mesh list: stopping can trigger callbacks that mutate the bookkeeping.
+	TArray<TObjectPtr<USkeletalMeshComponent>> Meshes;
+	for (const FSigilLocalMeshMontage& Entry : LocalMeshMontages)
+	{
+		Meshes.Add(Entry.Mesh);
+	}
+	for (USkeletalMeshComponent* Mesh : Meshes)
+	{
+		CurrentMontageStopForMesh(Mesh, OverrideBlendOutTime);
+	}
+}
+
+void USigilAbilitySystemComponent::CurrentMontageJumpToSectionForMesh(USkeletalMeshComponent* InMesh, FName SectionName)
+{
+	if (IsAvatarMainMesh(InMesh))
+	{
+		CurrentMontageJumpToSection(SectionName);
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetSecondaryMeshAnimInstance(InMesh);
+	if (UAnimMontage* CurrentMontage = GetCurrentMontageForMesh(InMesh); CurrentMontage && AnimInstance && SectionName != NAME_None)
+	{
+		AnimInstance->Montage_JumpToSection(SectionName, CurrentMontage);
+	}
+}
+
+void USigilAbilitySystemComponent::CurrentMontageSetNextSectionNameForMesh(USkeletalMeshComponent* InMesh, FName FromSectionName, FName ToSectionName)
+{
+	if (IsAvatarMainMesh(InMesh))
+	{
+		CurrentMontageSetNextSectionName(FromSectionName, ToSectionName);
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetSecondaryMeshAnimInstance(InMesh);
+	if (UAnimMontage* CurrentMontage = GetCurrentMontageForMesh(InMesh); CurrentMontage && AnimInstance)
+	{
+		AnimInstance->Montage_SetNextSection(FromSectionName, ToSectionName, CurrentMontage);
+	}
+}
+
+void USigilAbilitySystemComponent::CurrentMontageSetPlayRateForMesh(USkeletalMeshComponent* InMesh, float InPlayRate)
+{
+	if (IsAvatarMainMesh(InMesh))
+	{
+		CurrentMontageSetPlayRate(InPlayRate);
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetSecondaryMeshAnimInstance(InMesh);
+	if (UAnimMontage* CurrentMontage = GetCurrentMontageForMesh(InMesh); CurrentMontage && AnimInstance)
+	{
+		AnimInstance->Montage_SetPlayRate(CurrentMontage, InPlayRate);
+	}
+}
+
+UAnimMontage* USigilAbilitySystemComponent::GetCurrentMontageForMesh(const USkeletalMeshComponent* InMesh) const
+{
+	if (IsAvatarMainMesh(InMesh))
+	{
+		return GetCurrentMontage();
+	}
+
+	const FSigilLocalMeshMontage* Entry = FindLocalMeshMontage(InMesh);
+	const UAnimInstance* AnimInstance = GetSecondaryMeshAnimInstance(InMesh);
+	if (Entry && Entry->AnimMontage && AnimInstance && AnimInstance->Montage_IsActive(Entry->AnimMontage))
+	{
+		return Entry->AnimMontage;
+	}
+
+	return nullptr;
+}
+
+UGameplayAbility* USigilAbilitySystemComponent::GetAnimatingAbilityForMesh(const USkeletalMeshComponent* InMesh) const
+{
+	if (IsAvatarMainMesh(InMesh))
+	{
+		return GetAnimatingAbility();
+	}
+
+	const FSigilLocalMeshMontage* Entry = FindLocalMeshMontage(InMesh);
+	return Entry ? Entry->AnimatingAbility.Get() : nullptr;
+}
+
+bool USigilAbilitySystemComponent::IsAnimatingAbilityForAnyMesh(const UGameplayAbility* Ability) const
+{
+	if (!Ability)
+	{
+		return false;
+	}
+
+	if (GetAnimatingAbility() == Ability)
+	{
+		return true;
+	}
+
+	for (const FSigilLocalMeshMontage& Entry : LocalMeshMontages)
+	{
+		if (Entry.AnimatingAbility.Get() == Ability)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void USigilAbilitySystemComponent::ClearAnimatingAbilityForMesh(USkeletalMeshComponent* InMesh, UGameplayAbility* Ability)
+{
+	if (!Ability)
+	{
+		return;
+	}
+
+	if (IsAvatarMainMesh(InMesh))
+	{
+		ClearAnimatingAbility(Ability);
+		return;
+	}
+
+	if (FSigilLocalMeshMontage* Entry = FindLocalMeshMontage(InMesh); Entry && Entry->AnimatingAbility.Get() == Ability)
+	{
+		NotifyAbilityMeshMontage(Ability, InMesh, nullptr);
+		Entry->AnimatingAbility = nullptr;
+	}
+}
+
+void USigilAbilitySystemComponent::ClearAnimatingAbilityForAllMeshes(UGameplayAbility* Ability)
+{
+	if (!Ability)
+	{
+		return;
+	}
+
+	ClearAnimatingAbility(Ability);
+
+	for (FSigilLocalMeshMontage& Entry : LocalMeshMontages)
+	{
+		if (Entry.AnimatingAbility.Get() == Ability)
+		{
+			NotifyAbilityMeshMontage(Ability, Entry.Mesh, nullptr);
+			Entry.AnimatingAbility = nullptr;
+		}
+	}
+}
+
 #pragma endregion

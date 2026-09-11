@@ -77,3 +77,12 @@
 - 否掉了什么 + 为什么: 否掉直接改回 GS 语义（理由见上）；否掉不做任何事——差异不显式暴露，迁移 GS 配置的人会踩坑。
 - 复用层🔑: ② 引擎相关
 - 来源: 审计 §1；GASShooter `GSGATA_Trace.cpp:210-235`；`git log -S"PrimaryPC && bTraceFromPlayerViewPoint"`；Automation `SigilGas.TargetActor.AimViewPointRespectsFlags`。
+### [2026-09-11] B1①：多网格蒙太奇走"主网格引擎路径 + 次要网格本地播放"的单机简化版，不移植复制版
+
+- 阶段: 选型
+- 面临的选择: 审计 B1 两档——①单机简化版（只抄 API 形状：主网格走引擎 `PlayMontage`，其他网格仅本地 `Montage_Play`、不复制）；②完整复制版（GASShooter 约 690 行逐 mesh 复制 / 预测 / OnRep，5.8 下 `RepAnimMontage` 字段全变、`PlayMontageInternal` 私有，等于重写）。
+- 定了什么: 做①。`USigilAbilitySystemComponent` 新增 `PlayMontageForMesh / CurrentMontageStopForMesh / StopAllCurrentMontages / CurrentMontageJumpToSectionForMesh / CurrentMontageSetNextSectionNameForMesh / CurrentMontageSetPlayRateForMesh / GetCurrentMontageForMesh / GetAnimatingAbilityForMesh / IsAnimatingAbilityForAnyMesh / ClearAnimatingAbilityForMesh / ClearAnimatingAbilityForAllMeshes`，以 `IsAvatarMainMesh`（`ActorInfo->SkeletalMeshComponent`）分流：主网格原样调用引擎函数，其他网格在 `LocalMeshMontages`（`FSigilLocalMeshMontage`，Transient、不复制）记账，且只在 `ActorInfo->IsLocallyControlled()` 时播放；网格须直接或经拥有链属于化身（武器 / 装备 Actor 上的网格也算）。`USigilGameplayAbility` 新增 `GetCurrentMontageForMesh / SetCurrentMontageForMesh / MontageJumpToSectionForMesh / MontageSetNextSectionNameForMesh / MontageStopForMesh / MontageStopForAllMeshes`，主网格映射到引擎 `CurrentMontage`。`USigilAbilityTask_PlayMontageAndWaitForEvent` 加可选 `Mesh`（Params 字段 + 新静态 `PlayMontageForMeshAndWaitForEvent`），`Mesh` 为空时代码路径与改动前逐行一致。
+- 否掉了什么 + 为什么: 否掉②——产品层单机，复制版收益为零且 5.8 下是重写（审计 §5.6-1）；否掉给次要网格应用 `AnimRootMotionTranslationScale`（GS 原样应用）——根运动只由主网格驱动，改 Character 全局缩放会误伤世界身体；否掉 GS 在 `NotifyAbilityEnded` 里连主网格一起清 AnimatingAbility——引擎主网格记账由蒙太奇混出回调清理，保持不变，只清次要网格。
+- 踩坑 / 反思: 审计 §3.2 的两个 GS 源码 bug已处理：`SetCurrentMontageForMesh` 按值拷贝导致同网格第二次 Set 无效 → 改用指针查找（测试 `SigilGas.Montage.AbilityTracksMontagePerMesh` 覆盖）；Task 混用单网格 `GetCurrentMontage / ClearAnimatingAbility` → 全部按 `Mesh` 分流到 `GetAbilityCurrentMontage / ClearAnimatingAbilityForMesh`。Automation 无法造出带 AnimInstance 的骨骼网格，因此**真实蒙太奇播放未被自动化覆盖【未验证】**，测试只覆盖记账、路由与守卫（主网格识别、无 AnimInstance 返回 -1 且不记账、非化身网格拒绝、Task 无 AnimInstance 时广播 OnCancelled）。
+- 复用层🔑: ② 引擎相关
+- 来源: 审计 §2 B1、§3.2、§5.6-1；GASShooter `GSAbilitySystemComponent.h/.cpp:270-961`、`GSGameplayAbility.h:149-198`、`GSAT_PlayMontageForMeshAndWaitForEvent`；引擎 `AbilitySystemComponent_Abilities.cpp:3035-3090,3504-3540`；Automation `SigilGas.Montage.*`。

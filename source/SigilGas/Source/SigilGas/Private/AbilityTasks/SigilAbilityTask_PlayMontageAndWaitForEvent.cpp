@@ -4,9 +4,12 @@
 #include "AbilityTasks/SigilAbilityTask_PlayMontageAndWaitForEvent.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
+#include "SigilAbilitySystemComponent.h"
 #include "SigilGasLogChannels.h"
+#include "Abilities/SigilGameplayAbility.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Character.h"
 
 static bool GUseAggressivePlayMontageAndWaitEndTask = true;
@@ -23,11 +26,60 @@ USigilAbilityTask_PlayMontageAndWaitForEvent::USigilAbilityTask_PlayMontageAndWa
 	bStopWhenAbilityEnds = true;
 }
 
+USigilAbilitySystemComponent* USigilAbilityTask_PlayMontageAndWaitForEvent::GetSigilAbilitySystemComponent() const
+{
+	return Cast<USigilAbilitySystemComponent>(AbilitySystemComponent.Get());
+}
+
+bool USigilAbilityTask_PlayMontageAndWaitForEvent::UsesSecondaryMesh() const
+{
+	if (!Mesh)
+	{
+		return false;
+	}
+
+	const USigilAbilitySystemComponent* SigilASC = GetSigilAbilitySystemComponent();
+	return !SigilASC || !SigilASC->IsAvatarMainMesh(Mesh);
+}
+
+UAnimInstance* USigilAbilityTask_PlayMontageAndWaitForEvent::GetTargetAnimInstance() const
+{
+	if (Mesh)
+	{
+		return Mesh->GetAnimInstance();
+	}
+
+	const FGameplayAbilityActorInfo* ActorInfo = Ability ? Ability->GetCurrentActorInfo() : nullptr;
+	return ActorInfo ? ActorInfo->GetAnimInstance() : nullptr;
+}
+
+UAnimMontage* USigilAbilityTask_PlayMontageAndWaitForEvent::GetAbilityCurrentMontage() const
+{
+	if (!Ability)
+	{
+		return nullptr;
+	}
+
+	if (Mesh)
+	{
+		if (const USigilGameplayAbility* SigilAbility = Cast<USigilGameplayAbility>(Ability))
+		{
+			return SigilAbility->GetCurrentMontageForMesh(Mesh);
+		}
+		if (const USigilAbilitySystemComponent* SigilASC = GetSigilAbilitySystemComponent())
+		{
+			return SigilASC->GetCurrentMontageForMesh(Mesh);
+		}
+	}
+
+	return Ability->GetCurrentMontage();
+}
+
 void USigilAbilityTask_PlayMontageAndWaitForEvent::OnMontageBlendingOut(UAnimMontage* Montage, bool bInterrupted)
 {
-	const bool bPlayingThisMontage = (Montage == MontageToPlay) && Ability && Ability->GetCurrentMontage() == MontageToPlay;
+	const bool bPlayingThisMontage = (Montage == MontageToPlay) && Ability && GetAbilityCurrentMontage() == MontageToPlay;
 
-	if (bPlayingThisMontage)
+	if (bPlayingThisMontage && !UsesSecondaryMesh())
 	{
 		if (Montage == MontageToPlay)
 		{
@@ -43,7 +95,14 @@ void USigilAbilityTask_PlayMontageAndWaitForEvent::OnMontageBlendingOut(UAnimMon
 
 	if (bPlayingThisMontage && (bInterrupted || !bAllowInterruptAfterBlendOut))
 	{
-		if (UAbilitySystemComponent* ASC = AbilitySystemComponent.Get())
+		if (Mesh)
+		{
+			if (USigilAbilitySystemComponent* SigilASC = GetSigilAbilitySystemComponent())
+			{
+				SigilASC->ClearAnimatingAbilityForMesh(Mesh, Ability);
+			}
+		}
+		else if (UAbilitySystemComponent* ASC = AbilitySystemComponent.Get())
 		{
 			ASC->ClearAnimatingAbility(Ability);
 		}
@@ -143,7 +202,20 @@ USigilAbilityTask_PlayMontageAndWaitForEvent* USigilAbilityTask_PlayMontageAndWa
 	MyObj->bStopWhenAbilityEnds = Params.bStopWhenAbilityEnds;
 	MyObj->bAllowInterruptAfterBlendOut = Params.bAllowInterruptAfterBlendOut;
 	MyObj->StartTimeSeconds = Params.StartTimeSeconds;
+	MyObj->Mesh = Params.Mesh;
 
+	return MyObj;
+}
+
+USigilAbilityTask_PlayMontageAndWaitForEvent* USigilAbilityTask_PlayMontageAndWaitForEvent::PlayMontageForMeshAndWaitForEvent(UGameplayAbility* OwningAbility, FName TaskInstanceName,
+                                                                                                                            USkeletalMeshComponent* InMesh, UAnimMontage* MontageToPlay,
+                                                                                                                            FGameplayTagContainer EventTags, float Rate, FName StartSection,
+                                                                                                                            bool bStopWhenAbilityEnds, float AnimRootMotionTranslationScale,
+                                                                                                                            float StartTimeSeconds, bool bAllowInterruptAfterBlendOut)
+{
+	USigilAbilityTask_PlayMontageAndWaitForEvent* MyObj = PlayMontageAndWaitForEvent(OwningAbility, TaskInstanceName, MontageToPlay, EventTags, Rate, StartSection, bStopWhenAbilityEnds,
+	                                                                                 AnimRootMotionTranslationScale, StartTimeSeconds, bAllowInterruptAfterBlendOut);
+	MyObj->Mesh = InMesh;
 	return MyObj;
 }
 
@@ -158,15 +230,22 @@ void USigilAbilityTask_PlayMontageAndWaitForEvent::Activate()
 
 	if (UAbilitySystemComponent* ASC = AbilitySystemComponent.Get())
 	{
-		const FGameplayAbilityActorInfo* ActorInfo = Ability->GetCurrentActorInfo();
-		UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
-		if (AnimInstance != nullptr)
+		USigilAbilitySystemComponent* SigilASC = GetSigilAbilitySystemComponent();
+		UAnimInstance* AnimInstance = GetTargetAnimInstance();
+		if (Mesh && !SigilASC)
+		{
+			UE_LOG(LogSigilTasks, Warning, TEXT("SigilAbilityTask_PlayMontageAndWaitForEvent: playing on mesh [%s] requires a USigilAbilitySystemComponent."), *GetNameSafe(Mesh));
+		}
+		else if (AnimInstance != nullptr)
 		{
 			// Bind to event callback
 			EventHandle = ASC->AddGameplayEventTagContainerDelegate(
 				EventTags, FGameplayEventTagMulticastDelegate::FDelegate::CreateUObject(this, &USigilAbilityTask_PlayMontageAndWaitForEvent::OnGameplayEvent));
 
-			if (ASC->PlayMontage(Ability, Ability->GetCurrentActivationInfo(), MontageToPlay, Rate, StartSection) > 0.f)
+			const float Duration = Mesh
+				? SigilASC->PlayMontageForMesh(Ability, Mesh, Ability->GetCurrentActivationInfo(), MontageToPlay, Rate, StartSection, StartTimeSeconds)
+				: ASC->PlayMontage(Ability, Ability->GetCurrentActivationInfo(), MontageToPlay, Rate, StartSection);
+			if (Duration > 0.f)
 			{
 				// Playing a montage could potentially fire off a callback into game code which could kill this ability! Early out if we are  pending kill.
 				if (ShouldBroadcastAbilityTaskDelegates() == false)
@@ -182,8 +261,9 @@ void USigilAbilityTask_PlayMontageAndWaitForEvent::Activate()
 				MontageEndedDelegate.BindUObject(this, &USigilAbilityTask_PlayMontageAndWaitForEvent::OnMontageEnded);
 				AnimInstance->Montage_SetEndDelegate(MontageEndedDelegate, MontageToPlay);
 
+				// Root motion is driven by the avatar's main mesh only; secondary (cosmetic) meshes leave it alone.
 				ACharacter* Character = Cast<ACharacter>(GetAvatarActor());
-				if (Character && (Character->GetLocalRole() == ROLE_Authority ||
+				if (Character && !UsesSecondaryMesh() && (Character->GetLocalRole() == ROLE_Authority ||
 					(Character->GetLocalRole() == ROLE_AutonomousProxy && Ability->GetNetExecutionPolicy() == EGameplayAbilityNetExecutionPolicy::LocalPredicted)))
 				{
 					Character->SetAnimRootMotionTranslationScale(AnimRootMotionTranslationScale);
@@ -266,7 +346,7 @@ bool USigilAbilityTask_PlayMontageAndWaitForEvent::StopPlayingMontage()
 		return false;
 	}
 
-	UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
+	UAnimInstance* AnimInstance = GetTargetAnimInstance();
 	if (AnimInstance == nullptr)
 	{
 		return false;
@@ -274,6 +354,25 @@ bool USigilAbilityTask_PlayMontageAndWaitForEvent::StopPlayingMontage()
 
 	// Check if the montage is still playing
 	// The ability would have been interrupted, in which case we should automatically stop the montage
+	if (Mesh)
+	{
+		USigilAbilitySystemComponent* SigilASC = GetSigilAbilitySystemComponent();
+		if (SigilASC && SigilASC->GetAnimatingAbilityForMesh(Mesh) == Ability && SigilASC->GetCurrentMontageForMesh(Mesh) == MontageToPlay)
+		{
+			// Unbind delegates so they don't get called as well
+			if (FAnimMontageInstance* MontageInstance = AnimInstance->GetActiveInstanceForMontage(MontageToPlay))
+			{
+				MontageInstance->OnMontageBlendingOutStarted.Unbind();
+				MontageInstance->OnMontageEnded.Unbind();
+			}
+
+			SigilASC->CurrentMontageStopForMesh(Mesh);
+			return true;
+		}
+
+		return false;
+	}
+
 	UAbilitySystemComponent* ASC = AbilitySystemComponent.Get();
 	if (ASC && Ability)
 	{
@@ -301,8 +400,7 @@ FString USigilAbilityTask_PlayMontageAndWaitForEvent::GetDebugString() const
 	UAnimMontage* PlayingMontage = nullptr;
 	if (Ability)
 	{
-		const FGameplayAbilityActorInfo* ActorInfo = Ability->GetCurrentActorInfo();
-		UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
+		UAnimInstance* AnimInstance = GetTargetAnimInstance();
 
 		if (AnimInstance != nullptr)
 		{
@@ -310,5 +408,5 @@ FString USigilAbilityTask_PlayMontageAndWaitForEvent::GetDebugString() const
 		}
 	}
 
-	return FString::Printf(TEXT("PlayMontageAndWaitForEvent. MontageToPlay: %s  (Currently Playing): %s"), *GetNameSafe(MontageToPlay), *GetNameSafe(PlayingMontage));
+	return FString::Printf(TEXT("PlayMontageAndWaitForEvent. MontageToPlay: %s  Mesh: %s  (Currently Playing): %s"), *GetNameSafe(MontageToPlay), *GetNameSafe(Mesh), *GetNameSafe(PlayingMontage));
 }

@@ -12,8 +12,27 @@
 #include "SigilGameplayAbility.generated.h"
 
 class USigilAbilityCost;
+class USkeletalMeshComponent;
+class UAnimMontage;
 
 DECLARE_STATS_GROUP(TEXT("GameplayAbility"), STATGROUP_GameplayAbility, STATCAT_Advanced)
+
+/**
+ * A montage this ability is currently playing on one of the avatar's skeletal meshes.
+ * Adapted from GASShooter FAbilityMeshMontage (Copyright 2020 Dan Kestranek, MIT).
+ * 本技能当前在化身某个骨骼网格上播放的蒙太奇。
+ */
+USTRUCT()
+struct FSigilAbilityMeshMontage
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> Mesh = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAnimMontage> Montage = nullptr;
+};
 
 /**
  * Extended gameplay ability class for custom functionality.
@@ -479,6 +498,52 @@ public:
 	static bool IsAbilitySourceActive(const UObject* SourceObject);
 
 protected:
+
+#pragma region MeshMontage
+	// ----------------------------------------------------------------------------------------------------------------
+	//	Animation support for multiple USkeletalMeshComponents on the avatar. The main mesh maps onto the engine's
+	//	CurrentMontage; other meshes are tracked here. API shape from GASShooter UGSGameplayAbility
+	//	(Copyright 2020 Dan Kestranek, MIT); the by-value lookup bug of the original SetCurrentMontageForMesh is fixed.
+	//	多网格动画支持：主网格映射到引擎的 CurrentMontage，其他网格在此跟踪。
+	// ----------------------------------------------------------------------------------------------------------------
+public:
+	/**
+	 * Montage this ability is playing on the mesh (the engine CurrentMontage for the avatar's main mesh), or null.
+	 * 本技能在该网格上播放的蒙太奇（主网格即引擎 CurrentMontage），无则为 null。
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation")
+	UAnimMontage* GetCurrentMontageForMesh(const USkeletalMeshComponent* InMesh) const;
+
+	/**
+	 * Records the montage this ability now plays on the mesh (null clears it). Set by the ability system component.
+	 * 记录本技能现在在该网格上播放的蒙太奇（null 表示清除）。由技能系统组件调用。
+	 */
+	virtual void SetCurrentMontageForMesh(USkeletalMeshComponent* InMesh, UAnimMontage* InCurrentMontage);
+
+	/** Immediately jumps the mesh's active montage to a section, if this ability animates it. 若本技能正驱动该网格，立即跳到分段。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation")
+	void MontageJumpToSectionForMesh(USkeletalMeshComponent* InMesh, FName SectionName);
+
+	/** Sets the pending section on the mesh's active montage, if this ability animates it. 若本技能正驱动该网格，设置下一分段。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation")
+	void MontageSetNextSectionNameForMesh(USkeletalMeshComponent* InMesh, FName FromSectionName, FName ToSectionName);
+
+	/** Stops the mesh's montage, if this ability animates it. 若本技能正驱动该网格，停止其蒙太奇。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation", Meta = (AdvancedDisplay = "OverrideBlendOutTime"))
+	void MontageStopForMesh(USkeletalMeshComponent* InMesh, float OverrideBlendOutTime = -1.0f);
+
+	/** Stops every montage this ability animates on any mesh. 停止本技能在所有网格上驱动的蒙太奇。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation", Meta = (AdvancedDisplay = "OverrideBlendOutTime"))
+	void MontageStopForAllMeshes(float OverrideBlendOutTime = -1.0f);
+
+protected:
+	/** True if InMesh is the avatar's main mesh per CurrentActorInfo. InMesh 是否为 CurrentActorInfo 记录的化身主网格。 */
+	bool IsAvatarMainMesh(const USkeletalMeshComponent* InMesh) const;
+
+	/** Active montages on secondary meshes being played by this ability. 本技能在次要网格上的活动蒙太奇。 */
+	UPROPERTY(Transient)
+	TArray<FSigilAbilityMeshMontage> CurrentAbilityMeshMontages;
+#pragma endregion
 
 #pragma region Net
 public:

@@ -10,6 +10,7 @@
 #include "Stats/Stats2.h"
 #include "SigilAbilitySystemComponent.h"
 #include "SigilGasTags.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
@@ -646,6 +647,122 @@ void USigilGameplayAbility::SendTargetDataToServer(const FGameplayAbilityTargetD
 			TargetData, ApplicationTag, ASC->ScopedPredictionKey);
 	}
 }
+
+#pragma region MeshMontage
+
+bool USigilGameplayAbility::IsAvatarMainMesh(const USkeletalMeshComponent* InMesh) const
+{
+	return InMesh && CurrentActorInfo && CurrentActorInfo->SkeletalMeshComponent.Get() == InMesh;
+}
+
+UAnimMontage* USigilGameplayAbility::GetCurrentMontageForMesh(const USkeletalMeshComponent* InMesh) const
+{
+	if (!InMesh)
+	{
+		return nullptr;
+	}
+
+	if (IsAvatarMainMesh(InMesh))
+	{
+		return GetCurrentMontage();
+	}
+
+	const FSigilAbilityMeshMontage* Entry = CurrentAbilityMeshMontages.FindByPredicate([InMesh](const FSigilAbilityMeshMontage& Candidate) { return Candidate.Mesh == InMesh; });
+	return Entry ? Entry->Montage.Get() : nullptr;
+}
+
+void USigilGameplayAbility::SetCurrentMontageForMesh(USkeletalMeshComponent* InMesh, UAnimMontage* InCurrentMontage)
+{
+	ENSURE_ABILITY_IS_INSTANTIATED_OR_RETURN(SetCurrentMontageForMesh, );
+
+	if (!InMesh)
+	{
+		return;
+	}
+
+	if (IsAvatarMainMesh(InMesh))
+	{
+		SetCurrentMontage(InCurrentMontage);
+		return;
+	}
+
+	// GASShooter looked the entry up by value and mutated a copy, so a second Set for the same mesh never took effect.
+	if (FSigilAbilityMeshMontage* Entry = CurrentAbilityMeshMontages.FindByPredicate([InMesh](const FSigilAbilityMeshMontage& Candidate) { return Candidate.Mesh == InMesh; }))
+	{
+		Entry->Montage = InCurrentMontage;
+	}
+	else if (InCurrentMontage)
+	{
+		FSigilAbilityMeshMontage& NewEntry = CurrentAbilityMeshMontages.AddDefaulted_GetRef();
+		NewEntry.Mesh = InMesh;
+		NewEntry.Montage = InCurrentMontage;
+	}
+}
+
+void USigilGameplayAbility::MontageJumpToSectionForMesh(USkeletalMeshComponent* InMesh, FName SectionName)
+{
+	check(CurrentActorInfo);
+
+	USigilAbilitySystemComponent* const ASC = Cast<USigilAbilitySystemComponent>(CurrentActorInfo->AbilitySystemComponent.Get());
+	if (ASC && ASC->GetAnimatingAbilityForMesh(InMesh) == this)
+	{
+		ASC->CurrentMontageJumpToSectionForMesh(InMesh, SectionName);
+	}
+}
+
+void USigilGameplayAbility::MontageSetNextSectionNameForMesh(USkeletalMeshComponent* InMesh, FName FromSectionName, FName ToSectionName)
+{
+	check(CurrentActorInfo);
+
+	USigilAbilitySystemComponent* const ASC = Cast<USigilAbilitySystemComponent>(CurrentActorInfo->AbilitySystemComponent.Get());
+	if (ASC && ASC->GetAnimatingAbilityForMesh(InMesh) == this)
+	{
+		ASC->CurrentMontageSetNextSectionNameForMesh(InMesh, FromSectionName, ToSectionName);
+	}
+}
+
+void USigilGameplayAbility::MontageStopForMesh(USkeletalMeshComponent* InMesh, float OverrideBlendOutTime)
+{
+	check(CurrentActorInfo);
+
+	USigilAbilitySystemComponent* const ASC = Cast<USigilAbilitySystemComponent>(CurrentActorInfo->AbilitySystemComponent.Get());
+	if (ASC && ASC->GetAnimatingAbilityForMesh(InMesh) == this)
+	{
+		ASC->CurrentMontageStopForMesh(InMesh, OverrideBlendOutTime);
+	}
+}
+
+void USigilGameplayAbility::MontageStopForAllMeshes(float OverrideBlendOutTime)
+{
+	check(CurrentActorInfo);
+
+	USigilAbilitySystemComponent* const ASC = Cast<USigilAbilitySystemComponent>(CurrentActorInfo->AbilitySystemComponent.Get());
+	if (!ASC)
+	{
+		return;
+	}
+
+	if (ASC->GetAnimatingAbility() == this)
+	{
+		ASC->CurrentMontageStop(OverrideBlendOutTime);
+	}
+
+	// Copy: stopping can re-enter SetCurrentMontageForMesh and mutate the array.
+	TArray<TObjectPtr<USkeletalMeshComponent>> Meshes;
+	for (const FSigilAbilityMeshMontage& Entry : CurrentAbilityMeshMontages)
+	{
+		Meshes.Add(Entry.Mesh);
+	}
+	for (USkeletalMeshComponent* Mesh : Meshes)
+	{
+		if (ASC->GetAnimatingAbilityForMesh(Mesh) == this)
+		{
+			ASC->CurrentMontageStopForMesh(Mesh, OverrideBlendOutTime);
+		}
+	}
+}
+
+#pragma endregion
 
 #if WITH_EDITOR
 EDataValidationResult USigilGameplayAbility::IsDataValid(FDataValidationContext& Context) const

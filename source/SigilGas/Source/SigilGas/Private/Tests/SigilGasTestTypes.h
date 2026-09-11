@@ -197,6 +197,14 @@ public:
 		LastNewStackCount = NewStackCount;
 		LastOldStackCount = OldStackCount;
 	}
+
+	int32 MontageCancelledCount = 0;
+
+	UFUNCTION()
+	void HandleMontageCancelled(FGameplayTag EventTag, FGameplayEventData EventData)
+	{
+		++MontageCancelledCount;
+	}
 };
 
 /**
