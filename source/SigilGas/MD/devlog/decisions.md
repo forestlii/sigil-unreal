@@ -68,3 +68,12 @@
 - 否掉了什么 + 为什么: 否掉"只在 Tick 衰减"——即时确认模式 Tick 从不运行（Start→Confirm→Stop 一帧内完成），衰减会永远不发生；否掉改 `LineTrace::Configure` 签名塞新参数——两个 `BlueprintReadWrite` 字段直接设即可，不动既有蓝图节点引脚。随机种子仍是 `FMath::Rand()`（审计另一条"不可复现"未在本轮处理）。
 - 复用层🔑: ② 引擎相关
 - 来源: 审计 §3.3；`SigilAbilityTargetActor_Trace.cpp` 原 L252；Automation `SigilGas.TargetActor.SpreadDecaysOverTime`。
+### [2026-09-11] §1：AimWithPlayerController 意图核对——保留 Sigil 门控语义，加 GASShooter 兼容开关
+
+- 阶段: 迭代
+- 面临的选择: 审计 §1 指出行为差异：GASShooter `GSGATA_Trace.cpp:220-223` 只要有 `MasterPC` 就用玩家视线瞄准（再从 `TraceStart` 朝该点出射），Sigil 只在 `bTraceFromPlayerViewPoint` 为真时才用玩家视线，否则沿 `StartLocation` 的旋转瞄准。是有意改动还是漏抄？
+- 核对结果: `git log -S` 显示该门控随开源基线提交（`6b90416` "open-source baseline: four UE5.6 Generic* plugins"）一并进入，之后 `1f5a7ce` 仅改名，没有单独提交或注释说明动机 → **意图【未知】**。本轮不擅自改回 GS 语义（会让所有把 `bTraceFromPlayerViewPoint` 留 false 的第三人称 / AI 用法突然改成"从相机瞄准"，属于改公开语义）。
+- 定了什么: 把视点解析抽成 `GetAimViewPoint(TraceStart, OutViewStart, OutViewRot)`（虚函数，可测），新增 `bAlwaysAimWithPlayerController`（默认 false）——为 true 时恢复 GASShooter 的"相机瞄准、枪口出射"；`bTraceFromPlayerViewPoint` 语义不变。FP 枪械两者任一为 true 即可；把 GS 蓝图参数照搬到 Sigil 时需显式打开其一，否则会"从枪口而非相机瞄准"（审计原话）。
+- 否掉了什么 + 为什么: 否掉直接改回 GS 语义（理由见上）；否掉不做任何事——差异不显式暴露，迁移 GS 配置的人会踩坑。
+- 复用层🔑: ② 引擎相关
+- 来源: 审计 §1；GASShooter `GSGATA_Trace.cpp:210-235`；`git log -S"PrimaryPC && bTraceFromPlayerViewPoint"`；Automation `SigilGas.TargetActor.AimViewPointRespectsFlags`。

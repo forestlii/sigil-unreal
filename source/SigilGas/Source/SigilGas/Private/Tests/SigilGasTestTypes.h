@@ -6,6 +6,7 @@
 #include "Abilities/SigilAbilitySourceInterface.h"
 #include "Abilities/SigilGameplayAbility.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/PlayerController.h"
 #include "GameplayEffect.h"
 #include "NativeGameplayTags.h"
 #include "SigilAbilitySystemComponent.h"
@@ -130,6 +131,26 @@ class USigilGasTestFixedCooldownAbility final : public USigilGasTestAbility
 
 public:
 	USigilGasTestFixedCooldownAbility();
+};
+
+/**
+ * Player controller with a scripted view point, so target-actor aiming can be tested without a camera pipeline.
+ * 视点可脚本化的玩家控制器，让目标 Actor 的瞄准测试不依赖相机管线。
+ */
+UCLASS(Transient, NotPlaceable)
+class ASigilGasTestPlayerController final : public APlayerController
+{
+	GENERATED_BODY()
+
+public:
+	FVector ScriptedViewLocation = FVector::ZeroVector;
+	FRotator ScriptedViewRotation = FRotator::ZeroRotator;
+
+	virtual void GetPlayerViewPoint(FVector& OutLocation, FRotator& OutRotation) const override
+	{
+		OutLocation = ScriptedViewLocation;
+		OutRotation = ScriptedViewRotation;
+	}
 };
 
 /**

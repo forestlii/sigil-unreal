@@ -20,6 +20,7 @@ ASigilAbilityTargetActor_Trace::ASigilAbilityTargetActor_Trace()
 	bIgnoreBlockingHits = false;
 	bTraceAffectsAimPitch = true;
 	bTraceFromPlayerViewPoint = false;
+	bAlwaysAimWithPlayerController = false;
 	MaxRange = 999999.0f;
 	bUseAimingSpreadMod = false;
 	BaseSpread = 0.0f;
@@ -287,14 +288,9 @@ void ASigilAbilityTargetActor_Trace::AimWithPlayerController(const AActor* InSou
 		return;
 	}
 
-	// Default values in case of AI Controller
-	FVector ViewStart = TraceStart;
-	FRotator ViewRot = StartLocation.GetTargetingTransform().GetRotation().Rotator();
-
-	if (PrimaryPC && bTraceFromPlayerViewPoint)
-	{
-		PrimaryPC->GetPlayerViewPoint(ViewStart, ViewRot);
-	}
+	FVector ViewStart;
+	FRotator ViewRot;
+	GetAimViewPoint(TraceStart, ViewStart, ViewRot);
 
 	const FVector ViewDir = ViewRot.Vector();
 	FVector ViewEnd = ViewStart + (ViewDir * MaxRange);
@@ -342,6 +338,20 @@ void ASigilAbilityTargetActor_Trace::AimWithPlayerController(const AActor* InSou
 	const FVector ShootDir = WeaponRandomStream.VRandCone(AdjustedAimDir, ConeHalfAngle, ConeHalfAngle);
 
 	OutTraceEnd = TraceStart + (ShootDir * MaxRange);
+}
+
+void ASigilAbilityTargetActor_Trace::GetAimViewPoint(const FVector& TraceStart, FVector& OutViewStart, FRotator& OutViewRot) const
+{
+	// Default values in case of AI Controller (or when the player view is not requested).
+	OutViewStart = TraceStart;
+	OutViewRot = StartLocation.GetTargetingTransform().GetRotation().Rotator();
+
+	// GASShooter (Copyright 2020 Dan Kestranek, MIT) always used the player view here; Sigil gates it behind
+	// bTraceFromPlayerViewPoint and, since 2026-09, bAlwaysAimWithPlayerController (see MD/devlog/decisions.md).
+	if (PrimaryPC && (bTraceFromPlayerViewPoint || bAlwaysAimWithPlayerController))
+	{
+		PrimaryPC->GetPlayerViewPoint(OutViewStart, OutViewRot);
+	}
 }
 
 bool ASigilAbilityTargetActor_Trace::ClipCameraRayToAbilityRange(FVector CameraLocation, FVector CameraDirection, FVector AbilityCenter,

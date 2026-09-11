@@ -119,6 +119,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ExposeOnSpawn = true), Category = "GGA|TargetActor")
 	bool bTraceFromPlayerViewPoint;
 
+	/**
+	 * When a player controller exists, aim along its view even though the trace itself starts at StartLocation
+	 * ("aim from the camera, shoot from the muzzle"). This is GASShooter's unconditional behaviour; Sigil defaults to
+	 * false and aims along StartLocation's rotation unless bTraceFromPlayerViewPoint is set.
+	 * 存在玩家控制器时，即使检测从 StartLocation 出发也沿其视线瞄准（"相机瞄准、枪口出射"）。这是 GASShooter 的
+	 * 无条件行为；Sigil 默认 false，除非设置 bTraceFromPlayerViewPoint，否则沿 StartLocation 的旋转瞄准。
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ExposeOnSpawn = true), Category = "GGA|TargetActor")
+	bool bAlwaysAimWithPlayerController;
+
 	// HitResults will persist until Confirmation/Cancellation or until a new HitResult takes its place
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ExposeOnSpawn = true), Category = "GGA|TargetActor")
 	bool bUsePersistentHitResults;
@@ -160,6 +170,14 @@ public:
 
 	virtual void AimWithPlayerController(const AActor* InSourceActor, FCollisionQueryParams Params,
 	                                     const FVector& TraceStart, FVector& OutTraceEnd, bool bIgnorePitch = false);
+
+	/**
+	 * Resolves the view point the aim ray is cast from: the player controller's view when bTraceFromPlayerViewPoint or
+	 * bAlwaysAimWithPlayerController is set and a controller exists, otherwise TraceStart with StartLocation's rotation.
+	 * 解析瞄准射线的出发视点：设置了 bTraceFromPlayerViewPoint 或 bAlwaysAimWithPlayerController 且存在玩家控制器时
+	 * 用其视线，否则用 TraceStart 与 StartLocation 的旋转。
+	 */
+	virtual void GetAimViewPoint(const FVector& TraceStart, FVector& OutViewStart, FRotator& OutViewRot) const;
 
 	virtual bool ClipCameraRayToAbilityRange(FVector CameraLocation, FVector CameraDirection, FVector AbilityCenter,
 	                                         float AbilityRange, FVector& ClippedPosition);
