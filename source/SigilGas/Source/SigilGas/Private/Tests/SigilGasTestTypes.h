@@ -61,6 +61,52 @@ class USigilGasTestPlainObject final : public UObject
 };
 
 /**
+ * Records cooldown / stack async-task broadcasts for assertions.
+ * 记录冷却 / 堆叠异步任务的广播供断言。
+ */
+UCLASS(Transient)
+class USigilGasTestAsyncListener final : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	int32 CooldownBeginCount = 0;
+	int32 CooldownEndCount = 0;
+	int32 StackChangeCount = 0;
+	FGameplayTag LastCooldownTag;
+	float LastTimeRemaining = 0.f;
+	float LastDuration = 0.f;
+	FGameplayTag LastStackTag;
+	int32 LastNewStackCount = -1;
+	int32 LastOldStackCount = -1;
+
+	UFUNCTION()
+	void HandleCooldownBegin(FGameplayTag CooldownTag, float TimeRemaining, float Duration)
+	{
+		++CooldownBeginCount;
+		LastCooldownTag = CooldownTag;
+		LastTimeRemaining = TimeRemaining;
+		LastDuration = Duration;
+	}
+
+	UFUNCTION()
+	void HandleCooldownEnd(FGameplayTag CooldownTag, float TimeRemaining, float Duration)
+	{
+		++CooldownEndCount;
+		LastCooldownTag = CooldownTag;
+	}
+
+	UFUNCTION()
+	void HandleStackChanged(FGameplayTag EffectGameplayTag, FActiveGameplayEffectHandle Handle, int32 NewStackCount, int32 OldStackCount)
+	{
+		++StackChangeCount;
+		LastStackTag = EffectGameplayTag;
+		LastNewStackCount = NewStackCount;
+		LastOldStackCount = OldStackCount;
+	}
+};
+
+/**
  * Source object whose active state can be toggled by the test.
  * 测试可切换激活态的来源对象。
  */

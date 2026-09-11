@@ -23,3 +23,13 @@
 - 否掉了什么 + 为什么: 否掉挂在 ASC 上——Sigil 现有"按 Tag / Query 找技能"全在函数库（`FindAbilityWithTags` 等），保持同一入口；否掉子类匹配（`IsChildOf`）——GS 原语义是精确类，装备授予/回收场景需要精确定位。
 - 复用层🔑: ② 引擎相关
 - 来源: 审计 §2 A7；GASShooter `GSAbilitySystemComponent.cpp:140-156`；Automation `SigilGas.Library.FindAbilitySpecHandleForClass`。
+
+### [2026-09-11] C1：冷却 / 堆叠变化异步节点基于 UAbilityAsync，修掉原版两处假设
+
+- 阶段: 迭代
+- 面临的选择: 逐行照抄 GASDocumentation 的 `UAsyncTaskCooldownChanged` / `UAsyncTaskEffectStackChanged`（基于 `UBlueprintAsyncActionBase` + 手写 `EndTask`），或改基于引擎 `UAbilityAsync`（Sigil 现有 `AttributeChanged` / `TagAddedRemoved` 同款）。
+- 定了什么: 新增 `USigilAsyncTask_CooldownChanged`（`ListenForCooldownChange(ASC, CooldownTags, bUseServerCooldown)`，`OnCooldownBegin` / `OnCooldownEnd`）与 `USigilAsyncTask_EffectStackChanged`（`ListenForGameplayEffectStackChange(ASC, EffectTag)`），都继承 `UAbilityAsync`，用 `EndAction` 结束、`ShouldBroadcastDelegates` 守卫。文件头保留 `Copyright 2020 Dan Kestranek`（MIT）。两处改动：① 冷却剩余时间按命中的冷却标签本身查询，不再假设"冷却标签永远是 GrantedTags[0]"；② 结束时 `OnGameplayEffectStackChangeDelegate` 返回空指针要判空（效果已移除时原版会解引用空指针），移除广播的旧堆叠数用真实 `GetStackCount()` 而非常量 1。
+- 否掉了什么 + 为什么: 否掉 `UBlueprintAsyncActionBase` 直系——与 Sigil 现有异步节点风格不一致，且 `UAbilityAsync` 自带 ASC 解析与取消守卫。
+- 踩坑 / 反思: Minimal 复制模式的 ASC 上客户端收不到冷却 GE，`OnCooldownBegin` 不会触发（审计已提示）；写进头文件注释，未做绕过。
+- 复用层🔑: ② 引擎相关
+- 来源: 审计 §2 C1；GASDocumentation `AsyncTaskCooldownChanged.h/.cpp`、`AsyncTaskEffectStackChanged.h/.cpp`，README `1555-1564,3113-3126`；Automation `SigilGas.AsyncTask.CooldownChanged`、`SigilGas.AsyncTask.EffectStackChanged`。
