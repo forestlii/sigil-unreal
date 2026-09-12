@@ -7,6 +7,7 @@
 #include "Abilities/SigilAbilitySet.h"
 #include "Abilities/SigilGameplayAbility.h"
 #include "Equipping/SigilEquipmentSystemComponent.h"
+#include "Fragments/SigilItemFragment_DynamicAttributes.h"
 #include "GameFramework/Pawn.h"
 #include "NativeGameplayTags.h"
 #include "SigilAbilitySystemComponent.h"
@@ -14,6 +15,7 @@
 #include "Weapon/SigilWeaponActor.h"
 #include "SigilArsenalTestTypes.generated.h"
 
+class USigilAbilityCost_ItemIntegerAttribute;
 class USigilItemCollectionDefinition;
 class USkeletalMeshComponent;
 
@@ -112,4 +114,41 @@ UCLASS(Transient, NotPlaceable)
 class ASigilArsenalTestWeaponActor final : public ASigilWeaponActor
 {
 	GENERATED_BODY()
+};
+
+/** 可由测试配置初始弹匣数的动态属性片段。 */
+UCLASS(Transient)
+class USigilArsenalTestAmmoAttributes final : public USigilItemFragment_DynamicAttributes
+{
+	GENERATED_BODY()
+
+public:
+	void SetMagazineForTest(int32 Amount);
+};
+
+/** 使用真实弹药成本，成功提交后计数并立即结束的独立测试技能。 */
+UCLASS(Transient)
+class USigilArsenalTestAmmoFireAbility final : public USigilGameplayAbility
+{
+	GENERATED_BODY()
+
+public:
+	USigilArsenalTestAmmoFireAbility();
+
+	int32 ActivationCount = 0;
+	USigilAbilityCost_ItemIntegerAttribute* GetAmmoCostForTest() const;
+
+protected:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+	                             const FGameplayEventData* TriggerEventData) override;
+};
+
+/** 授予带弹药成本的测试技能，不改变原有装载测试的技能配置。 */
+UCLASS(Transient)
+class USigilArsenalTestAmmoAbilitySet final : public USigilAbilitySet
+{
+	GENERATED_BODY()
+
+public:
+	USigilArsenalTestAmmoAbilitySet();
 };

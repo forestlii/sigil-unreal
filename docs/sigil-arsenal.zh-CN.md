@@ -1,4 +1,4 @@
-[English](sigil-arsenal.md) | [简体中文](sigil-arsenal.zh-CN.md)
+﻿[English](sigil-arsenal.md) | [简体中文](sigil-arsenal.zh-CN.md)
 
 # sigil.arsenal
 
@@ -36,8 +36,18 @@ USigilWeaponEquipmentInstance  ── 把 AbilitySet 授予 Pawn 的 ASC（Sourc
 5. 角色的 `ISigilCombatInterface::QueryAbilityActions` 调用 `USigilArsenalFunctionLibrary::QueryActiveWeaponAbilityActions`。
 6. **先**初始化技能系统，**再**初始化装备系统（装载在 `OnEquipmentBeginPlay` 授予；ASC 未初始化只记 Warning、不授予）。
 
+## 弹匣成本
+
+将 `USigilAbilityCost_ItemIntegerAttribute` 加到单发技能的 `AdditionalCosts`，并在产生射击前调用 `CommitAbility`。`Tag` 默认 `Sigil.Arsenal.Ammo.Magazine`；`Quantity` 为正整数，默认 1；`FailureTag` 默认 `Sigil.Arsenal.Ability.Fail.Ammo`。项目可以替换标签。
+
+在 `USigilItemFragment_DynamicAttributes::InitialIntegerAttributes` 初始化弹匣数；容量放物品定义的 `StaticIntegerAttributes`，使用 `Sigil.Arsenal.Ammo.MagazineCapacity`。Cost 不限制补弹上限；换弹逻辑由消费项目负责。
+
+Cost 从被检查的技能 Spec 的 `SourceObject` 找到武器装备，再取源物品。缺装备、物品或属性，标签无效，消耗量非正或弹药不足，均拒绝并在配置有效时返回 `FailureTag`。仅装备所属 Pawn 的 authority 可以扣弹；执行扣除时再次核对余额，避免直接调用或重复扣除变成负数。客户端只检查，不预测扣弹。
+
+备弹、换弹技能、物品 AttributeSet 和 Tag→Attribute 映射不在本批范围内。网络回补与真实玩法【未验证】。
+
 ## 已知缺口
 
-- 弹药与射击节奏尚未纳入本包；弹匣数的落点是物品态（`USigilItemFragment_DynamicAttributes`）。
+- 弹匣 Cost 已提供；射击节奏待补。备弹与换弹逻辑留消费项目。
 - 动画层只链接一个主网格，第一人称次要网格不在范围内。
 - sigil.inventory 里对已激活条目调用 `USigilEquipmentSystemComponent::SetEquipmentActiveState(slot, false)` 是无操作；请用槽位组索引 API 切换。

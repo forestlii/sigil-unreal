@@ -1,4 +1,4 @@
-# SigilArsenal 决策日志
+﻿# SigilArsenal 决策日志
 
 > 本文件只记录 `SigilArsenal` 插件内部的设计取舍，不记录消费项目（如 ProjectSpecter）的玩法、资产或产品范围。
 >
@@ -41,3 +41,13 @@
 - 踩坑 / 反思: `USigilEquipmentSystemComponent::GetActiveEquipments` 把**空** `FGameplayTagQuery` 当"什么都不匹配"，库里用 `NoTagsMatch()` 的空表达式构造出"匹配所有槽位"的查询（`MakeAnySlotQuery`），对外把空查询解释为"任意槽位"。Automation 无法造出带 AnimInstance 的骨骼网格，动画层真实链接【未验证】，测试只覆盖授予 / 门控 / 切换 / 查表 / 反指。
 - 复用层🔑: ② 引擎相关
 - 来源: `SigilArsenalFunctionLibrary.cpp`；`SigilEquipmentSystemComponent.cpp:134-154`；`SigilCombatFunctionLibrary.cpp:87-120`。
+
+### [2026-09-13] A3：弹匣使用物品整数属性，Cost 在武器所属 authority 扣除
+
+- 阶段: 迭代
+- 面临的选择: 浮点缩放成本还是明确整数；Cost 放 SigilGas 还是已依赖 Inventory 的 SigilArsenal；读取当前激活武器还是读取被检查的技能来源。
+- 定了什么: `USigilAbilityCost_ItemIntegerAttribute` 放 SigilArsenal；`Quantity` 为正整数，标签可配置并提供 Magazine / MagazineCapacity / Fail.Ammo 原生默认值。弹匣由 DynamicAttributes 初始化，容量由物品定义的 StaticIntegerAttributes 表达。CheckCost 依据传入 Handle/ActorInfo 的 `Ability->GetSourceObject` 解析装备和源物品；ApplyCost 仅 owning pawn 的 authority 扣除，执行时再次检查属性与余额。
+- 否掉了什么 + 为什么: 不引入物品 AttributeSet、浮点舍入、复制抑制、备弹、换弹或 Tag→Attribute 映射；这些超出本批弹匣范围。拒绝无效标签和非正 Quantity，避免错误配置变成免费射击或增加弹药。没有调用依赖 CurrentSpec 的便捷库，是为覆盖激活前检查及同能力多 Spec 的来源定位；数据仍走同一装备→源物品链。
+- 复用层: 引擎相关，SigilArsenal 可复用武器库存桥。
+- 来源: Likeon 2026-09-13 本次指令；本机交接 `MD/handoff/2026-09-13-firearms-batch2-handoff.md` §3.1；审计 `gasshooter-sigil-borrow-audit.md` §2 A3（Mine，仅借结构，未复制第三方实现）；本机 UE5.8 `GameplayAbility.cpp` 的 `GetSourceObject`；`SigilItemInstance.cpp` 的整数属性方法。联网与真实玩法【未验证】。
+- 本批验证（2026-09-13，Codex 实跑）: 空实现的 `SigilArsenal.Ammo` 4 项均失败（抓到未扣弹/未拒绝）；实现后 HostEditor Win64 Development UE5.8 编译通过，`Automation RunTests SigilArsenal` 为 5 过 / 1 带警告过 / 0 失败，4 个新增 Ammo 用例均通过。带警告通过来自引擎未配置 GameplayCueNotifyPaths 提示。证据：`Host/Saved/Batch2/a3-red/index.json`、`a3-build.log`、`a3/index.json`。非 authority 测试只切换本地 Pawn Role，真实联网【未验证】。
