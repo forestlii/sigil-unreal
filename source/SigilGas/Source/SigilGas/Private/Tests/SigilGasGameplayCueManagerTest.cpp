@@ -4,6 +4,8 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "AbilitySystemGlobals.h"
+#include "GameplayAbilitiesDeveloperSettings.h"
 #include "Globals/SigilGameplayCueManager.h"
 #include "UObject/Package.h"
 
@@ -32,6 +34,26 @@ bool FSigilGasGameplayCueManagerTest::RunTest(const FString& Parameters)
 
 	Manager->bAsyncLoadRuntimeObjectLibraries = true;
 	TestTrue(TEXT("The config flag restores the engine's up-front async load"), Manager->ShouldAsyncLoadRuntimeObjectLibraries());
+
+	// Wiring: Host/Config/DefaultGame.ini sets GlobalGameplayCueManagerClass under [/Script/GameplayAbilities.AbilitySystemGlobals].
+	// UE 5.8 reads the class from UGameplayAbilitiesDeveloperSettings, whose OverrideConfigSection maps onto that legacy
+	// section; a [/Script/GameplayAbilities.GameplayAbilitiesDeveloperSettings] section is ignored (tried, assertion failed).
+	const UGameplayAbilitiesDeveloperSettings* Settings = GetDefault<UGameplayAbilitiesDeveloperSettings>();
+	TestNotNull(TEXT("The developer settings should exist"), Settings);
+	if (Settings)
+	{
+		TestEqual(TEXT("Host wires GlobalGameplayCueManagerClass through GameplayAbilitiesDeveloperSettings"),
+		          Settings->GlobalGameplayCueManagerClass.ToString(), FString(TEXT("/Script/SigilGas.SigilGameplayCueManager")));
+	}
+
+	UGameplayCueManager* GlobalManager = UAbilitySystemGlobals::Get().GetGameplayCueManager();
+	TestNotNull(TEXT("The global cue manager should exist"), GlobalManager);
+	TestTrue(TEXT("The global cue manager instantiated by the engine is the Sigil subclass"), GlobalManager && GlobalManager->IsA<USigilGameplayCueManager>());
+	// ShouldAsyncLoadRuntimeObjectLibraries is protected on the engine base class; query it through the Sigil subclass.
+	if (const USigilGameplayCueManager* SigilGlobalManager = Cast<USigilGameplayCueManager>(GlobalManager))
+	{
+		TestFalse(TEXT("The live global cue manager loads runtime object libraries on demand"), SigilGlobalManager->ShouldAsyncLoadRuntimeObjectLibraries());
+	}
 
 	return true;
 }

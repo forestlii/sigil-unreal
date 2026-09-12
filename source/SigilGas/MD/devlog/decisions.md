@@ -1,4 +1,4 @@
-# SigilGas 决策日志
+﻿# SigilGas 决策日志
 
 > 本文件只记录 `SigilGas` 插件内部的设计取舍，不记录消费项目（如 ProjectSpecter）的玩法、资产或产品范围。
 >
@@ -86,3 +86,13 @@
 - 踩坑 / 反思: 审计 §3.2 的两个 GS 源码 bug已处理：`SetCurrentMontageForMesh` 按值拷贝导致同网格第二次 Set 无效 → 改用指针查找（测试 `SigilGas.Montage.AbilityTracksMontagePerMesh` 覆盖）；Task 混用单网格 `GetCurrentMontage / ClearAnimatingAbility` → 全部按 `Mesh` 分流到 `GetAbilityCurrentMontage / ClearAnimatingAbilityForMesh`。Automation 无法造出带 AnimInstance 的骨骼网格，因此**真实蒙太奇播放未被自动化覆盖【未验证】**，测试只覆盖记账、路由与守卫（主网格识别、无 AnimInstance 返回 -1 且不记账、非化身网格拒绝、Task 无 AnimInstance 时广播 OnCancelled）。
 - 复用层🔑: ② 引擎相关
 - 来源: 审计 §2 B1、§3.2、§5.6-1；GASShooter `GSAbilitySystemComponent.h/.cpp:270-961`、`GSGameplayAbility.h:149-198`、`GSAT_PlayMontageForMeshAndWaitForEvent`；引擎 `AbilitySystemComponent_Abilities.cpp:3035-3090,3504-3540`；Automation `SigilGas.Montage.*`。
+### [2026-09-12] C3 修订（PR #4 评审 P1-A）：启用说明核实——ini 段名原本就对，补 Host 实配与接线断言
+
+- 阶段: 迭代
+- 面临的选择: 评审称 5.8 只从 `UGameplayAbilitiesDeveloperSettings` 读 `GlobalGameplayCueManagerClass`、`UAbilitySystemGlobals` 上的同名属性已 `UE_DEPRECATED(5.5)`，因此原注释教的 `[/Script/GameplayAbilities.AbilitySystemGlobals]` 段"照配 = 静默 no-op"，建议改成 `[/Script/GameplayAbilities.GameplayAbilitiesDeveloperSettings]`。
+- 核对结果: 前半句属实（`AbilitySystemGlobals.cpp:628-630` 只读 DeveloperSettings），**结论不成立**：`UGameplayAbilitiesDeveloperSettings::OverrideConfigSection`（头文件 L125-132）把自己的 config 段强制映射到 `/Script/GameplayAbilities.AbilitySystemGlobals` 以兼容旧项目，所以原注释的段名正是唯一生效的写法。本机实测：Host 配 `[…GameplayAbilitiesDeveloperSettings]` 段时新断言失败（读回仍是引擎默认类），改回 `[…AbilitySystemGlobals]` 段后通过。
+- 定了什么: ini 段名保持 `[/Script/GameplayAbilities.AbilitySystemGlobals]`，头文件注释补充"5.5+ 由 DeveloperSettings 读取但映射到该旧段、DeveloperSettings 段不生效"的说明；Host 新增被跟踪的 `Host/Config/DefaultGame.ini` 只配这一行；测试追加断言：`GetDefault<UGameplayAbilitiesDeveloperSettings>()->GlobalGameplayCueManagerClass` 等于 `/Script/SigilGas.SigilGameplayCueManager`，且 `UAbilitySystemGlobals::Get().GetGameplayCueManager()` 返回的实例 `IsA<USigilGameplayCueManager>` 并按需加载。
+- 否掉了什么 + 为什么: 否掉照评审改段名——实测不生效；否掉只改注释不配 Host——评审说得对，原测试只 `NewObject` 读布尔，暴露不了接线问题，断言必须打在引擎真实创建的全局管理器上。
+- 踩坑 / 反思: 上一条目写的"Host 没有 Config 目录"已不符现状——编辑器每次跑 Automation 会生成 `Host/Config/DefaultEngine.ini`（含 AndroidFileServer SecurityToken）与 `DefaultInput.ini`，这两个是垃圾、不提交；只有 `DefaultGame.ini` 是有意跟踪的。外部评审的"已复核"也要再复核一遍——这次是评审看漏了 `OverrideConfigSection`。
+- 复用层🔑: ② 引擎相关
+- 来源: `D:\P4\Code_UE5.6\MDnalysis\sigil-pr4-review.md` §2 P1-A；引擎 `GameplayAbilitiesDeveloperSettings.h:29,51-53,125-132`、`AbilitySystemGlobals.cpp:615-640`；Automation `SigilGas.CueManager.LoadsRuntimeObjectLibrariesOnDemand`（新增接线断言，两种段名各跑一次）。

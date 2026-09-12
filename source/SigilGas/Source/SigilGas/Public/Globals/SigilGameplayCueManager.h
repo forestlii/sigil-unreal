@@ -9,10 +9,14 @@
 /**
  * GameplayCueManager that loads GameplayCue notifies on first use instead of async-loading every cue (and everything
  * they reference) when a map starts. Idea from GASShooter UGSGameplayCueManager (Copyright 2020 Dan Kestranek, MIT),
- * made configurable. Enable it with:
+ * made configurable. Enable it in DefaultGame.ini:
  *   [/Script/GameplayAbilities.AbilitySystemGlobals]
  *   GlobalGameplayCueManagerClass=/Script/SigilGas.SigilGameplayCueManager
- * and optionally
+ * Note for UE 5.5+: the class is read from UGameplayAbilitiesDeveloperSettings (Project Settings > Gameplay Abilities
+ * Settings), but that settings object deliberately maps its config onto the legacy AbilitySystemGlobals section
+ * (UGameplayAbilitiesDeveloperSettings::OverrideConfigSection), so the section above is the one that works; a
+ * [/Script/GameplayAbilities.GameplayAbilitiesDeveloperSettings] section is NOT read (verified on 5.8.1, see the
+ * SigilGas.CueManager Automation test). Optionally
  *   [/Script/SigilGas.SigilGameplayCueManager]
  *   bAsyncLoadRuntimeObjectLibraries=True
  * to restore the engine default.
