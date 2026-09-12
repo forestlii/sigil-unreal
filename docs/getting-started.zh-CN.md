@@ -45,7 +45,7 @@
 
 打开编辑器，确认 **Edit > Plugins > Sigil** 分类下能看到插件。之后每个包各有自己的配置步骤——Settings 类、需要自建的 Tag 树、需要创建的资产，按各包指南的「前置要求」和「快速开始」来：
 
-- [sigil.input](sigil-input.zh-CN.md) · [sigil.gas](sigil-gas.zh-CN.md) · [sigil.combat](sigil-combat.zh-CN.md) · [sigil.movement](sigil-movement.zh-CN.md) · [sigil.inventory](sigil-inventory.zh-CN.md) · [sigil.interaction](sigil-interaction.zh-CN.md) · [sigil.camera](sigil-camera.zh-CN.md) · [sigil.ui](sigil-ui.zh-CN.md) · [sigil.effects](sigil-effects.zh-CN.md)
+- [sigil.input](sigil-input.zh-CN.md) · [sigil.gas](sigil-gas.zh-CN.md) · [sigil.combat](sigil-combat.zh-CN.md) · [sigil.movement](sigil-movement.zh-CN.md) · [sigil.inventory](sigil-inventory.zh-CN.md) · [sigil.interaction](sigil-interaction.zh-CN.md) · [sigil.camera](sigil-camera.zh-CN.md) · [sigil.ui](sigil-ui.zh-CN.md) · [sigil.effects](sigil-effects.zh-CN.md) · [sigil.arsenal](sigil-arsenal.zh-CN.md)
 
 ## 宿主工程
 
@@ -58,6 +58,7 @@
 ## 包依赖图
 
 ```
-sigil.combat ──> sigil.gas
+sigil.combat  ──> sigil.gas
+sigil.arsenal ──> sigil.gas、sigil.inventory、sigil.combat（可选集成层）
 （其余包完全独立）
 ```
