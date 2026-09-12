@@ -32,4 +32,9 @@ namespace SigilSetByCallerTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(CooldownDuration, "Sigil.SetByCaller.CooldownDuration", "SetByCaller data tag for the duration of a shared cooldown GameplayEffect; written by USigilGameplayAbility::ApplyCooldown from CooldownDuration.");
 }
 
+namespace SigilCooldownTags
+{
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(SharedMarker, "Sigil.Cooldown.Shared", "Granted by shared cooldown GameplayEffects so they pass IsDataValid; excluded from cooldown matching by USigilGameplayAbility::GetCooldownTags when CooldownTags is set.");
+}
+
 

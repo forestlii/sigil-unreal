@@ -266,6 +266,9 @@ const FGameplayTagContainer* USigilGameplayAbility::GetCooldownTags() const
 	if (ParentTags)
 	{
 		TempCooldownTags.AppendTags(*ParentTags);
+		// The shared GE grants Sigil.Cooldown.Shared only to satisfy IsDataValid; matching on it would make every ability
+		// that shares the effect block every other one (PR #4 review P1-E).
+		TempCooldownTags.RemoveTag(SigilCooldownTags::SharedMarker);
 	}
 	TempCooldownTags.AppendTags(CooldownTags);
 	return &TempCooldownTags;

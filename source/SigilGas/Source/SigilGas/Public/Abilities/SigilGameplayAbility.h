@@ -450,6 +450,10 @@ protected:
 	 * Extra cooldown tags for a shared cooldown GameplayEffect. They are injected into the cooldown spec's DynamicGrantedTags
 	 * and included in GetCooldownTags(), so one generic cooldown GE can be reused by many abilities (GASDocumentation 4.5.15).
 	 * Leave empty to keep the plain per-ability cooldown GE behaviour.
+	 * The shared GE must itself grant Sigil.Cooldown.Shared (engine Data Validation rejects cooldown effects that grant no
+	 * tags; the marker is excluded from cooldown matching). Misconfigurations are not guarded: CooldownDuration without
+	 * CooldownTags on a GE that grants only the marker means no per-ability cooldown, and CooldownTags with CooldownDuration
+	 * 0 on a SetByCaller GE means a zero-length cooldown plus an engine error log.
 	 * 共享冷却 GameplayEffect 的附加冷却标签：注入冷却 Spec 的 DynamicGrantedTags 并纳入 GetCooldownTags()，
 	 * 让一个通用冷却 GE 被多个技能复用（GASDocumentation 4.5.15）。留空则保持"每技能一个冷却 GE"的原行为。
 	 */

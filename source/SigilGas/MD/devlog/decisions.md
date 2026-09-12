@@ -113,3 +113,27 @@
 - 否掉了什么 + 为什么: 否掉给条目加 `TWeakObjectPtr<UAnimMontage>`"弱引用防泄漏"——治标；条目本身在技能结束后就没有存在意义，删掉最干净。否掉在 `EndAbility` 里也清 GA 数组——ASC 的 `NotifyAbilityEnded` 已逐条回调 `SetCurrentMontageForMesh(nullptr)`，两处都清是重复。
 - 复用层🔑: ② 引擎相关
 - 来源: `D:\P4\Code_UE5.6\MD\analysis\sigil-pr4-review.md` §2 P1-C；`SigilEquipmentSystemComponent.cpp:749`（按次 Spawn 装备 Actor）；Automation `SigilGas.Montage.BookkeepingIsReleased`（测试 ASC 子类直接注入条目，因为真实条目需要 AnimInstance）。
+### [2026-09-12] C2 修订（PR #4 评审 P1-E）：共享冷却 GE 授予标记标签过 Data Validation，并集里剔除该标记
+
+- 阶段: 迭代
+- 面临的选择: 引擎 `UGameplayAbility::IsDataValid`（`GameplayAbility.cpp:330-345`）要求 `CooldownGameplayEffectClass` 的 GE **自身**授予标签，看的是 GE 而非虚函数 `GetCooldownTags()`；自身不授予标签的共享 GE 会让每个用它的 GA 蓝图在保存校验 / DataValidation commandlet 报 Error。评审建议：给共享 GE 授予一个通用 Tag。但直接照做会引入新问题——引擎 `CheckCooldown` 用 `HasAnyMatchingGameplayTags(GetCooldownTags())`，通用 Tag 进了并集就会让所有共享该 GE 的技能互相阻塞。
+- 定了什么: 新增原生标签 `Sigil.Cooldown.Shared`（`SigilCooldownTags::SharedMarker`）作为"标记"：共享冷却 GE 自身授予它以通过校验；`USigilGameplayAbility::GetCooldownTags()` 在 `CooldownTags` 非空时把它从并集里 `RemoveTag`，冷却判定只看技能自己的标签。测试夹具的共享 GE 与固定时长 GE 都改为授予标签；新增第二个共享同一 GE 的技能，断言 A 冷却中 B 仍可激活且各自时长独立；引擎路径半段补"第二次激活被挡"断言（评审指出原先在测一个无效冷却，运行时警告就来自这里）；`WITH_EDITOR` 下断言共享技能 CDO 的 `IsDataValid` 不为 Invalid。
+- 否掉了什么 + 为什么: 否掉在 Sigil `IsDataValid` 里对"`CooldownTags` 非空"降级——引擎的错误是在 `Super::IsDataValid` 内部 `AddError`，子类无法只吞掉这一条；否掉"并集只返回 CooldownTags、丢掉 GE 自身标签"——GASDocumentation 的并集语义允许 GE 自带如 `Cooldown.Weapon` 之类真正参与判定的标签，只剔除标记最小侵入。
+- 复用层🔑: ② 引擎相关
+- 来源: `D:\P4\Code_UE5.6\MD\analysis\sigil-pr4-review.md` §2 P1-E；引擎 `GameplayAbility.cpp:330-345`；Automation `SigilGas.Ability.SharedCooldown`（新增标记剔除 / 不互斥 / 引擎路径阻塞 / Data Validation 断言）。
+
+### [2026-09-12] 披露（PR #4 评审 P1-D）：C4 改变了被动技能的蓝图事件顺序
+
+- 阶段: 迭代
+- 事实: 引擎 `UGameplayAbility::OnGiveAbility`（`GameplayAbility.cpp:2009-2018`）在授予时 Avatar 已存在则就地调 `OnAvatarSet`。Sigil `OnGiveAbility` = `Super → K2_OnGiveAbility → TryActivateAbilityOnSpawn`；C4 又在 `OnAvatarSet` 末尾加了 `TryActivateAbilityOnSpawn`。于是"授予时 Avatar 已存在"这一最常见情形下，带 `ActivationOnSpawn` 的被动技能事件顺序由 `K2_OnAvatarSet → K2_OnGiveAbility → 激活` 变为 `K2_OnAvatarSet → 激活 → K2_OnGiveAbility`。在蓝图 `OnGiveAbility` 里初始化、再在 `ActivateAbility` 里依赖该初始化的被动会翻车。
+- 定了什么: **本批次只披露、不改代码**。PR #4 正文里"未改任何既有公开 API 的默认语义"对 C4 不成立，正文已改写。候选修法（P2 / hardening-002）：`OnGiveAbility` 改为先 `K2_OnGiveAbility` 再 `Super`，并补顺序断言测试；或让 `OnAvatarSet` 的重试只在"授予时 Avatar 不存在、后来才到"的路径生效（用 `Spec` 上的标记区分）。
+- 复用层🔑: ② 引擎相关
+- 来源: `D:\P4\Code_UE5.6\MD\analysis\sigil-pr4-review.md` §2 P1-D；引擎 `GameplayAbility.cpp:2009-2018`；`SigilGameplayAbility.cpp` `OnGiveAbility` / `OnAvatarSet`。
+
+### [2026-09-12] 披露（PR #4 评审 P1-F）：C2 两种误配没有守卫
+
+- 阶段: 迭代
+- 事实: ① 只填 `CooldownDuration`、不填 `CooldownTags`，且共享 GE 只授予标记 `Sigil.Cooldown.Shared` → 技能没有自己的冷却标签，冷却静默失效（标记被剔除后 `GetCooldownTags()` 为空），且每次 `CheckCooldown` 可能刷警告；② 只填 `CooldownTags`、`CooldownDuration = 0`，而 GE 时长是 SetByCaller → 引擎报缺少 SetByCaller 量值的 Error 日志，时长为 0。
+- 定了什么: **本批次只披露、不改代码**——头文件注释已写明两种误配后果。候选修法（hardening-002）：Sigil `IsDataValid` 加两条校验（`CooldownDuration > 0` 但 `CooldownTags` 为空且 GE 除标记外不授予标签 → Error；`CooldownTags` 非空但 `CooldownDuration <= 0` 且 GE 时长为 SetByCaller → Error）。
+- 复用层🔑: ② 引擎相关
+- 来源: `D:\P4\Code_UE5.6\MD\analysis\sigil-pr4-review.md` §2 P1-F。

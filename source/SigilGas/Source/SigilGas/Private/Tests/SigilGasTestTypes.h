@@ -15,6 +15,8 @@
 namespace SigilGasTestTags
 {
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(SharedCooldown)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(SharedCooldownB)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(FixedCooldown)
 }
 
 /**
@@ -157,6 +159,19 @@ class USigilGasTestSharedCooldownAbility final : public USigilGasTestAbility
 
 public:
 	USigilGasTestSharedCooldownAbility();
+};
+
+/**
+ * Second ability sharing the same cooldown effect with its own tag and a 4 second duration.
+ * 共享同一冷却效果、带自有标签和 4 秒时长的第二个技能。
+ */
+UCLASS(Transient)
+class USigilGasTestSharedCooldownAbilityB final : public USigilGasTestAbility
+{
+	GENERATED_BODY()
+
+public:
+	USigilGasTestSharedCooldownAbilityB();
 };
 
 /**

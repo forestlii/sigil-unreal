@@ -7,6 +7,9 @@
 #include "SigilGasTags.h"
 #include "Tests/SigilGasTestTypes.h"
 #include "Tests/SigilGasTestWorld.h"
+#if WITH_EDITOR
+#include "Misc/DataValidation.h"
+#endif
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSigilGasSharedCooldownTest,
@@ -36,10 +39,21 @@ bool FSigilGasSharedCooldownTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	// GetCooldownTags() is the union of the GE's granted tags (none here) and CooldownTags.
+	// GetCooldownTags() is the union of the GE's granted tags and CooldownTags, minus the shared marker.
+	TestTrue(TEXT("The shared cooldown effect grants the marker (required by the engine's IsDataValid)"),
+	         GetDefault<USigilGasTestSharedCooldownEffect>()->GetGrantedTags().HasTagExact(SigilCooldownTags::SharedMarker));
 	const FGameplayTagContainer* ReportedCooldownTags = static_cast<UGameplayAbility*>(SharedInstance)->GetCooldownTags();
 	TestNotNull(TEXT("GetCooldownTags must return a container when CooldownTags is set"), ReportedCooldownTags);
 	TestTrue(TEXT("GetCooldownTags must include the ability's own cooldown tag"), ReportedCooldownTags && ReportedCooldownTags->HasTagExact(SigilGasTestTags::SharedCooldown));
+	TestFalse(TEXT("GetCooldownTags must exclude the shared marker"), ReportedCooldownTags && ReportedCooldownTags->HasTagExact(SigilCooldownTags::SharedMarker));
+
+#if WITH_EDITOR
+	{
+		FDataValidationContext ValidationContext;
+		const EDataValidationResult ValidationResult = GetDefault<USigilGasTestSharedCooldownAbility>()->IsDataValid(ValidationContext);
+		TestTrue(TEXT("A shared-cooldown ability passes Data Validation once the effect grants the marker"), ValidationResult != EDataValidationResult::Invalid);
+	}
+#endif
 
 	TestTrue(TEXT("The first activation succeeds"), ASC->TryActivateAbility(SharedHandle));
 	TestEqual(TEXT("Activation count after the first activation"), SharedInstance->ActivationCount, 1);
@@ -53,6 +67,25 @@ bool FSigilGasSharedCooldownTest::RunTest(const FString& Parameters)
 
 	TestFalse(TEXT("The second activation is blocked by the cooldown"), ASC->TryActivateAbility(SharedHandle));
 	TestEqual(TEXT("The blocked activation does not count"), SharedInstance->ActivationCount, 1);
+	TestTrue(TEXT("The owner carries the shared marker while any shared cooldown is active"), ASC->HasMatchingGameplayTag(SigilCooldownTags::SharedMarker));
+
+	// A second ability sharing the same effect with its own tag is NOT blocked by the first one's cooldown.
+	const FGameplayAbilitySpecHandle SharedHandleB = ASC->GiveAbility(FGameplayAbilitySpec(USigilGasTestSharedCooldownAbilityB::StaticClass(), 1));
+	FGameplayAbilitySpec* SharedSpecB = ASC->FindAbilitySpecFromHandle(SharedHandleB);
+	USigilGasTestAbility* SharedInstanceB = SharedSpecB ? Cast<USigilGasTestAbility>(SharedSpecB->GetPrimaryInstance()) : nullptr;
+	TestNotNull(TEXT("The second shared cooldown ability should have an instance"), SharedInstanceB);
+	if (SharedInstanceB)
+	{
+		TestTrue(TEXT("Ability B activates while ability A is on cooldown (the marker does not cross-block)"), ASC->TryActivateAbility(SharedHandleB));
+		TestEqual(TEXT("Ability B counted its activation"), SharedInstanceB->ActivationCount, 1);
+		TestTrue(TEXT("Ability B's own cooldown tag is granted"), ASC->HasMatchingGameplayTag(SigilGasTestTags::SharedCooldownB));
+		TestFalse(TEXT("Ability B is now on its own cooldown"), ASC->TryActivateAbility(SharedHandleB));
+		float TimeRemainingB = 0.f;
+		float DurationB = 0.f;
+		TestTrue(TEXT("Ability B's cooldown effect is active"), ASC->GetCooldownRemainingForTags(FGameplayTagContainer(SigilGasTestTags::SharedCooldownB), TimeRemainingB, DurationB));
+		TestEqual(TEXT("Ability B's cooldown uses its own SetByCaller duration"), DurationB, 4.f, KINDA_SMALL_NUMBER);
+		ASC->RemoveActiveEffectsWithGrantedTags(FGameplayTagContainer(SigilGasTestTags::SharedCooldownB));
+	}
 
 	ASC->RemoveActiveEffectsWithGrantedTags(SharedTagContainer);
 	TestFalse(TEXT("The cooldown tag is gone after removing the effect"), ASC->HasMatchingGameplayTag(SigilGasTestTags::SharedCooldown));
@@ -75,6 +108,9 @@ bool FSigilGasSharedCooldownTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The fixed cooldown ability activates"), ASC->TryActivateAbility(FixedHandle));
 	TestEqual(TEXT("The engine path still applies exactly one cooldown effect"), ASC->GetActiveGameplayEffects().GetNumGameplayEffects(), EffectsBefore + 1);
 	TestFalse(TEXT("The engine path never grants the shared cooldown tag"), ASC->HasMatchingGameplayTag(SigilGasTestTags::SharedCooldown));
+	TestTrue(TEXT("The engine path grants the fixed effect's own tag"), ASC->HasMatchingGameplayTag(SigilGasTestTags::FixedCooldown));
+	TestFalse(TEXT("The engine path blocks the second activation while the fixed cooldown runs"), ASC->TryActivateAbility(FixedHandle));
+	TestEqual(TEXT("The blocked engine-path activation does not count"), FixedInstance->ActivationCount, 1);
 
 	return true;
 }
