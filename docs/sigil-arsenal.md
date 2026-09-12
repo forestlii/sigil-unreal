@@ -46,8 +46,20 @@ The cost resolves the weapon equipment from the checked ability spec's `SourceOb
 
 Reserve ammunition, reload abilities, item AttributeSets and tag-to-attribute mappings are outside this batch. Network reconciliation and live gameplay remain unverified.
 
+## Fire cadence
+
+Subclass `USigilGameplayAbility_FireCadence` and grant it in the same weapon ability set as a self-ending single-shot `USigilGameplayAbility`. Bind input to the cadence ability only. Set `SingleShotAbilityClass`, `FireMode` (`SemiAuto`, `FullAuto`, `Burst`), `RoundsPerMinute` (default 600), and `BurstCount` (default 3). Cadence defaults to `InstancedPerActor` and `LocalOnly`; the shot owns `CommitAbility`, ammunition cost, effects, and its own `EndAbility`. Do not put per-shot costs or a fire-rate cooldown GE on the cadence ability.
+
+The first shot is immediate. Full auto uses a repeating timer at `60 / RoundsPerMinute`; after elapsed time N the periodic shots are `floor(N * RPM / 60)`, in addition to the first shot (subject to timer tick boundaries). Burst stops after `BurstCount` accepted shots; semi-auto accepts at most one shot per activation. Mode, burst size and timer interval are captured when activated. Configure input press edges in the consumer; the class does not implement Enhanced Input bindings or debounce repeated activations.
+
+The default `TryFireOnce` resolves the shot by class **and the same non-null weapon SourceObject**, then calls `BatchRPCTryActivateAbility(handle, false)`. Override the Blueprint Native Event for a different firing path; return false when the shot cannot be fired. A successful activation request is not a hit or server commit confirmation.
+
+Input release, a failed shot attempt (including an empty magazine), weapon deactivation, or cancellation stops the cadence and clears its timer. The existing equipment event stops it immediately on deactivation. The timer handles long frames using UE timer catch-up; a callback that ends and restarts the ability cannot advance the new activation's burst count. Empty magazines are detected on the next shot attempt.
+
+The local-only cadence does not implement authoritative rate limiting, ammo prediction/reconciliation, remote input, or network validation. Those integration concerns remain unverified.
+
 ## Known gaps
 
-- Magazine cost is implemented; fire cadence is pending. Reserve ammunition and reload logic belong to the consumer.
+- Magazine cost and fire cadence are provided; reserve ammunition and reload logic belong to the consumer.
 - The animation layer is linked to a single main mesh; first-person secondary meshes are not covered.
 - `USigilEquipmentSystemComponent::SetEquipmentActiveState(slot, false)` on an active entry is a no-op in sigil.inventory; switch through the group index API.

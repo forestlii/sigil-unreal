@@ -46,8 +46,20 @@ Cost 从被检查的技能 Spec 的 `SourceObject` 找到武器装备，再取�
 
 备弹、换弹技能、物品 AttributeSet 和 Tag→Attribute 映射不在本批范围内。网络回补与真实玩法【未验证】。
 
+## 射击节奏
+
+派生 `USigilGameplayAbility_FireCadence`，与自行结束的单发 `USigilGameplayAbility` 一起放进同一武器技能集；输入只绑定节奏技能。配置 `SingleShotAbilityClass`、`FireMode`（`SemiAuto`、`FullAuto`、`Burst`）、`RoundsPerMinute`（默认 600）、`BurstCount`（默认 3）。节奏默认 `InstancedPerActor` 和 `LocalOnly`；单发负责 `CommitAbility`、弹药 Cost、效果和自己的 `EndAbility`。不要把每发成本或控制射速的 Cooldown GE 配在节奏技能上。
+
+首发立即触发；全自动通过 `60 / RoundsPerMinute` 的循环 Timer 发后续子弹。经过 N 秒，后续发数为 `floor(N × RPM / 60)`，另加首发一发（受定时器 tick 边界影响）。Burst 在接受 `BurstCount` 次射击后结束；SemiAuto 每次激活最多一发。模式、连发数量与 Timer 间隔在激活时确定。消费项目负责按键边沿绑定，本类不实现 Enhanced Input 绑定或跨次激活的防抖。
+
+默认 `TryFireOnce` 按单发类与**同一非空武器 SourceObject** 精确定位，调用 `BatchRPCTryActivateAbility(handle, false)`。可覆写蓝图原生事件接其它射击路径，不能射击时返回 false；激活请求返回成功，不等于命中或服务端已提交成功。
+
+松开输入、单发尝试失败（含空弹匣）、武器失活或取消都会结束节奏并清理 Timer。失活由现有装备事件立即通知；空弹匣在下一次射击尝试时被检测。长帧遵循 UE Timer 的补发规则；回调中结束并重启同一技能时，旧回调不会推进新一轮的连发计数。
+
+本地节奏不实现服务端射速限制、弹药预测/回补、远端输入或联网验证；上述集成行为均【未验证】。
+
 ## 已知缺口
 
-- 弹匣 Cost 已提供；射击节奏待补。备弹与换弹逻辑留消费项目。
+- 弹匣 Cost 与射击节奏已提供；备弹与换弹逻辑留消费项目。
 - 动画层只链接一个主网格，第一人称次要网格不在范围内。
 - sigil.inventory 里对已激活条目调用 `USigilEquipmentSystemComponent::SetEquipmentActiveState(slot, false)` 是无操作；请用槽位组索引 API 切换。

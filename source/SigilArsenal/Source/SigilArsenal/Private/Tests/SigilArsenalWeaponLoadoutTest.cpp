@@ -19,7 +19,9 @@
 #include "SigilInventoryFactory.h"
 #include "SigilInventoryTags.h"
 #include "SigilItemSlotCollection.h"
+#include "Tests/SigilArsenalCadenceTestTypes.h"
 #include "Tests/SigilArsenalTestTypes.h"
+#include "TimerManager.h"
 #include "UObject/Package.h"
 #include "Utilities/SigilAbilitySystemFunctionLibrary.h"
 #include "Weapon/SigilWeaponInterface.h"
@@ -195,6 +197,47 @@ ASigilArsenalTestPawn* SpawnReadyPawn(UWorld* World, USigilItemSlotCollectionDef
 	Pawn->GetEquipment()->InitializeEquipmentSystem();
 	return Pawn;
 }
+
+/** 复用库存与装备夹具，只增加节奏技能的手动授予和确定性计时推进。 */
+struct FSigilArsenalCadenceFixture
+{
+	FSigilArsenalTestWorld TestWorld;
+	ASigilArsenalTestPawn* Pawn = nullptr;
+	USigilAbilitySystemComponent* ASC = nullptr;
+	FSigilArsenalAmmoWeapon Weapon;
+
+	explicit FSigilArsenalCadenceFixture(const TCHAR* Name) : TestWorld(Name)
+	{
+		if (!TestWorld.World)
+		{
+			return;
+		}
+		Pawn = SpawnReadyPawn(TestWorld.World, MakeWeaponSlotCollection());
+		if (Pawn)
+		{
+			ASC = Pawn->GetSigilAbilitySystem();
+			const FString DefinitionName = FString(Name) + TEXT("Gun");
+			Weapon = AddAmmoWeapon(Pawn, *DefinitionName, SigilArsenalTestTags::SlotPrimary);
+		}
+	}
+
+	bool IsReady() const { return TestWorld.World && Pawn && ASC && Weapon.IsReady(); }
+
+	template <typename TCadence>
+	TCadence* GiveCadence(USigilWeaponEquipmentInstance* Source = nullptr)
+	{
+		const FGameplayAbilitySpecHandle Handle = ASC->GiveAbility(FGameplayAbilitySpec(TCadence::StaticClass(), 1, INDEX_NONE, Source ? Source : Weapon.Equipment));
+		FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromHandle(Handle);
+		return Spec ? Cast<TCadence>(Spec->GetPrimaryInstance()) : nullptr;
+	}
+
+	void TickTimers(float DeltaSeconds)
+	{
+		// UE 每帧只 Tick 一次；首次 Tick(0) 把 Pending 定时器转成可运行状态。
+		++GFrameCounter;
+		TestWorld.World->GetTimerManager().Tick(DeltaSeconds);
+	}
+};
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -602,4 +645,401 @@ bool FSigilArsenalAmmoApplyGuardsTest::RunTest(const FString& Parameters)
 	Cost->Quantity = 1;
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilArsenalCadenceSemiAutoTest,
+	"SigilArsenal.Cadence.SemiAutoFiresOnceAndEnds",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilArsenalCadenceSemiAutoTest::RunTest(const FString& Parameters)
+{
+	FSigilArsenalCadenceFixture Fixture(TEXT("SigilArsenalSemiAutoWorld"));
+	if (!TestTrue(TEXT("节奏夹具准备完毕"), Fixture.IsReady()))
+	{
+		return false;
+	}
+	TestTrue(TEXT("本地节奏技能使用可本地控制的 ActorInfo"), Fixture.ASC->AbilityActorInfo->IsLocallyControlled());
+	USigilArsenalTestCountingCadence* Ability = Fixture.GiveCadence<USigilArsenalTestCountingCadence>();
+	if (!TestNotNull(TEXT("半自动节奏技能已授予"), Ability))
+	{
+		return false;
+	}
+	Ability->FireMode = ESigilFireMode::SemiAuto;
+	Ability->RoundsPerMinute = 600.f;
+	TestTrue(TEXT("半自动技能可激活"), Fixture.ASC->TryActivateAbility(Ability->GetCurrentAbilitySpecHandle()));
+	TestEqual(TEXT("激活立即成功射击一发"), Ability->SuccessfulShotCount, 1);
+	TestFalse(TEXT("半自动首发后立即结束"), Ability->IsActive());
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("半自动结束后不残留后续射击"), Ability->AttemptCount, 1);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilArsenalCadenceBurstTest,
+	"SigilArsenal.Cadence.BurstFiresConfiguredCount",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilArsenalCadenceBurstTest::RunTest(const FString& Parameters)
+{
+	FSigilArsenalCadenceFixture Fixture(TEXT("SigilArsenalBurstWorld"));
+	if (!TestTrue(TEXT("节奏夹具准备完毕"), Fixture.IsReady()))
+	{
+		return false;
+	}
+	USigilArsenalTestCountingCadence* Ability = Fixture.GiveCadence<USigilArsenalTestCountingCadence>();
+	if (!TestNotNull(TEXT("点射节奏技能已授予"), Ability))
+	{
+		return false;
+	}
+	Ability->FireMode = ESigilFireMode::Burst;
+	Ability->RoundsPerMinute = 600.f;
+	Ability->BurstCount = 3;
+	const FGameplayAbilitySpecHandle Handle = Ability->GetCurrentAbilitySpecHandle();
+	TestTrue(TEXT("三连发技能可激活"), Fixture.ASC->TryActivateAbility(Handle));
+	TestEqual(TEXT("三连发首发立即发生"), Ability->SuccessfulShotCount, 1);
+	TestTrue(TEXT("首发后等待后续点射"), Ability->IsActive());
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.11f);
+	TestEqual(TEXT("经过第一个间隔累计两发"), Ability->SuccessfulShotCount, 2);
+	Fixture.TickTimers(0.11f);
+	TestEqual(TEXT("三连发恰好成功三次"), Ability->SuccessfulShotCount, 3);
+	TestFalse(TEXT("到达三次后结束"), Ability->IsActive());
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("点射结束后没有额外尝试"), Ability->AttemptCount, 3);
+
+	Ability->BurstCount = 1;
+	TestTrue(TEXT("数量一的点射可再次激活"), Fixture.ASC->TryActivateAbility(Handle));
+	TestEqual(TEXT("新一轮独立完成一发"), Ability->SuccessfulShotCount, 4);
+	TestFalse(TEXT("数量一的点射立即结束"), Ability->IsActive());
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.35f);
+	TestEqual(TEXT("数量一也没有重复射击"), Ability->AttemptCount, 4);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilArsenalCadenceFullAutoTest,
+	"SigilArsenal.Cadence.FullAutoUsesConfiguredInterval",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilArsenalCadenceFullAutoTest::RunTest(const FString& Parameters)
+{
+	FSigilArsenalCadenceFixture Fixture(TEXT("SigilArsenalFullAutoWorld"));
+	if (!TestTrue(TEXT("节奏夹具准备完毕"), Fixture.IsReady()))
+	{
+		return false;
+	}
+	USigilArsenalTestCountingCadence* Ability = Fixture.GiveCadence<USigilArsenalTestCountingCadence>();
+	if (!TestNotNull(TEXT("全自动节奏技能已授予"), Ability))
+	{
+		return false;
+	}
+	Ability->FireMode = ESigilFireMode::FullAuto;
+	Ability->RoundsPerMinute = 300.f;
+	const FGameplayAbilitySpecHandle Handle = Ability->GetCurrentAbilitySpecHandle();
+	TestTrue(TEXT("全自动技能可激活"), Fixture.ASC->TryActivateAbility(Handle));
+	TestEqual(TEXT("第一个循环回调之前已有首发"), Ability->SuccessfulShotCount, 1);
+	Fixture.TickTimers(0.f);
+	TestEqual(TEXT("激活 Pending 定时器不会重复首发"), Ability->SuccessfulShotCount, 1);
+	// 每分钟 300 发即每 0.2 秒一发；0.45 秒内追加两发，首发单独计入。
+	Fixture.TickTimers(0.45f);
+	TestEqual(TEXT("零点四五秒内追加两发"), Ability->SuccessfulShotCount, 3);
+	Fixture.TickTimers(0.21f);
+	TestEqual(TEXT("累计零点六六秒内追加三发"), Ability->SuccessfulShotCount, 4);
+	Fixture.TickTimers(0.02f);
+	TestEqual(TEXT("不足下一个间隔时不会提前射击"), Ability->SuccessfulShotCount, 4);
+	TestTrue(TEXT("有持续输入时全自动保持运行"), Ability->IsActive());
+	Fixture.ASC->CancelAbilityHandle(Handle);
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("取消后不再追加射击"), Ability->SuccessfulShotCount, 4);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilArsenalCadenceAmmoRoutingTest,
+	"SigilArsenal.Cadence.DefaultRouteUsesSourceAmmoAndStopsWhenEmpty",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilArsenalCadenceAmmoRoutingTest::RunTest(const FString& Parameters)
+{
+	FSigilArsenalCadenceFixture Fixture(TEXT("SigilArsenalCadenceAmmoWorld"));
+	if (!TestTrue(TEXT("节奏夹具准备完毕"), Fixture.IsReady()))
+	{
+		return false;
+	}
+	const FSigilArsenalAmmoWeapon Rifle = AddAmmoWeapon(Fixture.Pawn, TEXT("SigilArsenalCadenceAmmoRifle"), SigilArsenalTestTags::SlotSecondary);
+	if (!TestTrue(TEXT("第二把武器也授予同类单发技能"), Rifle.IsReady()))
+	{
+		return false;
+	}
+	USigilArsenalTestRoutedCadence* PistolCadence = Fixture.GiveCadence<USigilArsenalTestRoutedCadence>();
+	USigilArsenalTestRoutedCadence* RifleCadence = Fixture.GiveCadence<USigilArsenalTestRoutedCadence>(Rifle.Equipment);
+	if (!TestTrue(TEXT("两把武器均有独立节奏 Spec"), PistolCadence && RifleCadence))
+	{
+		return false;
+	}
+	for (USigilArsenalTestRoutedCadence* Cadence : {PistolCadence, RifleCadence})
+	{
+		Cadence->FireMode = ESigilFireMode::FullAuto;
+		Cadence->RoundsPerMinute = 600.f;
+		Cadence->SingleShotAbilityClass = USigilArsenalTestAmmoFireAbility::StaticClass();
+	}
+
+	TestTrue(TEXT("手枪默认路由可激活"), Fixture.ASC->TryActivateAbility(PistolCadence->GetCurrentAbilitySpecHandle()));
+	TestEqual(TEXT("首发立即消耗手枪一发"), Fixture.Weapon.Item->GetIntegerAttribute(SigilArsenalTags::Ammo_Magazine), 1);
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.11f);
+	TestEqual(TEXT("后续间隔消耗手枪最后一发"), Fixture.Weapon.Item->GetIntegerAttribute(SigilArsenalTags::Ammo_Magazine), 0);
+	Fixture.TickTimers(0.11f);
+	TestFalse(TEXT("空弹匣的单发失败立即结束节奏"), PistolCadence->IsActive());
+	TestEqual(TEXT("手枪单发技能恰好成功两次"), Fixture.Weapon.Ability->ActivationCount, 2);
+	TestEqual(TEXT("手枪耗尽不动步枪两发弹药"), Rifle.Item->GetIntegerAttribute(SigilArsenalTags::Ammo_Magazine), 2);
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("耗尽结束后不再激活单发"), Fixture.Weapon.Ability->ActivationCount, 2);
+
+	Fixture.Pawn->GetEquipment()->SetGroupActiveIndex(SigilArsenalTestTags::SlotWeaponGroup, 1);
+	TestTrue(TEXT("步枪节奏可独立激活"), Fixture.ASC->TryActivateAbility(RifleCadence->GetCurrentAbilitySpecHandle()));
+	TestEqual(TEXT("步枪默认路由找到同源单发并消耗一发"), Rifle.Item->GetIntegerAttribute(SigilArsenalTags::Ammo_Magazine), 1);
+	TestEqual(TEXT("步枪单发技能成功一次"), Rifle.Ability->ActivationCount, 1);
+	TestEqual(TEXT("切枪不会再次激活手枪单发"), Fixture.Weapon.Ability->ActivationCount, 2);
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.11f);
+	Fixture.TickTimers(0.11f);
+	TestFalse(TEXT("步枪自己的弹药耗尽后同样结束"), RifleCadence->IsActive());
+	TestEqual(TEXT("步枪独立射完两发"), Rifle.Ability->ActivationCount, 2);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilArsenalCadenceLifecycleTest,
+	"SigilArsenal.Cadence.ReleaseDeactivationCancelAndRemovalClearTimers",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilArsenalCadenceLifecycleTest::RunTest(const FString& Parameters)
+{
+	FSigilArsenalCadenceFixture Fixture(TEXT("SigilArsenalCadenceLifecycleWorld"));
+	if (!TestTrue(TEXT("节奏夹具准备完毕"), Fixture.IsReady()))
+	{
+		return false;
+	}
+	const FSigilArsenalAmmoWeapon Rifle = AddAmmoWeapon(Fixture.Pawn, TEXT("SigilArsenalCadenceLifecycleRifle"), SigilArsenalTestTags::SlotSecondary);
+	USigilArsenalTestCountingCadence* Ability = Fixture.GiveCadence<USigilArsenalTestCountingCadence>();
+	if (!TestTrue(TEXT("切枪及节奏对象准备完毕"), Rifle.IsReady() && Ability))
+	{
+		return false;
+	}
+	Ability->FireMode = ESigilFireMode::FullAuto;
+	Ability->RoundsPerMinute = 600.f;
+	const FGameplayAbilitySpecHandle Handle = Ability->GetCurrentAbilitySpecHandle();
+
+	TestTrue(TEXT("释放输入场景可激活"), Fixture.ASC->TryActivateAbility(Handle));
+	Fixture.TickTimers(0.f);
+	USigilAbilitySystemFunctionLibrary::SetAbilityInputReleased(Fixture.ASC, Handle);
+	TestFalse(TEXT("释放输入立即结束，不等待下次计时"), Ability->IsActive());
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("释放输入后没有残余射击"), Ability->AttemptCount, 1);
+
+	TestTrue(TEXT("失活场景可重新激活"), Fixture.ASC->TryActivateAbility(Handle));
+	Fixture.TickTimers(0.f);
+	Fixture.Pawn->GetEquipment()->SetGroupActiveIndex(SigilArsenalTestTags::SlotWeaponGroup, 1);
+	TestFalse(TEXT("源武器失活立即结束节奏"), Ability->IsActive());
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("武器失活后没有残余射击"), Ability->AttemptCount, 2);
+	TestFalse(TEXT("失活源武器不能重新激活节奏"), Fixture.ASC->TryActivateAbility(Handle));
+
+	Fixture.Pawn->GetEquipment()->SetGroupActiveIndex(SigilArsenalTestTags::SlotWeaponGroup, 0);
+	TestTrue(TEXT("取消场景可重新激活"), Fixture.ASC->TryActivateAbility(Handle));
+	Fixture.TickTimers(0.f);
+	Fixture.ASC->CancelAbilityHandle(Handle);
+	TestFalse(TEXT("显式取消立即结束节奏"), Ability->IsActive());
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("取消后没有残余射击"), Ability->AttemptCount, 3);
+
+	TestTrue(TEXT("移除场景可重新激活"), Fixture.ASC->TryActivateAbility(Handle));
+	Fixture.TickTimers(0.f);
+	Fixture.ASC->ClearAbility(Handle);
+	TestNull(TEXT("移除后 Spec 已不在 ASC 中"), Fixture.ASC->FindAbilitySpecFromHandle(Handle));
+	Fixture.Pawn->GetEquipment()->SetGroupActiveIndex(SigilArsenalTestTags::SlotWeaponGroup, 1);
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("移除后计时与武器事件都不再触发射击"), Ability->AttemptCount, 4);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilArsenalCadenceInvalidConfigTest,
+	"SigilArsenal.Cadence.InvalidConfigAndShotFailureStopSafely",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilArsenalCadenceInvalidConfigTest::RunTest(const FString& Parameters)
+{
+	FSigilArsenalCadenceFixture Fixture(TEXT("SigilArsenalCadenceInvalidWorld"));
+	if (!TestTrue(TEXT("节奏夹具准备完毕"), Fixture.IsReady()))
+	{
+		return false;
+	}
+	USigilArsenalTestCountingCadence* Ability = Fixture.GiveCadence<USigilArsenalTestCountingCadence>();
+	if (!TestNotNull(TEXT("配置验证节奏技能已授予"), Ability))
+	{
+		return false;
+	}
+	const FGameplayAbilitySpecHandle Handle = Ability->GetCurrentAbilitySpecHandle();
+	Ability->FireMode = ESigilFireMode::FullAuto;
+	const float InvalidRates[] = {0.f, -600.f};
+	for (const float Rate : InvalidRates)
+	{
+		Ability->RoundsPerMinute = Rate;
+		Fixture.ASC->TryActivateAbility(Handle);
+		TestFalse(TEXT("非法 RPM 不留下运行中的节奏"), Ability->IsActive());
+		Fixture.TickTimers(0.f);
+		Fixture.TickTimers(0.35f);
+		TestEqual(TEXT("非法 RPM 不尝试首发或后续射击"), Ability->AttemptCount, 0);
+	}
+	Ability->RoundsPerMinute = 600.f;
+	Ability->FireMode = ESigilFireMode::Burst;
+	const int32 InvalidBurstCounts[] = {0, -1};
+	for (const int32 Count : InvalidBurstCounts)
+	{
+		Ability->BurstCount = Count;
+		Fixture.ASC->TryActivateAbility(Handle);
+		TestFalse(TEXT("非法点射数量不留下运行中的节奏"), Ability->IsActive());
+		Fixture.TickTimers(0.f);
+		Fixture.TickTimers(0.35f);
+		TestEqual(TEXT("非法点射数量不尝试射击"), Ability->AttemptCount, 0);
+	}
+
+	Ability->BurstCount = 3;
+	Ability->FireMode = ESigilFireMode::FullAuto;
+	Ability->MaxSuccessfulShots = 0;
+	Fixture.ASC->TryActivateAbility(Handle);
+	TestEqual(TEXT("首发失败仅尝试一次"), Ability->AttemptCount, 1);
+	TestFalse(TEXT("首发失败立即结束"), Ability->IsActive());
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.35f);
+	TestEqual(TEXT("首发失败后不再重试"), Ability->AttemptCount, 1);
+
+	Ability->MaxSuccessfulShots = 1;
+	TestTrue(TEXT("允许一发后可以再次激活"), Fixture.ASC->TryActivateAbility(Handle));
+	TestEqual(TEXT("此次首发成功"), Ability->SuccessfulShotCount, 1);
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.11f);
+	TestFalse(TEXT("后续单发失败也立即结束"), Ability->IsActive());
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("总共只有首次失败和此轮两次尝试"), Ability->AttemptCount, 3);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilArsenalCadenceReentryTest,
+	"SigilArsenal.Cadence.CallbackRestartPreservesNewActivation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilArsenalCadenceReentryTest::RunTest(const FString& Parameters)
+{
+	FSigilArsenalCadenceFixture Fixture(TEXT("SigilArsenalCadenceReentryWorld"));
+	if (!TestTrue(TEXT("节奏夹具准备完毕"), Fixture.IsReady()))
+	{
+		return false;
+	}
+	USigilArsenalTestReentrantCadence* Ability = Fixture.GiveCadence<USigilArsenalTestReentrantCadence>();
+	if (!TestNotNull(TEXT("重入节奏技能已授予"), Ability))
+	{
+		return false;
+	}
+	Ability->FireMode = ESigilFireMode::FullAuto;
+	Ability->RoundsPerMinute = 600.f;
+	const FGameplayAbilitySpecHandle Handle = Ability->GetCurrentAbilitySpecHandle();
+	TestTrue(TEXT("第一轮节奏可激活"), Fixture.ASC->TryActivateAbility(Handle));
+	TestEqual(TEXT("第一轮首发成功"), Ability->SuccessfulShotCount, 1);
+	Fixture.TickTimers(0.f);
+	Ability->bRestartOnNextShot = true;
+	Fixture.TickTimers(0.11f);
+	TestEqual(TEXT("仅在指定回调内重启一次"), Ability->RestartCount, 1);
+	TestTrue(TEXT("回调内取消后的重新激活成功"), Ability->bRestartSucceeded);
+	TestTrue(TEXT("旧回调返回 false 不会结束新一轮"), Ability->IsActive());
+	TestEqual(TEXT("旧轮两发加新轮首发共三发"), Ability->SuccessfulShotCount, 3);
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.11f);
+	TestEqual(TEXT("新一轮的定时器继续追加一发"), Ability->SuccessfulShotCount, 4);
+	Fixture.TickTimers(0.11f);
+	TestEqual(TEXT("新一轮没有受到旧定时器重复调度"), Ability->SuccessfulShotCount, 5);
+	Fixture.ASC->CancelAbilityHandle(Handle);
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("最终取消能清理新一轮定时器"), Ability->SuccessfulShotCount, 5);
+
+	// 首发也可能重入；旧激活返回后不能再额外登记一个循环定时器。
+	Ability->bRestartOnNextShot = true;
+	TestTrue(TEXT("首发重入场景可激活"), Fixture.ASC->TryActivateAbility(Handle));
+	TestEqual(TEXT("首发路径也只重启一次"), Ability->RestartCount, 2);
+	TestTrue(TEXT("首发重启后新一轮保持运行"), Ability->IsActive());
+	TestEqual(TEXT("本次旧轮首发与新轮首发各一次"), Ability->SuccessfulShotCount, 7);
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.11f);
+	TestEqual(TEXT("首发重入后只保留新一轮的一个计时器"), Ability->SuccessfulShotCount, 8);
+	Fixture.ASC->CancelAbilityHandle(Handle);
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("首发重入后同样可完整清理"), Ability->SuccessfulShotCount, 8);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilArsenalCadenceDeferredEndTest,
+	"SigilArsenal.Cadence.QueuedOldEndDoesNotStopRestartedActivation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilArsenalCadenceDeferredEndTest::RunTest(const FString& Parameters)
+{
+	FSigilArsenalCadenceFixture Fixture(TEXT("SigilArsenalCadenceDeferredEndWorld"));
+	if (!TestTrue(TEXT("节奏夹具准备完毕"), Fixture.IsReady()))
+	{
+		return false;
+	}
+	USigilArsenalTestCountingCadence* Ability = Fixture.GiveCadence<USigilArsenalTestCountingCadence>();
+	if (!TestNotNull(TEXT("延后结束回归技能已授予"), Ability))
+	{
+		return false;
+	}
+	Ability->FireMode = ESigilFireMode::FullAuto;
+	Ability->RoundsPerMinute = 600.f;
+	const FGameplayAbilitySpecHandle Handle = Ability->GetCurrentAbilitySpecHandle();
+	TestTrue(TEXT("第一轮节奏可激活"), Fixture.ASC->TryActivateAbility(Handle));
+	TestEqual(TEXT("第一轮已有首发"), Ability->SuccessfulShotCount, 1);
+	Fixture.TickTimers(0.f);
+
+	int32 EndedCount = 0;
+	bool bRestartSucceeded = false;
+	const FDelegateHandle EndedHandle = Fixture.ASC->AbilityEndedCallbacks.AddLambda([&Fixture, Ability, Handle, &EndedCount, &bRestartSucceeded](UGameplayAbility* EndedAbility)
+	{
+		if (EndedAbility != Ability)
+		{
+			return;
+		}
+		++EndedCount;
+		if (EndedCount == 1)
+		{
+			bRestartSucceeded = Fixture.ASC->TryActivateAbility(Handle);
+		}
+	});
+	const FGameplayAbilityActorInfo* ActorInfo = Ability->GetCurrentActorInfo();
+	const FGameplayAbilityActivationInfo OldActivationInfo = Ability->GetCurrentActivationInfo();
+	Ability->BeginScopeLockForTest();
+	Ability->EndAbility(Handle, ActorInfo, OldActivationInfo, false, true);
+	Ability->EndAbility(Handle, ActorInfo, OldActivationInfo, false, true);
+	TestEqual(TEXT("作用域锁内两个结束请求都尚未触发结束回调"), EndedCount, 0);
+	Ability->EndScopeLockForTest();
+	Fixture.ASC->AbilityEndedCallbacks.Remove(EndedHandle);
+
+	TestTrue(TEXT("第一条排队 End 的回调成功重启技能"), bRestartSucceeded);
+	TestEqual(TEXT("第二条旧 End 没有再结束新一轮"), EndedCount, 1);
+	TestTrue(TEXT("排队结束请求处理完后新一轮仍运行"), Ability->IsActive());
+	TestEqual(TEXT("新旧两轮各有一次首发"), Ability->SuccessfulShotCount, 2);
+	Fixture.TickTimers(0.f);
+	Fixture.TickTimers(0.11f);
+	TestEqual(TEXT("第二条旧 End 没有清除新一轮定时器"), Ability->SuccessfulShotCount, 3);
+	Fixture.ASC->CancelAbilityHandle(Handle);
+	Fixture.TickTimers(0.75f);
+	TestEqual(TEXT("结束回归最后没有残余定时射击"), Ability->SuccessfulShotCount, 3);
+	return true;
+}
+
 #endif
