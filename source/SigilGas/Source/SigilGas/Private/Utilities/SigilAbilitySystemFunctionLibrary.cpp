@@ -305,6 +305,31 @@ bool USigilAbilitySystemFunctionLibrary::FindAbilityMatchingQuery(const UAbility
 	return false;
 }
 
+FGameplayAbilitySpecHandle USigilAbilitySystemFunctionLibrary::FindAbilitySpecHandleForClass(const UAbilitySystemComponent* AbilitySystem, TSubclassOf<UGameplayAbility> AbilityClass,
+                                                                                            const UObject* OptionalSourceObject)
+{
+	// Copyright 2020 Dan Kestranek (MIT) - GASShooter UGSAbilitySystemComponent::FindAbilitySpecHandleForClass, adapted to a library function.
+	if (!IsValid(AbilitySystem) || !AbilityClass)
+	{
+		return FGameplayAbilitySpecHandle();
+	}
+
+	for (const FGameplayAbilitySpec& Spec : AbilitySystem->GetActivatableAbilities())
+	{
+		if (!Spec.Ability || Spec.Ability->GetClass() != AbilityClass)
+		{
+			continue;
+		}
+
+		if (!OptionalSourceObject || Spec.SourceObject.Get() == OptionalSourceObject)
+		{
+			return Spec.Handle;
+		}
+	}
+
+	return FGameplayAbilitySpecHandle();
+}
+
 bool USigilAbilitySystemFunctionLibrary::FindAbilityWithTags(const UAbilitySystemComponent* AbilitySystem, FGameplayAbilitySpecHandle& OutAbilityHandle, FGameplayTagContainer Tags, bool bExactMatch)
 {
 	if (!IsValid(AbilitySystem) || Tags.IsEmpty())

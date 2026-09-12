@@ -11,7 +11,9 @@
 #include "Feedback/SigilContextEffectsLibrary.h"
 #include "Feedback/SigilContextEffectsPreviewSetting.h"
 #include "Feedback/SigilContextEffectsSubsystem.h"
+#include "GameFramework/Pawn.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Perspective/SigilViewPerspectiveInterface.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SigilAnimNotify_ContextEffects)
 
@@ -59,6 +61,11 @@ void USigilAnimNotify_ContextEffects::Notify(USkeletalMeshComponent* MeshComp, U
 	Super::Notify(MeshComp, Animation, EventReference);
 
 	if (!MeshComp)
+	{
+		return;
+	}
+
+	if (!ShouldPlayForPerspective(MeshComp->GetOwner()))
 	{
 		return;
 	}
@@ -163,6 +170,99 @@ void USigilAnimNotify_ContextEffects::Notify(USkeletalMeshComponent* MeshComp, U
 		PerformEditorPreview(OwningActor, SourceContext, TargetContext, MeshComp);
 #endif
 	}
+}
+
+bool USigilAnimNotify_ContextEffects::ShouldPlayForPerspectiveFilter(ESigilContextEffectsPerspectiveFilter Filter, bool bIsLocallyControlled, bool bHasPerspectiveProvider,
+                                                                     bool bIsFirstPerson)
+{
+	// Rule adapted from GASShooter GSAnimNotify_PlaySoundForPerspective (Copyright 2020 Dan Kestranek, MIT):
+	// first person effects belong to the locally controlled viewer in first person; everything else is the world body.
+	const bool bLocalFirstPerson = bIsLocallyControlled && bHasPerspectiveProvider && bIsFirstPerson;
+
+	switch (Filter)
+	{
+	case ESigilContextEffectsPerspectiveFilter::FirstPersonOnly:
+		return bLocalFirstPerson;
+	case ESigilContextEffectsPerspectiveFilter::ThirdPersonOnly:
+		return !bLocalFirstPerson;
+	case ESigilContextEffectsPerspectiveFilter::Any:
+	default:
+		return true;
+	}
+}
+
+void USigilAnimNotify_ContextEffects::ResolvePerspective(const AActor* OwningActor, bool& bOutLocallyControlled, bool& bOutHasPerspectiveProvider, bool& bOutFirstPerson)
+{
+	bOutLocallyControlled = false;
+	bOutHasPerspectiveProvider = false;
+	bOutFirstPerson = false;
+
+	const APawn* ControllingPawn = nullptr;
+
+	// Bounded walk up the owner chain: weapon / equipment actors are owned by the pawn that renders them.
+	constexpr int32 MaxDepth = 8;
+	const AActor* Current = OwningActor;
+	for (int32 Depth = 0; Current && Depth < MaxDepth; ++Depth, Current = Current->GetOwner())
+	{
+		if (!ControllingPawn)
+		{
+			ControllingPawn = Cast<APawn>(Current);
+		}
+
+		if (!bOutHasPerspectiveProvider)
+		{
+			if (Current->Implements<USigilViewPerspectiveInterface>())
+			{
+				bOutHasPerspectiveProvider = true;
+				bOutFirstPerson = ISigilViewPerspectiveInterface::Execute_IsInFirstPersonPerspective(Current);
+			}
+			else
+			{
+				for (const UActorComponent* Component : Current->GetComponents())
+				{
+					if (Component && Component->Implements<USigilViewPerspectiveInterface>())
+					{
+						bOutHasPerspectiveProvider = true;
+						bOutFirstPerson = ISigilViewPerspectiveInterface::Execute_IsInFirstPersonPerspective(Component);
+						break;
+					}
+				}
+			}
+		}
+
+		if (ControllingPawn && bOutHasPerspectiveProvider)
+		{
+			break;
+		}
+	}
+
+	if (!ControllingPawn && OwningActor)
+	{
+		ControllingPawn = OwningActor->GetInstigator();
+	}
+
+	bOutLocallyControlled = ControllingPawn && ControllingPawn->IsLocallyControlled();
+}
+
+bool USigilAnimNotify_ContextEffects::ShouldPlayForPerspective(const AActor* OwningActor) const
+{
+	if (PerspectiveFilter == ESigilContextEffectsPerspectiveFilter::Any)
+	{
+		return true;
+	}
+
+	// Animation editor preview and other non-game worlds: always play so the notify can be authored.
+	const UWorld* World = OwningActor ? OwningActor->GetWorld() : nullptr;
+	if (!World || !World->IsGameWorld())
+	{
+		return true;
+	}
+
+	bool bLocallyControlled = false;
+	bool bHasProvider = false;
+	bool bFirstPerson = false;
+	ResolvePerspective(OwningActor, bLocallyControlled, bHasProvider, bFirstPerson);
+	return ShouldPlayForPerspectiveFilter(PerspectiveFilter, bLocallyControlled, bHasProvider, bFirstPerson);
 }
 
 #if WITH_EDITOR

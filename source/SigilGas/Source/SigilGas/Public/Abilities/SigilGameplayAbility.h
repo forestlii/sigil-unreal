@@ -7,12 +7,32 @@
 #include "SigilAbilitySystemStructLibrary.h"
 #include "SigilGameplayAbilityInterface.h"
 #include "Tickable.h"
+#include "ScalableFloat.h"
 #include "Abilities/GameplayAbility.h"
 #include "SigilGameplayAbility.generated.h"
 
 class USigilAbilityCost;
+class USkeletalMeshComponent;
+class UAnimMontage;
 
 DECLARE_STATS_GROUP(TEXT("GameplayAbility"), STATGROUP_GameplayAbility, STATCAT_Advanced)
+
+/**
+ * A montage this ability is currently playing on one of the avatar's skeletal meshes.
+ * Adapted from GASShooter FAbilityMeshMontage (Copyright 2020 Dan Kestranek, MIT).
+ * 本技能当前在化身某个骨骼网格上播放的蒙太奇。
+ */
+USTRUCT()
+struct FSigilAbilityMeshMontage
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> Mesh = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAnimMontage> Montage = nullptr;
+};
 
 /**
  * Extended gameplay ability class for custom functionality.
@@ -230,8 +250,10 @@ protected:
 	void K2_OnRemoveAbility();
 
 	/**
-	 * Called when the avatar is set for the ability.
-	 * 技能的化身设置时调用。
+	 * Called when the avatar is set for the ability. Also retries TryActivateAbilityOnSpawn so passive abilities
+	 * (Sigil.Ability.Trait.ActivationOnSpawn) granted before the avatar arrived still activate.
+	 * 技能的化身设置时调用。同时重试 TryActivateAbilityOnSpawn，让化身晚到之前授予的被动技能
+	 * （Sigil.Ability.Trait.ActivationOnSpawn）仍能激活。
 	 * @param ActorInfo The actor info. 演员信息。
 	 * @param Spec The ability spec. 技能规格。
 	 */
@@ -410,6 +432,122 @@ protected:
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ability")
 	bool bEnableTick;
+
+	/**
+	 * If true, the ability can only activate while its SourceObject reports active through ISigilAbilitySourceInterface
+	 * (for example: the weapon that granted the ability is the one currently equipped). A missing SourceObject, or one
+	 * that does not implement the interface, fails activation with Sigil.Ability.ActivateFail.SourceObjectInactive.
+	 * Adapted from GASShooter's bSourceObjectMustEqualCurrentWeaponToActivate (Copyright 2020 Dan Kestranek, MIT),
+	 * but resolved through an interface instead of casting to a concrete character class.
+	 * 为 true 时，只有 SourceObject 通过 ISigilAbilitySourceInterface 汇报激活才允许激活本技能
+	 * （例如授予本技能的武器正是当前装备的武器）。SourceObject 缺失或未实现接口时，
+	 * 以 Sigil.Ability.ActivateFail.SourceObjectInactive 失败。
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability")
+	bool bRequireSourceObjectActive;
+
+	/**
+	 * Extra cooldown tags for a shared cooldown GameplayEffect. They are injected into the cooldown spec's DynamicGrantedTags
+	 * and included in GetCooldownTags(), so one generic cooldown GE can be reused by many abilities (GASDocumentation 4.5.15).
+	 * Leave empty to keep the plain per-ability cooldown GE behaviour.
+	 * The shared GE must itself grant Sigil.Cooldown.Shared (engine Data Validation rejects cooldown effects that grant no
+	 * tags; the marker is excluded from cooldown matching). Misconfigurations are not guarded: CooldownDuration without
+	 * CooldownTags on a GE that grants only the marker means no per-ability cooldown, and CooldownTags with CooldownDuration
+	 * 0 on a SetByCaller GE means a zero-length cooldown plus an engine error log.
+	 * 共享冷却 GameplayEffect 的附加冷却标签：注入冷却 Spec 的 DynamicGrantedTags 并纳入 GetCooldownTags()，
+	 * 让一个通用冷却 GE 被多个技能复用（GASDocumentation 4.5.15）。留空则保持"每技能一个冷却 GE"的原行为。
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cooldown")
+	FGameplayTagContainer CooldownTags;
+
+	/**
+	 * Cooldown duration written as a SetByCaller magnitude (tag CooldownDurationSetByCallerTag) on the cooldown spec when > 0.
+	 * The shared cooldown GE must use a SetByCaller duration with the same data tag.
+	 * 大于 0 时以 SetByCaller 量值（标签 CooldownDurationSetByCallerTag）写入冷却 Spec；共享冷却 GE 的时长须用同一数据标签的 SetByCaller。
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cooldown")
+	FScalableFloat CooldownDuration;
+
+	/**
+	 * SetByCaller data tag that CooldownDuration is written into. Defaults to Sigil.SetByCaller.CooldownDuration.
+	 * CooldownDuration 写入的 SetByCaller 数据标签，默认 Sigil.SetByCaller.CooldownDuration。
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cooldown")
+	FGameplayTag CooldownDurationSetByCallerTag;
+
+private:
+	/** Scratch container returned by GetCooldownTags(): union of the cooldown GE's granted tags and CooldownTags. */
+	mutable FGameplayTagContainer TempCooldownTags;
+
+public:
+	/**
+	 * Returns the union of the cooldown GameplayEffect's granted tags and this ability's CooldownTags.
+	 * 返回冷却 GameplayEffect 的授予标签与本技能 CooldownTags 的并集。
+	 */
+	virtual const FGameplayTagContainer* GetCooldownTags() const override;
+
+	/**
+	 * Applies the cooldown GameplayEffect, injecting CooldownTags and the SetByCaller CooldownDuration when configured;
+	 * otherwise behaves exactly like the engine implementation.
+	 * 应用冷却 GameplayEffect；配置了 CooldownTags / CooldownDuration 时注入它们，否则与引擎实现完全一致。
+	 */
+	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+	/**
+	 * Returns true if the given source object implements ISigilAbilitySourceInterface and reports active.
+	 * 给定来源对象实现了 ISigilAbilitySourceInterface 且汇报激活时返回 true。
+	 * @param SourceObject The ability spec's SourceObject. 技能规格的 SourceObject。
+	 * @return True if active. 激活则返回 true。
+	 */
+	UFUNCTION(BlueprintPure, Category = "GGA|Ability|Source")
+	static bool IsAbilitySourceActive(const UObject* SourceObject);
+
+protected:
+
+#pragma region MeshMontage
+	// ----------------------------------------------------------------------------------------------------------------
+	//	Animation support for multiple USkeletalMeshComponents on the avatar. The main mesh maps onto the engine's
+	//	CurrentMontage; other meshes are tracked here. API shape from GASShooter UGSGameplayAbility
+	//	(Copyright 2020 Dan Kestranek, MIT); the by-value lookup bug of the original SetCurrentMontageForMesh is fixed.
+	//	多网格动画支持：主网格映射到引擎的 CurrentMontage，其他网格在此跟踪。
+	// ----------------------------------------------------------------------------------------------------------------
+public:
+	/**
+	 * Montage this ability is playing on the mesh (the engine CurrentMontage for the avatar's main mesh), or null.
+	 * 本技能在该网格上播放的蒙太奇（主网格即引擎 CurrentMontage），无则为 null。
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation")
+	UAnimMontage* GetCurrentMontageForMesh(const USkeletalMeshComponent* InMesh) const;
+
+	/**
+	 * Records the montage this ability now plays on the mesh (null clears it). Set by the ability system component.
+	 * 记录本技能现在在该网格上播放的蒙太奇（null 表示清除）。由技能系统组件调用。
+	 */
+	virtual void SetCurrentMontageForMesh(USkeletalMeshComponent* InMesh, UAnimMontage* InCurrentMontage);
+
+	/** Immediately jumps the mesh's active montage to a section, if this ability animates it. 若本技能正驱动该网格，立即跳到分段。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation")
+	void MontageJumpToSectionForMesh(USkeletalMeshComponent* InMesh, FName SectionName);
+
+	/** Sets the pending section on the mesh's active montage, if this ability animates it. 若本技能正驱动该网格，设置下一分段。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation")
+	void MontageSetNextSectionNameForMesh(USkeletalMeshComponent* InMesh, FName FromSectionName, FName ToSectionName);
+
+	/** Stops the mesh's montage, if this ability animates it. 若本技能正驱动该网格，停止其蒙太奇。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation", Meta = (AdvancedDisplay = "OverrideBlendOutTime"))
+	void MontageStopForMesh(USkeletalMeshComponent* InMesh, float OverrideBlendOutTime = -1.0f);
+
+	/** Stops every montage this ability animates on any mesh. 停止本技能在所有网格上驱动的蒙太奇。 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Ability|Animation", Meta = (AdvancedDisplay = "OverrideBlendOutTime"))
+	void MontageStopForAllMeshes(float OverrideBlendOutTime = -1.0f);
+
+protected:
+	/** True if InMesh is the avatar's main mesh per CurrentActorInfo. InMesh 是否为 CurrentActorInfo 记录的化身主网格。 */
+	bool IsAvatarMainMesh(const USkeletalMeshComponent* InMesh) const;
+
+	/** Active montages on secondary meshes being played by this ability. 本技能在次要网格上的活动蒙太奇。 */
+	UPROPERTY(Transient)
+	TArray<FSigilAbilityMeshMontage> CurrentAbilityMeshMontages;
+#pragma endregion
 
 #pragma region Net
 public:

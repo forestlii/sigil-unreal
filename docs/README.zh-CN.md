@@ -2,7 +2,7 @@
 
 # Sigil 文档
 
-Sigil 是一套模块化、纯代码的 **Unreal Engine 5.8** 玩法框架插件。每个包只解决一个领域、可独立取用——唯一的包间依赖是 `sigil.combat → sigil.gas`。
+Sigil 是一套模块化、纯代码的 **Unreal Engine 5.8** 玩法框架插件。每个包只解决一个领域、可独立取用——基础包之间唯一的依赖是 `sigil.combat → sigil.gas`；`sigil.arsenal` 是叠在 `sigil.gas`、`sigil.inventory`、`sigil.combat` 之上的可选集成层。
 
 ## 入门
 
@@ -22,6 +22,7 @@ Sigil 是一套模块化、纯代码的 **Unreal Engine 5.8** 玩法框架插件
 | sigil.camera | [sigil-camera.zh-CN.md](sigil-camera.zh-CN.md) | 驱动弹簧臂相机的相机模式栈 |
 | sigil.ui | [sigil-ui.zh-CN.md](sigil-ui.zh-CN.md) | CommonUI 扩展：UI 分层、数据驱动动作、弹窗、扩展点 |
 | sigil.effects | [sigil-effects.zh-CN.md](sigil-effects.zh-CN.md) | Context 驱动的音效/特效，按 Tag 查询与物理表面选择 |
+| sigil.arsenal | [sigil-arsenal.zh-CN.md](sigil-arsenal.zh-CN.md) | 物品驱动的武器装载：技能集、每把武器的蒙太奇表、动画层（依赖 gas、inventory、combat） |
 
 ## 约定
 
@@ -34,6 +35,6 @@ Sigil 是一套模块化、纯代码的 **Unreal Engine 5.8** 玩法框架插件
 ```
 source/
   SigilInput/  SigilGas/  SigilCombat/  SigilMovement/  SigilInventory/
-  SigilInteraction/  SigilCamera/  SigilUI/  SigilEffects/
+  SigilInteraction/  SigilCamera/  SigilUI/  SigilEffects/  SigilArsenal/
 Host/            # 用于编译与冒烟验证整套插件的最小宿主工程
 ```
