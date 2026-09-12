@@ -72,10 +72,25 @@ UPrimitiveComponent* ASigilWeaponActor::GetPrimitiveComponent_Implementation()
 
 	if (WeaponMeshTagName.IsValid())
 	{
-		CachedPrimitiveComponent = Cast<UPrimitiveComponent>(GetOwner()->FindComponentByTag(UPrimitiveComponent::StaticClass(), WeaponMeshTagName));
+		// Legacy layout first: the weapon mesh lives on the owning pawn (melee trace host with the blade as a pawn component).
+		if (AActor* OwnerActor = GetOwner())
+		{
+			CachedPrimitiveComponent = Cast<UPrimitiveComponent>(OwnerActor->FindComponentByTag(UPrimitiveComponent::StaticClass(), WeaponMeshTagName));
+		}
+
+		// Equipment-spawned weapons carry their own mesh: look on this actor by tag, then take its first primitive.
 		if (!IsValid(CachedPrimitiveComponent))
 		{
-			UE_LOG(LogSigilCombat, Warning, TEXT("Failed to find weapon mesh via tag (%s) on actor(%s)."), *WeaponMeshTagName.ToString(), *GetOwner()->GetName());
+			CachedPrimitiveComponent = Cast<UPrimitiveComponent>(FindComponentByTag(UPrimitiveComponent::StaticClass(), WeaponMeshTagName));
+		}
+		if (!IsValid(CachedPrimitiveComponent))
+		{
+			CachedPrimitiveComponent = FindComponentByClass<UPrimitiveComponent>();
+		}
+
+		if (!IsValid(CachedPrimitiveComponent))
+		{
+			UE_LOG(LogSigilCombat, Warning, TEXT("Failed to find weapon mesh via tag (%s) on owner (%s) or on weapon actor (%s)."), *WeaponMeshTagName.ToString(), *GetNameSafe(GetOwner()), *GetName());
 		}
 	}
 
