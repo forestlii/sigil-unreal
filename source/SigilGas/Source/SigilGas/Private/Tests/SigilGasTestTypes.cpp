@@ -11,7 +11,7 @@ namespace SigilGasTestTags
 ASigilGasTestAbilityActor::ASigilGasTestAbilityActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	AbilitySystem = CreateDefaultSubobject<USigilAbilitySystemComponent>(TEXT("AbilitySystem"));
+	AbilitySystem = CreateDefaultSubobject<USigilGasTestAbilitySystemComponent>(TEXT("AbilitySystem"));
 }
 
 USigilGasTestAbility::USigilGasTestAbility()

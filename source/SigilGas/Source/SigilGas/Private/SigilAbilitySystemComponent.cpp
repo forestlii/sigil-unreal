@@ -612,6 +612,11 @@ bool USigilAbilitySystemComponent::IsAvatarMainMesh(const USkeletalMeshComponent
 	return InMesh && AbilityActorInfo.IsValid() && AbilityActorInfo->SkeletalMeshComponent.Get() == InMesh;
 }
 
+bool USigilAbilitySystemComponent::ShouldPlaySecondaryMeshMontages() const
+{
+	return AbilityActorInfo.IsValid() && AbilityActorInfo->IsLocallyControlled();
+}
+
 FSigilLocalMeshMontage* USigilAbilitySystemComponent::FindLocalMeshMontage(const USkeletalMeshComponent* InMesh)
 {
 	return LocalMeshMontages.FindByPredicate([InMesh](const FSigilLocalMeshMontage& Entry) { return Entry.Mesh == InMesh; });
@@ -680,10 +685,11 @@ float USigilAbilitySystemComponent::PlayMontageForMesh(UGameplayAbility* InAnima
 		return PlayMontage(InAnimatingAbility, ActivationInfo, NewAnimMontage, InPlayRate, StartSectionName, StartTimeSeconds);
 	}
 
-	// Secondary meshes (first person body, arms, weapon) are cosmetic for the local viewer only.
-	if (!AbilityActorInfo.IsValid() || !AbilityActorInfo->IsLocallyControlled())
+	// Secondary meshes (first person body, arms, weapon) are cosmetic for the local viewer only. Skipping them is not a
+	// failure: report 0 so ability tasks keep their timing instead of cancelling the ability (PR #4 review P1-B).
+	if (!ShouldPlaySecondaryMeshMontages())
 	{
-		return -1.f;
+		return 0.f;
 	}
 
 	UAnimInstance* AnimInstance = GetSecondaryMeshAnimInstance(InMesh);

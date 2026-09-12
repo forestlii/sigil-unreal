@@ -10,7 +10,9 @@
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/World.h"
 #include "GameFramework/Character.h"
+#include "TimerManager.h"
 
 static bool GUseAggressivePlayMontageAndWaitEndTask = true;
 static FAutoConsoleVariableRef CVarAggressivePlayMontageAndWaitEndTask(
@@ -236,6 +238,14 @@ void USigilAbilityTask_PlayMontageAndWaitForEvent::Activate()
 		{
 			UE_LOG(LogSigilTasks, Warning, TEXT("SigilAbilityTask_PlayMontageAndWaitForEvent: playing on mesh [%s] requires a USigilAbilitySystemComponent."), *GetNameSafe(Mesh));
 		}
+		else if (Mesh && UsesSecondaryMesh() && !SigilASC->ShouldPlaySecondaryMeshMontages())
+		{
+			// Not rendered on this machine: no montage, no cancellation - just keep the ability's timing (review P1-B).
+			EventHandle = ASC->AddGameplayEventTagContainerDelegate(
+				EventTags, FGameplayEventTagMulticastDelegate::FDelegate::CreateUObject(this, &USigilAbilityTask_PlayMontageAndWaitForEvent::OnGameplayEvent));
+			StartSkippedSecondaryMeshTimer();
+			bPlayedMontage = true;
+		}
 		else if (AnimInstance != nullptr)
 		{
 			// Bind to event callback
@@ -295,6 +305,34 @@ void USigilAbilityTask_PlayMontageAndWaitForEvent::Activate()
 	SetWaitingOnAvatar();
 }
 
+void USigilAbilityTask_PlayMontageAndWaitForEvent::StartSkippedSecondaryMeshTimer()
+{
+	bSecondaryMeshSkipped = true;
+
+	const float PlayLength = MontageToPlay ? MontageToPlay->GetPlayLength() : 0.f;
+	const float ScaledLength = Rate > KINDA_SMALL_NUMBER ? FMath::Max(0.f, PlayLength - FMath::Max(0.f, StartTimeSeconds)) / Rate : 0.f;
+
+	UWorld* World = GetWorld();
+	if (ScaledLength <= 0.f || !World)
+	{
+		OnSkippedSecondaryMeshFinished();
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(SkippedSecondaryMeshTimerHandle, this, &USigilAbilityTask_PlayMontageAndWaitForEvent::OnSkippedSecondaryMeshFinished, ScaledLength, false);
+}
+
+void USigilAbilityTask_PlayMontageAndWaitForEvent::OnSkippedSecondaryMeshFinished()
+{
+	if (ShouldBroadcastAbilityTaskDelegates())
+	{
+		OnBlendOut.Broadcast(FGameplayTag(), FGameplayEventData());
+		OnCompleted.Broadcast(FGameplayTag(), FGameplayEventData());
+	}
+
+	EndTask();
+}
+
 void USigilAbilityTask_PlayMontageAndWaitForEvent::ExternalCancel()
 {
 	if (ShouldBroadcastAbilityTaskDelegates())
@@ -323,6 +361,14 @@ void USigilAbilityTask_PlayMontageAndWaitForEvent::OnDestroy(bool AbilityEnded)
 	if (UAbilitySystemComponent* ASC = AbilitySystemComponent.Get())
 	{
 		ASC->RemoveGameplayEventTagContainerDelegate(EventTags, EventHandle);
+	}
+
+	if (SkippedSecondaryMeshTimerHandle.IsValid())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(SkippedSecondaryMeshTimerHandle);
+		}
 	}
 
 	Super::OnDestroy(AbilityEnded);
@@ -408,5 +454,6 @@ FString USigilAbilityTask_PlayMontageAndWaitForEvent::GetDebugString() const
 		}
 	}
 
-	return FString::Printf(TEXT("PlayMontageAndWaitForEvent. MontageToPlay: %s  Mesh: %s  (Currently Playing): %s"), *GetNameSafe(MontageToPlay), *GetNameSafe(Mesh), *GetNameSafe(PlayingMontage));
+	return FString::Printf(TEXT("PlayMontageAndWaitForEvent. MontageToPlay: %s  Mesh: %s  (Currently Playing): %s%s"), *GetNameSafe(MontageToPlay), *GetNameSafe(Mesh), *GetNameSafe(PlayingMontage),
+	                       bSecondaryMeshSkipped ? TEXT("  [secondary mesh skipped: not locally controlled]") : TEXT(""));
 }

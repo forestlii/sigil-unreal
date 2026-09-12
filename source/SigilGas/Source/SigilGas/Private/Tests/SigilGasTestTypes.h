@@ -18,6 +18,42 @@ namespace SigilGasTestTags
 }
 
 /**
+ * Ability system component with test hooks: scripted local control for secondary-mesh montages and direct access to the
+ * per-mesh montage bookkeeping (entries can only be created by a real Montage_Play, which needs animation assets).
+ * 带测试钩子的技能系统组件：可脚本化次要网格蒙太奇的本地控制判定，并可直接读写按网格的蒙太奇记账
+ * （真实条目只能由 Montage_Play 创建，而那需要动画资产）。
+ */
+UCLASS(Transient)
+class USigilGasTestAbilitySystemComponent final : public USigilAbilitySystemComponent
+{
+	GENERATED_BODY()
+
+public:
+	USigilGasTestAbilitySystemComponent(const FObjectInitializer& ObjectInitializer)
+		: Super(ObjectInitializer)
+	{
+	}
+
+	bool bScriptedLocallyControlled = true;
+
+	virtual bool ShouldPlaySecondaryMeshMontages() const override
+	{
+		return bScriptedLocallyControlled && Super::ShouldPlaySecondaryMeshMontages();
+	}
+
+	void AddTrackedMeshMontageForTest(USkeletalMeshComponent* InMesh, UAnimMontage* InMontage, UGameplayAbility* InAbility)
+	{
+		FSigilLocalMeshMontage& Entry = FindOrAddLocalMeshMontage(InMesh);
+		Entry.AnimMontage = InMontage;
+		Entry.AnimatingAbility = InAbility;
+		NotifyAbilityMeshMontage(InAbility, InMesh, InMontage);
+	}
+
+	int32 GetTrackedMeshMontageCount() const { return LocalMeshMontages.Num(); }
+	bool HasTrackedMeshMontage(const USkeletalMeshComponent* InMesh) const { return FindLocalMeshMontage(InMesh) != nullptr; }
+};
+
+/**
  * Minimal avatar/owner actor carrying a Sigil ability system component for automation tests.
  * 自动化测试用的最小化身/拥有者 Actor，自带 Sigil 技能系统组件。
  */
@@ -30,10 +66,11 @@ public:
 	ASigilGasTestAbilityActor();
 
 	USigilAbilitySystemComponent* GetAbilitySystem() const { return AbilitySystem; }
+	USigilGasTestAbilitySystemComponent* GetTestAbilitySystem() const { return AbilitySystem; }
 
 private:
 	UPROPERTY()
-	TObjectPtr<USigilAbilitySystemComponent> AbilitySystem;
+	TObjectPtr<USigilGasTestAbilitySystemComponent> AbilitySystem;
 };
 
 /**
@@ -199,11 +236,25 @@ public:
 	}
 
 	int32 MontageCancelledCount = 0;
+	int32 MontageBlendOutCount = 0;
+	int32 MontageCompletedCount = 0;
 
 	UFUNCTION()
 	void HandleMontageCancelled(FGameplayTag EventTag, FGameplayEventData EventData)
 	{
 		++MontageCancelledCount;
+	}
+
+	UFUNCTION()
+	void HandleMontageBlendOut(FGameplayTag EventTag, FGameplayEventData EventData)
+	{
+		++MontageBlendOutCount;
+	}
+
+	UFUNCTION()
+	void HandleMontageCompleted(FGameplayTag EventTag, FGameplayEventData EventData)
+	{
+		++MontageCompletedCount;
 	}
 };
 

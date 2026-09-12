@@ -9,6 +9,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Tests/SigilGasTestTypes.h"
 #include "Tests/SigilGasTestWorld.h"
+#include "TimerManager.h"
 
 namespace
 {
@@ -237,6 +238,104 @@ bool FSigilGasMontageTaskMeshTest::RunTest(const FString& Parameters)
 	ASC->CancelAbilityHandle(Fixture.Handle);
 	TestFalse(TEXT("The ability is inactive after cancellation"), Ability->IsActive());
 	TestFalse(TEXT("No secondary mesh bookkeeping survives"), ASC->IsAnimatingAbilityForAnyMesh(Ability));
+
+	return true;
+}
+
+#endif
+#if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilGasMontageRemoteSecondaryMeshTest,
+	"SigilGas.Montage.RemoteSecondaryMeshKeepsAbilityTiming",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilGasMontageRemoteSecondaryMeshTest::RunTest(const FString& Parameters)
+{
+	FSigilGasMontageFixture Fixture(TEXT("SigilGasMontageRemoteWorld"));
+	TestTrue(TEXT("The montage fixture should be valid"), Fixture.IsValid());
+	if (!Fixture.IsValid())
+	{
+		return false;
+	}
+
+	USigilGasTestAbilitySystemComponent* ASC = Fixture.Actor->GetTestAbilitySystem();
+	USigilGasTestAbility* Ability = Fixture.Ability;
+	const FGameplayAbilityActivationInfo ActivationInfo;
+
+	// Montage with a real play length so the skipped path has something to wait for.
+	UAnimMontage* Montage = NewObject<UAnimMontage>(GetTransientPackage(), TEXT("SigilGasTestMontageRemote"));
+	Montage->SetCompositeLength(2.f);
+	TestEqual(TEXT("The montage reports its play length"), Montage->GetPlayLength(), 2.f, KINDA_SMALL_NUMBER);
+
+	// Locally controlled (default): the ASC would try to play; without an anim instance it fails with -1.
+	TestTrue(TEXT("Standalone actor info counts as locally controlled"), ASC->ShouldPlaySecondaryMeshMontages());
+	TestEqual(TEXT("Local: missing anim instance is a failure (-1)"), ASC->PlayMontageForMesh(Ability, Fixture.SecondaryMesh, ActivationInfo, Montage, 1.f), -1.f);
+
+	// Not locally controlled: the secondary mesh is skipped with 0, never -1, and nothing is tracked.
+	ASC->bScriptedLocallyControlled = false;
+	TestFalse(TEXT("Scripted remote control disables secondary mesh montages"), ASC->ShouldPlaySecondaryMeshMontages());
+	TestEqual(TEXT("Remote: the secondary mesh is skipped with 0"), ASC->PlayMontageForMesh(Ability, Fixture.SecondaryMesh, ActivationInfo, Montage, 1.f), 0.f);
+	TestEqual(TEXT("Remote: a weapon mesh is skipped with 0 as well"), ASC->PlayMontageForMesh(Ability, Fixture.WeaponMesh, ActivationInfo, Montage, 1.f), 0.f);
+	TestFalse(TEXT("Remote: nothing is tracked for the skipped mesh"), ASC->HasTrackedMeshMontage(Fixture.SecondaryMesh));
+	TestFalse(TEXT("Remote: the ability animates nothing"), ASC->IsAnimatingAbilityForAnyMesh(Ability));
+	TestEqual(TEXT("Remote: the main mesh still goes through the engine path (no anim instance -> -1)"), ASC->PlayMontageForMesh(Ability, Fixture.MainMesh, ActivationInfo, Montage, 1.f), -1.f);
+
+	// The task on a skipped secondary mesh must not cancel the ability; it completes after the montage length.
+	Ability->bEndImmediately = false;
+	TestTrue(TEXT("The ability activates and stays active"), ASC->TryActivateAbility(Fixture.Handle));
+
+	USigilGasTestAsyncListener* Listener = NewObject<USigilGasTestAsyncListener>(Fixture.Actor);
+	USigilAbilityTask_PlayMontageAndWaitForEvent* Task = USigilAbilityTask_PlayMontageAndWaitForEvent::PlayMontageForMeshAndWaitForEvent(Ability, NAME_None, Fixture.SecondaryMesh, Montage, FGameplayTagContainer(), 2.f);
+	TestNotNull(TEXT("The task should be created"), Task);
+	if (!Task)
+	{
+		return false;
+	}
+	Task->OnCancelled.AddDynamic(Listener, &USigilGasTestAsyncListener::HandleMontageCancelled);
+	Task->OnBlendOut.AddDynamic(Listener, &USigilGasTestAsyncListener::HandleMontageBlendOut);
+	Task->OnCompleted.AddDynamic(Listener, &USigilGasTestAsyncListener::HandleMontageCompleted);
+	Task->ReadyForActivation();
+
+	TestEqual(TEXT("Skipping the secondary mesh never broadcasts OnCancelled"), Listener->MontageCancelledCount, 0);
+	TestEqual(TEXT("The task has not completed yet"), Listener->MontageCompletedCount, 0);
+	TestTrue(TEXT("The ability is still active while the skipped montage 'plays'"), Ability->IsActive());
+	TestTrue(TEXT("The task is still active"), Task->IsActive());
+
+	// FTimerManager::Tick only runs once per GFrameCounter value, so bump the frame counter before every manual tick.
+	auto TickTimers = [&Fixture](float DeltaSeconds)
+	{
+		++GFrameCounter;
+		Fixture.World.World->GetTimerManager().Tick(DeltaSeconds);
+	};
+
+	// A timer set outside of a tick is Pending until the next tick activates it (its expiry is measured from that tick's
+	// InternalTime), so run one zero-length activation tick first - exactly what happens between two engine frames.
+	TickTimers(0.f);
+	TestEqual(TEXT("The activation tick does not complete the task"), Listener->MontageCompletedCount, 0);
+
+	// Montage length 2s at rate 2 -> 1s. Half a second in: still waiting.
+	TickTimers(0.5f);
+	TestEqual(TEXT("Halfway through the scaled length the task has not completed"), Listener->MontageCompletedCount, 0);
+
+	// Past the scaled length: blend out + completed exactly once, task ended, ability untouched.
+	TickTimers(0.6f);
+	TestEqual(TEXT("OnBlendOut fires once after the scaled montage length"), Listener->MontageBlendOutCount, 1);
+	TestEqual(TEXT("OnCompleted fires once after the scaled montage length"), Listener->MontageCompletedCount, 1);
+	TestEqual(TEXT("Still no OnCancelled"), Listener->MontageCancelledCount, 0);
+	TestFalse(TEXT("The task ended itself"), Task->IsActive());
+	TestTrue(TEXT("The ability keeps running; only the ability decides when to end"), Ability->IsActive());
+
+	// Cancelling the ability with a pending skipped-mesh task clears its timer without firing it.
+	Listener->MontageCompletedCount = 0;
+	USigilAbilityTask_PlayMontageAndWaitForEvent* PendingTask = USigilAbilityTask_PlayMontageAndWaitForEvent::PlayMontageForMeshAndWaitForEvent(Ability, NAME_None, Fixture.SecondaryMesh, Montage, FGameplayTagContainer(), 1.f);
+	PendingTask->OnCompleted.AddDynamic(Listener, &USigilGasTestAsyncListener::HandleMontageCompleted);
+	PendingTask->OnCancelled.AddDynamic(Listener, &USigilGasTestAsyncListener::HandleMontageCancelled);
+	PendingTask->ReadyForActivation();
+	ASC->CancelAbilityHandle(Fixture.Handle);
+	TestFalse(TEXT("The ability is inactive after cancellation"), Ability->IsActive());
+	TickTimers(5.f);
+	TestEqual(TEXT("A cleared skipped-mesh timer never completes"), Listener->MontageCompletedCount, 0);
 
 	return true;
 }

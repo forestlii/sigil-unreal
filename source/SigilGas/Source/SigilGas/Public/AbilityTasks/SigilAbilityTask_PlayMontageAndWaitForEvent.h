@@ -232,6 +232,17 @@ protected:
 	UPROPERTY()
 	TObjectPtr<USkeletalMeshComponent> Mesh;
 
+	/**
+	 * Secondary mesh skipped because this machine does not render it (not locally controlled): the montage is not played
+	 * but the task still completes after the montage's scaled play length so ability timing is unchanged.
+	 * 次要网格因本机不渲染（非本地控制）被跳过：不播放蒙太奇，但任务仍在蒙太奇缩放后的时长过后完成，技能时序不变。
+	 */
+	void StartSkippedSecondaryMeshTimer();
+	void OnSkippedSecondaryMeshFinished();
+
+	FTimerHandle SkippedSecondaryMeshTimerHandle;
+	bool bSecondaryMeshSkipped = false;
+
 	FOnMontageBlendingOutStarted BlendingOutDelegate;
 	FOnMontageEnded MontageEndedDelegate;
 	FDelegateHandle InterruptedHandle;

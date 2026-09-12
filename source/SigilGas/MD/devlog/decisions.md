@@ -95,4 +95,13 @@
 - 否掉了什么 + 为什么: 否掉照评审改段名——实测不生效；否掉只改注释不配 Host——评审说得对，原测试只 `NewObject` 读布尔，暴露不了接线问题，断言必须打在引擎真实创建的全局管理器上。
 - 踩坑 / 反思: 上一条目写的"Host 没有 Config 目录"已不符现状——编辑器每次跑 Automation 会生成 `Host/Config/DefaultEngine.ini`（含 AndroidFileServer SecurityToken）与 `DefaultInput.ini`，这两个是垃圾、不提交；只有 `DefaultGame.ini` 是有意跟踪的。外部评审的"已复核"也要再复核一遍——这次是评审看漏了 `OverrideConfigSection`。
 - 复用层🔑: ② 引擎相关
-- 来源: `D:\P4\Code_UE5.6\MDnalysis\sigil-pr4-review.md` §2 P1-A；引擎 `GameplayAbilitiesDeveloperSettings.h:29,51-53,125-132`、`AbilitySystemGlobals.cpp:615-640`；Automation `SigilGas.CueManager.LoadsRuntimeObjectLibrariesOnDemand`（新增接线断言，两种段名各跑一次）。
+- 来源: `D:\P4\Code_UE5.6\MD\analysis\sigil-pr4-review.md` §2 P1-A；引擎 `GameplayAbilitiesDeveloperSettings.h:29,51-53,125-132`、`AbilitySystemGlobals.cpp:615-640`；Automation `SigilGas.CueManager.LoadsRuntimeObjectLibrariesOnDemand`（新增接线断言，两种段名各跑一次）。
+### [2026-09-12] B1① 修订（PR #4 评审 P1-B）：非本地控制的次要网格"跳过"不等于"技能取消"
+
+- 阶段: 迭代
+- 面临的选择: 原实现次要网格在非本地控制时 `PlayMontageForMesh` 返回 -1，Task 把 `Duration <= 0` 一律当播放失败广播 `OnCancelled`——listen server 上为远端 Pawn 跑该技能时，纯表现网格没播会把技能砍掉。选项：① 返回蒙太奇长度假装播了；② 返回 0 且 Task 不广播取消、立即完成；③ 返回 0，Task 按蒙太奇缩放时长起定时器，到时广播 `OnBlendOut`+`OnCompleted`。
+- 定了什么: ③。ASC 新增虚函数 `ShouldPlaySecondaryMeshMontages()`（= `ActorInfo->IsLocallyControlled()`），`PlayMontageForMesh` 对次要网格在其为 false 时返回 **0**（有意跳过），-1 只表示真失败。Task 在该分支仍绑定 GameplayEvent 委托，起 `GetPlayLength() - StartTimeSeconds) / Rate` 的定时器，到时先后广播 `OnBlendOut`、`OnCompleted` 并 `EndTask`；`OnDestroy` 清定时器；长度为 0 则立即完成。主网格路径不变。
+- 否掉了什么 + 为什么: 否掉①——调用方拿到"长度"会去绑蒙太奇委托，永远收不到结束回调；否掉②——立即完成会让依赖 `OnCompleted` 收尾的技能在远端提前结束，时序仍然不一致。
+- 踩坑 / 反思: 单机 `IsLocallyControlled()` 恒真，这个分支之前根本走不到，"现在不炸不等于语义对"（评审原话）。测试用 `USigilGasTestAbilitySystemComponent::bScriptedLocallyControlled` 强制走远端分支，`FTimerManager::Tick` 推进时间断言完成时机。
+- 复用层🔑: ② 引擎相关
+- 来源: `D:\P4\Code_UE5.6\MD\analysis\sigil-pr4-review.md` §2 P1-B；Automation `SigilGas.Montage.RemoteSecondaryMeshKeepsAbilityTiming`。

@@ -521,11 +521,21 @@ public:
 	bool IsAvatarMainMesh(const USkeletalMeshComponent* InMesh) const;
 
 	/**
+	 * True when secondary (cosmetic) mesh montages should play on this machine: the actor info is locally controlled.
+	 * Remote / simulated pawns return false; their secondary meshes stay silent while ability timing continues unchanged.
+	 * 本机是否应播放次要（纯表现）网格的蒙太奇：演员信息为本地控制时为 true。远端 / 模拟 Pawn 返回 false，
+	 * 其次要网格不播放，但技能时序照常推进。
+	 */
+	virtual bool ShouldPlaySecondaryMeshMontages() const;
+
+	/**
 	 * Plays a montage on the given mesh. Main mesh: engine PlayMontage (replicated / predicted as usual).
-	 * Other meshes: local Montage_Play only when the actor info is locally controlled; simulated proxies play nothing.
-	 * Returns the montage length, or -1 if nothing played.
-	 * 在指定网格上播放蒙太奇。主网格走引擎 PlayMontage（照常复制 / 预测）；其他网格仅在本地控制时本地 Montage_Play，
-	 * 模拟代理不播放。返回蒙太奇长度，未播放返回 -1。
+	 * Other meshes: local Montage_Play only when ShouldPlaySecondaryMeshMontages() is true.
+	 * Returns the montage length; 0 when the secondary mesh was intentionally skipped (not locally controlled) so the
+	 * caller must not treat it as a failure; -1 if nothing could be played (invalid mesh / montage / anim instance).
+	 * 在指定网格上播放蒙太奇。主网格走引擎 PlayMontage（照常复制 / 预测）；其他网格仅在 ShouldPlaySecondaryMeshMontages()
+	 * 为 true 时本地 Montage_Play。返回蒙太奇长度；次要网格因非本地控制被有意跳过时返回 0（调用方不得当失败处理）；
+	 * 无法播放（网格 / 蒙太奇 / AnimInstance 无效）返回 -1。
 	 */
 	virtual float PlayMontageForMesh(UGameplayAbility* AnimatingAbility, USkeletalMeshComponent* InMesh, FGameplayAbilityActivationInfo ActivationInfo, UAnimMontage* Montage, float InPlayRate,
 	                                 FName StartSectionName = NAME_None, float StartTimeSeconds = 0.0f);
