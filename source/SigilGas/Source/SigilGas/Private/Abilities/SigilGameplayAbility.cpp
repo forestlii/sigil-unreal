@@ -337,11 +337,17 @@ void USigilGameplayAbility::OnRemoveAbility(const FGameplayAbilityActorInfo* Act
 {
 	K2_OnRemoveAbility();
 
+	// The ASC drops its side of the per-mesh bookkeeping when the ability ends; this drops ours when the spec goes away.
+	CurrentAbilityMeshMontages.Reset();
+
 	Super::OnRemoveAbility(ActorInfo, Spec);
 }
 
 void USigilGameplayAbility::OnAvatarSet(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
 {
+	// Meshes tracked here belonged to the previous avatar (the ASC resets its LocalMeshMontages on avatar change as well).
+	CurrentAbilityMeshMontages.Reset();
+
 	Super::OnAvatarSet(ActorInfo, Spec);
 	K2_OnAvatarSet();
 
@@ -686,12 +692,19 @@ void USigilGameplayAbility::SetCurrentMontageForMesh(USkeletalMeshComponent* InM
 		return;
 	}
 
+	// Null clears: drop the entry instead of keeping a (Mesh, null) pair around (PR #4 review P1-C).
+	if (!InCurrentMontage)
+	{
+		CurrentAbilityMeshMontages.RemoveAll([InMesh](const FSigilAbilityMeshMontage& Candidate) { return Candidate.Mesh == InMesh || !IsValid(Candidate.Mesh); });
+		return;
+	}
+
 	// GASShooter looked the entry up by value and mutated a copy, so a second Set for the same mesh never took effect.
 	if (FSigilAbilityMeshMontage* Entry = CurrentAbilityMeshMontages.FindByPredicate([InMesh](const FSigilAbilityMeshMontage& Candidate) { return Candidate.Mesh == InMesh; }))
 	{
 		Entry->Montage = InCurrentMontage;
 	}
-	else if (InCurrentMontage)
+	else
 	{
 		FSigilAbilityMeshMontage& NewEntry = CurrentAbilityMeshMontages.AddDefaulted_GetRef();
 		NewEntry.Mesh = InMesh;

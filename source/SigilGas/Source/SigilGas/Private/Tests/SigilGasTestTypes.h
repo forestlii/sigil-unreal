@@ -87,6 +87,8 @@ public:
 
 	void SetRequireSourceObjectActive(bool bInRequire) { bRequireSourceObjectActive = bInRequire; }
 
+	int32 GetTrackedMeshMontageCount() const { return CurrentAbilityMeshMontages.Num(); }
+
 	int32 ActivationCount = 0;
 	bool bEndImmediately = true;
 

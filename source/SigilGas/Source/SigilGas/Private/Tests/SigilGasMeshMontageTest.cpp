@@ -341,3 +341,89 @@ bool FSigilGasMontageRemoteSecondaryMeshTest::RunTest(const FString& Parameters)
 }
 
 #endif
+#if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilGasMontageBookkeepingReleaseTest,
+	"SigilGas.Montage.BookkeepingIsReleased",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilGasMontageBookkeepingReleaseTest::RunTest(const FString& Parameters)
+{
+	FSigilGasMontageFixture Fixture(TEXT("SigilGasMontageReleaseWorld"));
+	TestTrue(TEXT("The montage fixture should be valid"), Fixture.IsValid());
+	if (!Fixture.IsValid())
+	{
+		return false;
+	}
+
+	USigilGasTestAbilitySystemComponent* ASC = Fixture.Actor->GetTestAbilitySystem();
+	USigilGasTestAbility* Ability = Fixture.Ability;
+	UAnimMontage* Montage = NewObject<UAnimMontage>(GetTransientPackage(), TEXT("SigilGasTestMontageRelease"));
+
+	TestEqual(TEXT("No ASC entries initially"), ASC->GetTrackedMeshMontageCount(), 0);
+	TestEqual(TEXT("No ability entries initially"), Ability->GetTrackedMeshMontageCount(), 0);
+
+	// ClearAnimatingAbilityForMesh drops the entry on both sides.
+	ASC->AddTrackedMeshMontageForTest(Fixture.SecondaryMesh, Montage, Ability);
+	TestEqual(TEXT("One ASC entry after tracking"), ASC->GetTrackedMeshMontageCount(), 1);
+	TestEqual(TEXT("One ability entry after tracking"), Ability->GetTrackedMeshMontageCount(), 1);
+	TestTrue(TEXT("The ability animates the tracked mesh"), ASC->IsAnimatingAbilityForAnyMesh(Ability));
+	ASC->ClearAnimatingAbilityForMesh(Fixture.SecondaryMesh, Ability);
+	TestEqual(TEXT("ClearAnimatingAbilityForMesh removes the ASC entry"), ASC->GetTrackedMeshMontageCount(), 0);
+	TestEqual(TEXT("ClearAnimatingAbilityForMesh removes the ability entry"), Ability->GetTrackedMeshMontageCount(), 0);
+	TestFalse(TEXT("Nothing is animated after the clear"), ASC->IsAnimatingAbilityForAnyMesh(Ability));
+
+	// ClearAnimatingAbilityForAllMeshes drops every entry of the ability, leaves other abilities alone.
+	ASC->AddTrackedMeshMontageForTest(Fixture.SecondaryMesh, Montage, Ability);
+	ASC->AddTrackedMeshMontageForTest(Fixture.WeaponMesh, Montage, Ability);
+	TestEqual(TEXT("Two ASC entries for two meshes"), ASC->GetTrackedMeshMontageCount(), 2);
+	ASC->ClearAnimatingAbilityForAllMeshes(Ability);
+	TestEqual(TEXT("ClearAnimatingAbilityForAllMeshes removes all ASC entries of the ability"), ASC->GetTrackedMeshMontageCount(), 0);
+	TestEqual(TEXT("...and all ability entries"), Ability->GetTrackedMeshMontageCount(), 0);
+
+	// Ending the ability (NotifyAbilityEnded) releases entries too.
+	Ability->bEndImmediately = false;
+	TestTrue(TEXT("The ability activates"), ASC->TryActivateAbility(Fixture.Handle));
+	ASC->AddTrackedMeshMontageForTest(Fixture.SecondaryMesh, Montage, Ability);
+	TestEqual(TEXT("Entry tracked while the ability runs"), ASC->GetTrackedMeshMontageCount(), 1);
+	ASC->CancelAbilityHandle(Fixture.Handle);
+	TestFalse(TEXT("The ability ended"), Ability->IsActive());
+	TestEqual(TEXT("Ending the ability removes its ASC entries"), ASC->GetTrackedMeshMontageCount(), 0);
+	TestEqual(TEXT("Ending the ability removes its ability entries"), Ability->GetTrackedMeshMontageCount(), 0);
+
+	// A destroyed mesh leaves a stale entry that is pruned on the next lookup-or-add.
+	USkeletalMeshComponent* Temporary = NewObject<USkeletalMeshComponent>(Fixture.Actor, TEXT("TemporaryMesh"));
+	Temporary->RegisterComponent();
+	ASC->AddTrackedMeshMontageForTest(Temporary, Montage, Ability);
+	TestEqual(TEXT("The temporary mesh is tracked"), ASC->GetTrackedMeshMontageCount(), 1);
+	Temporary->DestroyComponent();
+	ASC->AddTrackedMeshMontageForTest(Fixture.SecondaryMesh, Montage, Ability);
+	TestEqual(TEXT("Adding another mesh prunes the destroyed one (no zombie)"), ASC->GetTrackedMeshMontageCount(), 1);
+	TestTrue(TEXT("The live mesh survives the prune"), ASC->HasTrackedMeshMontage(Fixture.SecondaryMesh));
+	ASC->ClearAnimatingAbilityForAllMeshes(Ability);
+
+	// Ability side: a null Set removes the entry; avatar change and removal reset the list.
+	Ability->SetCurrentMontageForMesh(Fixture.SecondaryMesh, Montage);
+	Ability->SetCurrentMontageForMesh(Fixture.SecondaryMesh, nullptr);
+	TestEqual(TEXT("Setting null removes the ability entry instead of keeping a (mesh, null) pair"), Ability->GetTrackedMeshMontageCount(), 0);
+
+	Ability->SetCurrentMontageForMesh(Fixture.SecondaryMesh, Montage);
+	Ability->SetCurrentMontageForMesh(Fixture.WeaponMesh, Montage);
+	TestEqual(TEXT("Two ability entries before the avatar change"), Ability->GetTrackedMeshMontageCount(), 2);
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AActor* NewAvatar = Fixture.World.World->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity, Params);
+	ASC->InitAbilityActorInfo(Fixture.Actor, NewAvatar);
+	TestEqual(TEXT("OnAvatarSet resets the ability's per-mesh bookkeeping"), Ability->GetTrackedMeshMontageCount(), 0);
+	TestNull(TEXT("Stale meshes are not reported after the avatar change"), Ability->GetCurrentMontageForMesh(Fixture.SecondaryMesh));
+
+	Ability->SetCurrentMontageForMesh(Fixture.SecondaryMesh, Montage);
+	TestEqual(TEXT("One ability entry before removal"), Ability->GetTrackedMeshMontageCount(), 1);
+	ASC->ClearAbility(Fixture.Handle);
+	TestEqual(TEXT("OnRemoveAbility resets the ability's per-mesh bookkeeping"), Ability->GetTrackedMeshMontageCount(), 0);
+
+	return true;
+}
+
+#endif

@@ -583,6 +583,12 @@ protected:
 	/** Anim instance of a secondary mesh that belongs to the avatar (directly or through its owner chain), else null. */
 	UAnimInstance* GetSecondaryMeshAnimInstance(const USkeletalMeshComponent* InMesh) const;
 
+	/** Drops entries whose mesh has been destroyed / garbage collected. 删除网格已销毁 / 被 GC 的条目。 */
+	void PruneStaleMeshMontageEntries();
+
+	/** Notifies the ability and removes every secondary-mesh entry it animates (plus stale ones). 通知技能并移除其驱动的所有次要网格条目。 */
+	void ReleaseMeshMontageEntriesForAbility(UGameplayAbility* Ability);
+
 	/** Tells the (Sigil) ability which montage it is now playing on the mesh. */
 	void NotifyAbilityMeshMontage(UGameplayAbility* Ability, USkeletalMeshComponent* InMesh, UAnimMontage* Montage) const;
 #pragma endregion

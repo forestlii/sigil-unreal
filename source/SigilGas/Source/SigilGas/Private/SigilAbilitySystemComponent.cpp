@@ -438,14 +438,7 @@ void USigilAbilitySystemComponent::NotifyAbilityEnded(FGameplayAbilitySpecHandle
 	}
 
 	// Secondary meshes only: the engine keeps its own main-mesh bookkeeping until the montage blends out.
-	for (FSigilLocalMeshMontage& Entry : LocalMeshMontages)
-	{
-		if (Entry.AnimatingAbility.Get() == Ability)
-		{
-			NotifyAbilityMeshMontage(Ability, Entry.Mesh, nullptr);
-			Entry.AnimatingAbility = nullptr;
-		}
-	}
+	ReleaseMeshMontageEntriesForAbility(Ability);
 
 	AbilityEndedEvent.Broadcast(Handle, Ability, bWasCancelled);
 }
@@ -629,6 +622,9 @@ const FSigilLocalMeshMontage* USigilAbilitySystemComponent::FindLocalMeshMontage
 
 FSigilLocalMeshMontage& USigilAbilitySystemComponent::FindOrAddLocalMeshMontage(USkeletalMeshComponent* InMesh)
 {
+	// Meshes that were garbage collected (equipment actors are respawned per equip) leave null entries behind.
+	PruneStaleMeshMontageEntries();
+
 	if (FSigilLocalMeshMontage* Existing = FindLocalMeshMontage(InMesh))
 	{
 		return *Existing;
@@ -637,6 +633,25 @@ FSigilLocalMeshMontage& USigilAbilitySystemComponent::FindOrAddLocalMeshMontage(
 	FSigilLocalMeshMontage& Entry = LocalMeshMontages.AddDefaulted_GetRef();
 	Entry.Mesh = InMesh;
 	return Entry;
+}
+
+void USigilAbilitySystemComponent::PruneStaleMeshMontageEntries()
+{
+	LocalMeshMontages.RemoveAll([](const FSigilLocalMeshMontage& Entry) { return !IsValid(Entry.Mesh); });
+}
+
+void USigilAbilitySystemComponent::ReleaseMeshMontageEntriesForAbility(UGameplayAbility* Ability)
+{
+	for (FSigilLocalMeshMontage& Entry : LocalMeshMontages)
+	{
+		if (Entry.AnimatingAbility.Get() == Ability)
+		{
+			NotifyAbilityMeshMontage(Ability, Entry.Mesh, nullptr);
+		}
+	}
+
+	// Drop the entries outright: a nulled entry would otherwise live (and hold its montage) for as long as the ASC does.
+	LocalMeshMontages.RemoveAll([Ability](const FSigilLocalMeshMontage& Entry) { return Entry.AnimatingAbility.Get() == Ability || !IsValid(Entry.Mesh); });
 }
 
 UAnimInstance* USigilAbilitySystemComponent::GetSecondaryMeshAnimInstance(const USkeletalMeshComponent* InMesh) const
@@ -871,10 +886,10 @@ void USigilAbilitySystemComponent::ClearAnimatingAbilityForMesh(USkeletalMeshCom
 		return;
 	}
 
-	if (FSigilLocalMeshMontage* Entry = FindLocalMeshMontage(InMesh); Entry && Entry->AnimatingAbility.Get() == Ability)
+	if (const FSigilLocalMeshMontage* Entry = FindLocalMeshMontage(InMesh); Entry && Entry->AnimatingAbility.Get() == Ability)
 	{
 		NotifyAbilityMeshMontage(Ability, InMesh, nullptr);
-		Entry->AnimatingAbility = nullptr;
+		LocalMeshMontages.RemoveAll([InMesh](const FSigilLocalMeshMontage& Candidate) { return Candidate.Mesh == InMesh || !IsValid(Candidate.Mesh); });
 	}
 }
 
@@ -886,15 +901,7 @@ void USigilAbilitySystemComponent::ClearAnimatingAbilityForAllMeshes(UGameplayAb
 	}
 
 	ClearAnimatingAbility(Ability);
-
-	for (FSigilLocalMeshMontage& Entry : LocalMeshMontages)
-	{
-		if (Entry.AnimatingAbility.Get() == Ability)
-		{
-			NotifyAbilityMeshMontage(Ability, Entry.Mesh, nullptr);
-			Entry.AnimatingAbility = nullptr;
-		}
-	}
+	ReleaseMeshMontageEntriesForAbility(Ability);
 }
 
 #pragma endregion

@@ -105,3 +105,11 @@
 - 踩坑 / 反思: 单机 `IsLocallyControlled()` 恒真，这个分支之前根本走不到，"现在不炸不等于语义对"（评审原话）。测试用 `USigilGasTestAbilitySystemComponent::bScriptedLocallyControlled` 强制走远端分支，`FTimerManager::Tick` 推进时间断言完成时机。
 - 复用层🔑: ② 引擎相关
 - 来源: `D:\P4\Code_UE5.6\MD\analysis\sigil-pr4-review.md` §2 P1-B；Automation `SigilGas.Montage.RemoteSecondaryMeshKeepsAbilityTiming`。
+### [2026-09-12] B1① 修订（PR #4 评审 P1-C）：按网格记账"用完即删"，GA 侧随化身 / 授予生命周期清空
+
+- 阶段: 迭代
+- 面临的选择: 原实现 ASC 的 `LocalMeshMontages` 与 GA 的 `CurrentAbilityMeshMontages` 只把字段置空、从不移除；装备按次 Spawn 新 Actor 时每次换装的新网格都是新条目，无界增长且 `AnimMontage` 强引用挂着，网格 GC 后成 `Mesh == null` 僵尸；GA 在换化身 / 移除技能时不清理，`GetCurrentMontageForMesh` 可返回陈旧值（Task 正靠它判 `bPlayingThisMontage`）。
+- 定了什么: ASC：`NotifyAbilityEnded` / `ClearAnimatingAbilityForMesh` / `ClearAnimatingAbilityForAllMeshes` 改为通知 GA 后 `RemoveAll` 条目（新增 `ReleaseMeshMontageEntriesForAbility`）；`FindOrAddLocalMeshMontage` 先 `PruneStaleMeshMontageEntries()` 剪掉 `!IsValid(Mesh)` 的僵尸。GA：`SetCurrentMontageForMesh(Mesh, nullptr)` 直接删条目；`OnAvatarSet` 与 `OnRemoveAbility` 里 `Reset()`。
+- 否掉了什么 + 为什么: 否掉给条目加 `TWeakObjectPtr<UAnimMontage>`"弱引用防泄漏"——治标；条目本身在技能结束后就没有存在意义，删掉最干净。否掉在 `EndAbility` 里也清 GA 数组——ASC 的 `NotifyAbilityEnded` 已逐条回调 `SetCurrentMontageForMesh(nullptr)`，两处都清是重复。
+- 复用层🔑: ② 引擎相关
+- 来源: `D:\P4\Code_UE5.6\MD\analysis\sigil-pr4-review.md` §2 P1-C；`SigilEquipmentSystemComponent.cpp:749`（按次 Spawn 装备 Actor）；Automation `SigilGas.Montage.BookkeepingIsReleased`（测试 ASC 子类直接注入条目，因为真实条目需要 AnimInstance）。
