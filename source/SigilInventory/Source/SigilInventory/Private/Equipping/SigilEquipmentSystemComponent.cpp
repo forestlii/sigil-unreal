@@ -14,6 +14,7 @@
 #include "SigilInventoryLogChannels.h"
 #include "Engine/ActorChannel.h"
 #include "Net/UnrealNetwork.h"
+#include "UObject/StrongObjectPtr.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SigilEquipmentSystemComponent)
 
@@ -36,6 +37,10 @@ void USigilEquipmentSystemComponent::GetLifetimeReplicatedProps(TArray<FLifetime
 
 void USigilEquipmentSystemComponent::EquipItemToSlot(USigilItemInstance* Item, const FGameplayTag& SlotTag)
 {
+	if (bResettingEquipment || bRemovingAllEquipment)
+	{
+		return;
+	}
 	if (!bEquipmentSystemInitialized || !OwnerHasAuthority())
 	{
 		SIGIL_INVENTORY_CLOG(Error, "not initialized or has no authority!")
@@ -47,8 +52,9 @@ void USigilEquipmentSystemComponent::EquipItemToSlot(USigilItemInstance* Item, c
 		return;
 	}
 
+	const uint64 Revision = EquipmentLifecycleRevision;
 	UObject* EquipmentInstance = CreateEquipmentInstance(GetOwner(), Item);
-	if (!IsValid(EquipmentInstance))
+	if (!IsValid(EquipmentInstance) || !bEquipmentSystemInitialized || EquipmentLifecycleRevision != Revision)
 	{
 		return;
 	}
@@ -260,6 +266,10 @@ UObject* USigilEquipmentSystemComponent::GetEquipmentByItem(const USigilItemInst
 
 void USigilEquipmentSystemComponent::SetEquipmentActiveState(FGameplayTag SlotTag, bool NewActiveState)
 {
+	if (bResettingEquipment || bRemovingAllEquipment)
+	{
+		return;
+	}
 	if (!bEquipmentSystemInitialized || !OwnerHasAuthority())
 	{
 		SIGIL_INVENTORY_CLOG(Error, "not initialized or has no authority!")
@@ -310,7 +320,7 @@ void USigilEquipmentSystemComponent::SetEquipmentActiveStateWithGroupRestriction
 	}
 
 	const FSigilEquipmentEntry& Entry = Container.Entries[Idx];
-	if (Entry.bActive)
+	if (Entry.bActive == NewActiveState)
 	{
 		return;
 	}
@@ -343,6 +353,7 @@ void USigilEquipmentSystemComponent::SetEquipmentActiveStateWithGroupRestriction
 		{
 			GroupActiveIdxMap[MatchingGroup] = INDEX_NONE;
 		}
+		GroupChangeIds.Remove(MatchingGroup);
 	}
 
 	SetEquipmentActiveState(Idx, NewActiveState);
@@ -360,15 +371,16 @@ void USigilEquipmentSystemComponent::SetEquipmentActiveState(int32 Idx, bool New
 	FSigilEquipmentEntry& Entry = Container.Entries[Idx];
 
 	Entry.bActive = NewActiveState;
-	OnEquipmentEntryChanged(Entry, Idx);
 	Container.MarkItemDirty(Entry);
+	const FSigilEquipmentEntry Snapshot = Entry;
+	OnEquipmentEntryChanged(Snapshot, Idx);
 }
 
 
 void USigilEquipmentSystemComponent::OnTargetCollectionChanged(const FSigilInventoryStackUpdateMessage& Message)
 {
 	// only handle equip/unequip on the server side.
-	if (!OwnerHasAuthority())
+	if (!OwnerHasAuthority() || !bEquipmentSystemInitialized || bResettingEquipment || !IsValid(TargetCollection))
 	{
 		return;
 	}
@@ -559,6 +571,10 @@ void USigilEquipmentSystemComponent::InitializeEquipmentSystem()
 
 void USigilEquipmentSystemComponent::InitializeEquipmentSystemWithInventory(USigilInventorySystemComponent* InventorySystem)
 {
+	if (bResettingEquipment || bRemovingAllEquipment)
+	{
+		return;
+	}
 	if (bEquipmentSystemInitialized || !OwnerHasAuthority())
 	{
 		SIGIL_INVENTORY_CLOG(Error, "already initialized or has no authority!")
@@ -604,10 +620,20 @@ void USigilEquipmentSystemComponent::InitializeEquipmentSystemWithInventory(USig
 	Inventory->OnCollectionRemovedEvent.AddDynamic(this, &ThisClass::OnTargetCollectionRemoved);
 
 	bEquipmentSystemInitialized = true;
+	const uint64 Revision = ++EquipmentLifecycleRevision;
 	OnEquipmentSystemInitialized();
 
-	for (const FSigilItemInfo& ItemInfo : TargetCollection->GetAllItemInfos())
+	if (!bEquipmentSystemInitialized || EquipmentLifecycleRevision != Revision)
 	{
+		return;
+	}
+	const TArray<FSigilItemInfo> ItemInfos = TargetCollection->GetAllItemInfos();
+	for (const FSigilItemInfo& ItemInfo : ItemInfos)
+	{
+		if (!bEquipmentSystemInitialized || EquipmentLifecycleRevision != Revision)
+		{
+			return;
+		}
 		FGameplayTag SlotTag = TargetCollection->GetItemSlotName(ItemInfo.Item);
 		EquipItemToSlot(ItemInfo.Item, SlotTag);
 	}
@@ -615,21 +641,28 @@ void USigilEquipmentSystemComponent::InitializeEquipmentSystemWithInventory(USig
 
 void USigilEquipmentSystemComponent::ResetEquipmentSystem()
 {
-	if (!bEquipmentSystemInitialized || !OwnerHasAuthority())
+	if (!OwnerHasAuthority())
 	{
-		SIGIL_INVENTORY_CLOG(Error, "not initialized or has no authority!")
+		SIGIL_INVENTORY_CLOG(Error, "has no authority!")
 		return;
 	}
+	if (bResettingEquipment || !bEquipmentSystemInitialized)
+	{
+		return;
+	}
+	TGuardValue<bool> ResetGuard(bResettingEquipment, true);
+	++EquipmentLifecycleRevision;
+	GroupChangeIds.Empty();
 	RemoveAllEquipments();
 	if (IsValid(Inventory))
 	{
 		Inventory->OnCollectionRemovedEvent.RemoveDynamic(this, &ThisClass::OnTargetCollectionRemoved);
 		Inventory->OnInventoryStackUpdate.RemoveDynamic(this, &ThisClass::OnTargetCollectionChanged);
-		Inventory = nullptr;
-		TargetCollection = nullptr;
-		TargetCollectionDefinition = nullptr;
-		GroupActiveIdxMap.Empty();
 	}
+	Inventory = nullptr;
+	TargetCollection = nullptr;
+	TargetCollectionDefinition = nullptr;
+	GroupActiveIdxMap.Empty();
 	bEquipmentSystemInitialized = false;
 	OnEquipmentSystemInitialized();
 }
@@ -686,9 +719,18 @@ void USigilEquipmentSystemComponent::RemoveAllEquipments()
 		SIGIL_INVENTORY_CLOG(Error, "not initialized or has no authority!")
 		return;
 	}
-	for (int32 i = 0; i < Container.Entries.Num(); i++)
+	TGuardValue<bool> RemoveGuard(bRemovingAllEquipment, true);
+	const TArray<FSigilEquipmentEntry> Snapshot = Container.Entries;
+	for (const FSigilEquipmentEntry& Entry : Snapshot)
 	{
-		RemoveEquipmentEntry(i);
+		const int32 Idx = Container.Entries.IndexOfByPredicate([&Entry](const FSigilEquipmentEntry& Current)
+		{
+			return Current.Instance == Entry.Instance;
+		});
+		if (Idx != INDEX_NONE)
+		{
+			RemoveEquipmentEntry(Idx);
+		}
 	}
 }
 
@@ -697,20 +739,36 @@ void USigilEquipmentSystemComponent::AddEquipmentEntry(const FSigilEquipmentEntr
 	check(NewEntry.IsValid())
 	int32 Idx = Container.Entries.AddDefaulted();
 	Container.Entries[Idx] = NewEntry;
+	Container.MarkItemDirty(Container.Entries[Idx]);
 
 	AddReplicatedEquipmentObject(NewEntry.Instance);
 	OnEquipmentEntryAdded(NewEntry, Idx);
-	Container.MarkItemDirty(Container.Entries[Idx]);
 }
 
 void USigilEquipmentSystemComponent::RemoveEquipmentEntry(int32 Idx)
 {
 	check(Container.Entries.IsValidIndex(Idx));
-	const FSigilEquipmentEntry& Entry = Container.Entries[Idx];
-	RemoveReplicatedEquipmentObject(Entry.Instance);
-	OnEquipmentEntryRemoved(Entry, Idx);
+	const FSigilEquipmentEntry Entry = Container.Entries[Idx];
+	const TStrongObjectPtr<UObject> KeepInstance(Entry.Instance);
+	const TStrongObjectPtr<USigilItemInstance> KeepSource(Entry.ItemInstance);
+	// 先移出真实容器；结束回调再次卸装/重置时不会命中正在结束的实例。
 	Container.Entries.RemoveAt(Idx);
 	Container.MarkArrayDirty();
+	if (TargetCollectionDefinition)
+	{
+		for (auto& Pair : GroupActiveIdxMap)
+		{
+			const auto* Group = TargetCollectionDefinition->SlotGroupMap.Find(Pair.Key);
+			const FGameplayTag* ActiveSlot = Group ? Group->IndexToSlotMap.Find(Pair.Value) : nullptr;
+			if (ActiveSlot && *ActiveSlot == Entry.EquippedSlot)
+			{
+				Pair.Value = INDEX_NONE;
+				GroupChangeIds.Remove(Pair.Key);
+			}
+		}
+	}
+	RemoveReplicatedEquipmentObject(Entry.Instance);
+	OnEquipmentEntryRemoved(Entry, Idx);
 }
 
 UObject* USigilEquipmentSystemComponent::CreateEquipmentInstance_Implementation(AActor* Owner, USigilItemInstance* ItemInstance) const
@@ -771,35 +829,57 @@ UObject* USigilEquipmentSystemComponent::CreateEquipmentInstance_Implementation(
 }
 
 
-void USigilEquipmentSystemComponent::OnEquipmentEntryAdded(const FSigilEquipmentEntry& Entry, int32 Idx)
+void USigilEquipmentSystemComponent::OnEquipmentEntryAdded(const FSigilEquipmentEntry& InEntry, int32 Idx)
 {
+	const FSigilEquipmentEntry Entry = InEntry;
+	const auto IsStillEquipped = [this, &Entry]()
+	{
+		return IsValid(Entry.Instance) && GetEquipmentInSlot(Entry.EquippedSlot) == Entry.Instance;
+	};
+	if (!IsStillEquipped())
+	{
+		return;
+	}
 	APawn* OwningPawn = GetPawn<APawn>();
 
 	SlotToIdxMap.Add(Entry.EquippedSlot, Entry.Instance);
 
 	ISigilEquipmentInterface::Execute_ReceiveOwningPawn(Entry.Instance, OwningPawn);
+	if (!IsStillEquipped()) { return; }
 	ISigilEquipmentInterface::Execute_ReceiveSourceItem(Entry.Instance, Entry.ItemInstance);
+	if (!IsStillEquipped()) { return; }
 	ISigilEquipmentInterface::Execute_OnEquipmentBeginPlay(Entry.Instance);
+	if (!IsStillEquipped()) { return; }
 	OnEquipmentStateChangedEvent.Broadcast(Entry.Instance, Entry.EquippedSlot, true);
+	if (!IsStillEquipped()) { return; }
 
-	if (Entry.bActive)
+	const int32 CurrentIdx = Container.IndexOfBySlot(Entry.EquippedSlot);
+	if (Entry.bActive && Container.Entries[CurrentIdx].bActive)
 	{
-		ISigilEquipmentInterface::Execute_OnActiveStateChanged(Entry.Instance, Entry.bActive);
-		OnEquipmentActiveStateChangedEvent.Broadcast(Entry.Instance, Entry.EquippedSlot, Entry.bActive);
+		OnEquipmentEntryChanged(Entry, CurrentIdx);
 	}
 }
 
 void USigilEquipmentSystemComponent::OnEquipmentEntryChanged(const FSigilEquipmentEntry& Entry, int32 Idx)
 {
-	ISigilEquipmentInterface::Execute_OnActiveStateChanged(Entry.Instance, Entry.bActive);
-	OnEquipmentActiveStateChangedEvent.Broadcast(Entry.Instance, Entry.EquippedSlot, Entry.bActive);
+	const FSigilEquipmentEntry Snapshot = Entry;
+	ISigilEquipmentInterface::Execute_OnActiveStateChanged(Snapshot.Instance, Snapshot.bActive);
+	const int32 CurrentIdx = Container.IndexOfBySlot(Snapshot.EquippedSlot);
+	if (CurrentIdx != INDEX_NONE && Container.Entries[CurrentIdx].Instance == Snapshot.Instance
+		&& Container.Entries[CurrentIdx].bActive == Snapshot.bActive)
+	{
+		OnEquipmentActiveStateChangedEvent.Broadcast(Snapshot.Instance, Snapshot.EquippedSlot, Snapshot.bActive);
+	}
 }
 
-void USigilEquipmentSystemComponent::OnEquipmentEntryRemoved(const FSigilEquipmentEntry& Entry, int32 Idx)
+void USigilEquipmentSystemComponent::OnEquipmentEntryRemoved(const FSigilEquipmentEntry& InEntry, int32 Idx)
 {
 	// remove but still active, so notify instance to do deactivate behavior.
-
-	SlotToIdxMap.Remove(Entry.EquippedSlot);
+	const FSigilEquipmentEntry Entry = InEntry;
+	if (SlotToIdxMap.FindRef(Entry.EquippedSlot) == Entry.Instance)
+	{
+		SlotToIdxMap.Remove(Entry.EquippedSlot);
+	}
 
 	if (IsValid(Entry.Instance)) // The instance may alreay in pending kill state, so no point to continues execution.
 	{
@@ -807,9 +887,9 @@ void USigilEquipmentSystemComponent::OnEquipmentEntryRemoved(const FSigilEquipme
 		{
 			ISigilEquipmentInterface::Execute_OnActiveStateChanged(Entry.Instance, false);
 		}
-		ISigilEquipmentInterface::Execute_OnEquipmentEndPlay(Entry.Instance);
-		ISigilEquipmentInterface::Execute_ReceiveOwningPawn(Entry.Instance, nullptr);
-		ISigilEquipmentInterface::Execute_ReceiveSourceItem(Entry.Instance, nullptr);
+		if (IsValid(Entry.Instance)) { ISigilEquipmentInterface::Execute_OnEquipmentEndPlay(Entry.Instance); }
+		if (IsValid(Entry.Instance)) { ISigilEquipmentInterface::Execute_ReceiveOwningPawn(Entry.Instance, nullptr); }
+		if (IsValid(Entry.Instance)) { ISigilEquipmentInterface::Execute_ReceiveSourceItem(Entry.Instance, nullptr); }
 	}
 
 	OnEquipmentStateChangedEvent.Broadcast(Entry.Instance, Entry.EquippedSlot, false);
@@ -838,6 +918,7 @@ void USigilEquipmentSystemComponent::AddReplicatedEquipmentObject(TObjectPtr<UOb
 
 void USigilEquipmentSystemComponent::RemoveReplicatedEquipmentObject(TObjectPtr<UObject> Instance)
 {
+	PendingReplicatedEquipments.Remove(Instance);
 	if (OwnerHasAuthority() && IsValid(Instance))
 	{
 		bool IsReplicationManaged = ISigilEquipmentInterface::Execute_IsReplicationManaged(Instance);
@@ -925,6 +1006,10 @@ TMap<int32, UObject*> USigilEquipmentSystemComponent::GetEquipmentsOfGroup(FGame
 
 void USigilEquipmentSystemComponent::SetGroupActiveIndex(FGameplayTag GroupTag, int32 NewIndex)
 {
+	if (bResettingEquipment || bRemovingAllEquipment)
+	{
+		return;
+	}
 	if (!bEquipmentSystemInitialized || !OwnerHasAuthority())
 	{
 		SIGIL_INVENTORY_CLOG(Error, "not initialized or has no authority!")
@@ -950,6 +1035,10 @@ void USigilEquipmentSystemComponent::ServerSetGroupActiveIndex_Implementation(FG
 
 void USigilEquipmentSystemComponent::CycleGroupActiveIndex(FGameplayTag GroupTag, bool bDirection)
 {
+	if (bResettingEquipment || bRemovingAllEquipment)
+	{
+		return;
+	}
 	if (!bEquipmentSystemInitialized || !OwnerHasAuthority())
 	{
 		SIGIL_INVENTORY_CLOG(Error, "not initialized or has no authority!")
@@ -996,15 +1085,30 @@ void USigilEquipmentSystemComponent::ServerCycleGroupActiveIndex_Implementation(
 
 void USigilEquipmentSystemComponent::OnGroupActiveIndexChanged(const FGameplayTag& GroupTag, int32 PrevIndex, int32 NewIndex)
 {
-	if (!OwnerHasAuthority())
+	if (!OwnerHasAuthority() || !bEquipmentSystemInitialized || !TargetCollectionDefinition)
 	{
 		return;
 	}
+	const auto* Group = TargetCollectionDefinition->SlotGroupMap.Find(GroupTag);
+	if (!Group)
+	{
+		return;
+	}
+	const FGameplayTag PrevSlot = Group->IndexToSlotMap.FindRef(PrevIndex);
+	const FGameplayTag NewSlot = Group->IndexToSlotMap.FindRef(NewIndex);
+	UObject* ExpectedTarget = GetEquipmentInSlot(NewSlot);
+	const uint64 ChangeId = ++NextGroupChangeId;
+	GroupChangeIds.Add(GroupTag, ChangeId);
+	const auto IsCurrentChange = [this, GroupTag, ChangeId]()
+	{
+		const uint64* CurrentId = GroupChangeIds.Find(GroupTag);
+		return bEquipmentSystemInitialized && !bResettingEquipment && !bRemovingAllEquipment
+			&& CurrentId && *CurrentId == ChangeId;
+	};
 
 	// Deactivate the equipment for prev active index.
-	if (PrevIndex != INDEX_NONE && TargetCollectionDefinition->SlotGroupMap[GroupTag].IndexToSlotMap.Contains(PrevIndex))
+	if (PrevSlot.IsValid())
 	{
-		FGameplayTag PrevSlot = TargetCollectionDefinition->SlotGroupMap[GroupTag].IndexToSlotMap[PrevIndex];
 		int32 EquipmentEntryIdx = Container.IndexOfBySlot(PrevSlot);
 		if (EquipmentEntryIdx != INDEX_NONE)
 		{
@@ -1014,14 +1118,27 @@ void USigilEquipmentSystemComponent::OnGroupActiveIndexChanged(const FGameplayTa
 			}
 		}
 	}
+	if (!IsCurrentChange())
+	{
+		return;
+	}
 
 	// Activate the equipment for new active index.
-	if (NewIndex != INDEX_NONE && TargetCollectionDefinition->SlotGroupMap[GroupTag].IndexToSlotMap.Contains(NewIndex))
+	if (NewSlot.IsValid())
 	{
-		FGameplayTag NewSlot = TargetCollectionDefinition->SlotGroupMap[GroupTag].IndexToSlotMap[NewIndex];
-
+		if (GetEquipmentInSlot(NewSlot) != ExpectedTarget)
+		{
+			// 目标由回调补入/替换：旧请求不接管它，也不留下占用的选择索引。
+			int32* ActiveIndex = GroupActiveIdxMap.Find(GroupTag);
+			if (ActiveIndex && *ActiveIndex == NewIndex)
+			{
+				*ActiveIndex = INDEX_NONE;
+			}
+			GroupChangeIds.Remove(GroupTag);
+			return;
+		}
 		int32 EquipmentEntryIdx = Container.IndexOfBySlot(NewSlot);
-		if (EquipmentEntryIdx != INDEX_NONE)
+		if (EquipmentEntryIdx != INDEX_NONE && Container.Entries[EquipmentEntryIdx].Instance == ExpectedTarget)
 		{
 			if (!Container.Entries[EquipmentEntryIdx].bActive)
 			{
@@ -1029,9 +1146,16 @@ void USigilEquipmentSystemComponent::OnGroupActiveIndexChanged(const FGameplayTa
 			}
 		}
 	}
+	if (!IsCurrentChange())
+	{
+		return;
+	}
 
 	OnEquipmentGroupActiveIndexChangedEvent.Broadcast(GroupTag, PrevIndex, NewIndex);
-	ClientNotifyGroupActiveIndexChanged(GroupTag, PrevIndex, NewIndex);
+	if (IsCurrentChange())
+	{
+		ClientNotifyGroupActiveIndexChanged(GroupTag, PrevIndex, NewIndex);
+	}
 }
 
 void USigilEquipmentSystemComponent::ClientNotifyGroupActiveIndexChanged_Implementation(const FGameplayTag& GroupTag, int32 PrevIndex, int32 NewIndex)

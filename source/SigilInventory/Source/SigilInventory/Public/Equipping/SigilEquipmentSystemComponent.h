@@ -730,4 +730,12 @@ protected:
 	TMap<FGameplayTag, TObjectPtr<UObject>> SlotToIdxMap;
 
 #pragma endregion
+
+private:
+	// 同步回调可以重入；清理期间禁止创建新装备，旧切换只认自己的代号。
+	bool bResettingEquipment = false;
+	bool bRemovingAllEquipment = false;
+	uint64 EquipmentLifecycleRevision = 0;
+	uint64 NextGroupChangeId = 0;
+	TMap<FGameplayTag, uint64> GroupChangeIds;
 };
