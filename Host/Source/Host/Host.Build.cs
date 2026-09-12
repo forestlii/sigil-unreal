@@ -9,5 +9,6 @@ public class Host : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine" });
+		PrivateDependencyModuleNames.Add("SigilUI");
 	}
 }
