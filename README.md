@@ -17,8 +17,9 @@ A suite of modular, code-only gameplay framework plugins for **Unreal Engine 5.8
 | `sigil.camera` | `SigilCamera` | Camera mode stack driving spring-arm cameras with penetration avoidance |
 | `sigil.ui` | `SigilUI` | CommonUI extensions: layered game UI, data-driven UI actions, modals, extension points, widget factories |
 | `sigil.effects` | `SigilEffects` | Context-driven SFX/VFX selected by gameplay tag queries and physical surfaces |
+| `sigil.arsenal` | `SigilArsenal` | Item-driven weapon loadouts: equipment grants ability sets, per-weapon montage tables and animation layers (bridges inventory, gas and combat) |
 
-All packages are mutually independent — the only cross-package dependency is `sigil.combat → sigil.gas`. Take only what you need.
+All base packages are mutually independent — the only cross-package dependency among them is `sigil.combat → sigil.gas`. `sigil.arsenal` is the optional integration layer on top of `sigil.gas`, `sigil.inventory` and `sigil.combat`. Take only what you need.
 
 All gameplay tags live under the `Sigil.*` namespace; C++ types use the unified `Sigil` prefix (e.g. `USigilAbilitySet`, `USigilItemDefinition`).
 

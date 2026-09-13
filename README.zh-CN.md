@@ -17,8 +17,9 @@
 | `sigil.camera` | `SigilCamera` | 相机模式栈，驱动弹簧臂相机并带穿模规避 |
 | `sigil.ui` | `SigilUI` | CommonUI 扩展：分层游戏 UI、数据驱动 UI 动作、弹窗、扩展点、控件工厂 |
 | `sigil.effects` | `SigilEffects` | Context 驱动的音效/特效，按 Tag 查询与物理表面选择 |
+| `sigil.arsenal` | `SigilArsenal` | 物品驱动的武器装载：装备即授予技能集、每把武器自己的蒙太奇表与动画层（桥接 inventory、gas、combat） |
 
-所有包互相独立——唯一的包间依赖是 `sigil.combat → sigil.gas`。按需取用。
+基础包互相独立——它们之间唯一的依赖是 `sigil.combat → sigil.gas`。`sigil.arsenal` 是叠在 `sigil.gas`、`sigil.inventory`、`sigil.combat` 之上的可选集成层。按需取用。
 
 所有 GameplayTag 收拢在 `Sigil.*` 命名空间下；C++ 类型统一 `Sigil` 前缀（如 `USigilAbilitySet`、`USigilItemDefinition`）。
 

@@ -222,8 +222,10 @@ protected:
 	bool bWeaponActive;
 
 	/**
-	 * Tag name for looking up the mesh component.
-	 * 查找网格组件的标签名称。
+	 * Component tag used to find the weapon mesh. Looked up on the owning pawn first (legacy: the blade as a pawn component),
+	 * then on this actor by tag, then this actor's first primitive component (equipment-spawned weapons that own their mesh).
+	 * 查找武器网格的组件标签。先在拥有者 Pawn 上找（旧布局：刀刃作为 Pawn 组件），再在本 Actor 上按标签找，
+	 * 最后取本 Actor 的第一个 Primitive 组件（装备生成、自带网格的武器）。
 	 */
 	UPROPERTY(EditDefaultsOnly, Category="WeaponSetting")
 	FName WeaponMeshTagName{TEXT("WeaponMesh")};

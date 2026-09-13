@@ -45,7 +45,7 @@ This page walks you through installing the Sigil plugin suite into an Unreal Eng
 
 Open the editor and confirm the plugins are listed under **Edit > Plugins > Sigil**. Each package then has its own setup steps — settings classes to configure, tag trees to define, and assets to create. Follow the *Prerequisites* and *Quick Start* sections of each package guide:
 
-- [sigil.input](sigil-input.md) · [sigil.gas](sigil-gas.md) · [sigil.combat](sigil-combat.md) · [sigil.movement](sigil-movement.md) · [sigil.inventory](sigil-inventory.md) · [sigil.interaction](sigil-interaction.md) · [sigil.camera](sigil-camera.md) · [sigil.ui](sigil-ui.md) · [sigil.effects](sigil-effects.md)
+- [sigil.input](sigil-input.md) · [sigil.gas](sigil-gas.md) · [sigil.combat](sigil-combat.md) · [sigil.movement](sigil-movement.md) · [sigil.inventory](sigil-inventory.md) · [sigil.interaction](sigil-interaction.md) · [sigil.camera](sigil-camera.md) · [sigil.ui](sigil-ui.md) · [sigil.effects](sigil-effects.md) · [sigil.arsenal](sigil-arsenal.md)
 
 ## The Host Project
 
@@ -58,6 +58,7 @@ The repository ships with `Host/`, a minimal C++ project that links all nine plu
 ## Package Dependency Graph
 
 ```
-sigil.combat ──> sigil.gas
+sigil.combat  ──> sigil.gas
+sigil.arsenal ──> sigil.gas, sigil.inventory, sigil.combat   (optional integration layer)
 (all other packages are fully independent)
 ```

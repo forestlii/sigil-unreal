@@ -2,7 +2,7 @@
 
 # Sigil Documentation
 
-Sigil is a suite of modular, code-only gameplay framework plugins for **Unreal Engine 5.8**. Each package solves one domain and can be adopted independently — the only cross-package dependency is `sigil.combat → sigil.gas`.
+Sigil is a suite of modular, code-only gameplay framework plugins for **Unreal Engine 5.8**. Each package solves one domain and can be adopted independently — the only cross-package dependency among the base packages is `sigil.combat → sigil.gas`; `sigil.arsenal` is an optional integration layer on top of `sigil.gas`, `sigil.inventory` and `sigil.combat`.
 
 ## Getting Started
 
@@ -22,6 +22,7 @@ Sigil is a suite of modular, code-only gameplay framework plugins for **Unreal E
 | sigil.camera | [sigil-camera.md](sigil-camera.md) | Camera mode stack driving spring-arm cameras |
 | sigil.ui | [sigil-ui.md](sigil-ui.md) | CommonUI extensions: UI layers, data-driven actions, modals, extension points |
 | sigil.effects | [sigil-effects.md](sigil-effects.md) | Context-driven SFX/VFX selected by tag queries and physical surfaces |
+| sigil.arsenal | [sigil-arsenal.md](sigil-arsenal.md) | Item-driven weapon loadouts: ability sets, per-weapon montage tables, animation layers (depends on gas, inventory, combat) |
 
 ## Conventions
 
@@ -34,6 +35,6 @@ Sigil is a suite of modular, code-only gameplay framework plugins for **Unreal E
 ```
 source/
   SigilInput/  SigilGas/  SigilCombat/  SigilMovement/  SigilInventory/
-  SigilInteraction/  SigilCamera/  SigilUI/  SigilEffects/
+  SigilInteraction/  SigilCamera/  SigilUI/  SigilEffects/  SigilArsenal/
 Host/            # minimal host project used to compile & smoke-test the suite
 ```

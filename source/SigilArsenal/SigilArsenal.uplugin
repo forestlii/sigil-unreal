@@ -1,0 +1,39 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "sigil.arsenal",
+	"Description": "Item-driven weapon loadouts: bridges sigil.inventory equipment to sigil.gas ability sets and sigil.combat ability action sets (per-weapon montages, anim layers).",
+	"Category": "Sigil",
+	"CreatedBy": "Likeon",
+	"CreatedByURL": "https://github.com/forestlii",
+	"DocsURL": "https://github.com/forestlii/sigil-unreal",
+	"SupportURL": "https://github.com/forestlii/sigil-unreal/issues",
+	"EngineVersion": "5.8.0",
+	"CanContainContent": false,
+	"Modules": [
+		{
+			"Name": "SigilArsenal",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "SigilGas",
+			"Enabled": true
+		},
+		{
+			"Name": "SigilInventory",
+			"Enabled": true
+		},
+		{
+			"Name": "SigilCombat",
+			"Enabled": true
+		},
+		{
+			"Name": "GameplayAbilities",
+			"Enabled": true
+		}
+	]
+}
