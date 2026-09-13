@@ -1,4 +1,4 @@
-[English](sigil-arsenal.md) | [简体中文](sigil-arsenal.zh-CN.md)
+﻿[English](sigil-arsenal.md) | [简体中文](sigil-arsenal.zh-CN.md)
 
 # sigil.arsenal
 
@@ -36,8 +36,30 @@ weapon actor (ISigilWeaponInterface)   SourceObject = the equipment instance
 5. On the character, implement `ISigilCombatInterface::QueryAbilityActions` by calling `USigilArsenalFunctionLibrary::QueryActiveWeaponAbilityActions`.
 6. Initialize the ability system **before** the equipment system (the loadout is granted in `OnEquipmentBeginPlay`; without an initialized ASC it logs a warning and grants nothing).
 
+## Magazine cost
+
+Add `USigilAbilityCost_ItemIntegerAttribute` to the single-shot ability's `AdditionalCosts`, and call `CommitAbility` before producing the shot. `Tag` defaults to `Sigil.Arsenal.Ammo.Magazine`, `Quantity` is a positive integer (default 1), and `FailureTag` defaults to `Sigil.Arsenal.Ability.Fail.Ammo`. Projects may replace either tag.
+
+Initialize the magazine with `USigilItemFragment_DynamicAttributes::InitialIntegerAttributes`. Put the capacity on the item definition's `StaticIntegerAttributes` under `Sigil.Arsenal.Ammo.MagazineCapacity`. The cost does not clamp reloads or enforce capacity; reload logic belongs to the consumer.
+
+The cost resolves the weapon equipment from the checked ability spec's `SourceObject`, then its source item. Missing equipment, item, attribute, invalid tag, non-positive quantity, or insufficient ammunition rejects the cost and adds `FailureTag` when configured. Only the equipment's authoritative owning pawn may deduct ammunition; application rechecks availability so direct or repeated application cannot make the count negative. Client checks are read-only and do not predict subtraction.
+
+Reserve ammunition, reload abilities, item AttributeSets and tag-to-attribute mappings are outside this batch. Network reconciliation and live gameplay remain unverified.
+
+## Fire cadence
+
+Subclass `USigilGameplayAbility_FireCadence` and grant it in the same weapon ability set as a self-ending single-shot `USigilGameplayAbility`. Bind input to the cadence ability only. Set `SingleShotAbilityClass`, `FireMode` (`SemiAuto`, `FullAuto`, `Burst`), `RoundsPerMinute` (default 600), and `BurstCount` (default 3). Cadence defaults to `InstancedPerActor` and `LocalOnly`; the shot owns `CommitAbility`, ammunition cost, effects, and its own `EndAbility`. Do not put per-shot costs or a fire-rate cooldown GE on the cadence ability.
+
+The first shot is immediate. Full auto uses a repeating timer at `60 / RoundsPerMinute`; after elapsed time N the periodic shots are `floor(N * RPM / 60)`, in addition to the first shot (subject to timer tick boundaries). Burst stops after `BurstCount` accepted shots; semi-auto accepts at most one shot per activation. Mode, burst size and timer interval are captured when activated. Configure input press edges in the consumer; the class does not implement Enhanced Input bindings or debounce repeated activations.
+
+The default `TryFireOnce` resolves the shot by class **and the same non-null weapon SourceObject**, then calls `BatchRPCTryActivateAbility(handle, false)`. Override the Blueprint Native Event for a different firing path; return false when the shot cannot be fired. A successful activation request is not a hit or server commit confirmation.
+
+Input release, a failed shot attempt (including an empty magazine), weapon deactivation, or cancellation stops the cadence and clears its timer. The existing equipment event stops it immediately on deactivation. The timer handles long frames using UE timer catch-up; a callback that ends and restarts the ability cannot advance the new activation's burst count. Empty magazines are detected on the next shot attempt.
+
+The local-only cadence does not implement authoritative rate limiting, ammo prediction/reconciliation, remote input, or network validation. Those integration concerns remain unverified.
+
 ## Known gaps
 
-- Ammo and fire cadence are not part of this package yet; item state (`USigilItemFragment_DynamicAttributes`) is the intended home for magazine counts.
+- Magazine cost and fire cadence are provided; reserve ammunition and reload logic belong to the consumer.
 - The animation layer is linked to a single main mesh; first-person secondary meshes are not covered.
 - `USigilEquipmentSystemComponent::SetEquipmentActiveState(slot, false)` on an active entry is a no-op in sigil.inventory; switch through the group index API.
