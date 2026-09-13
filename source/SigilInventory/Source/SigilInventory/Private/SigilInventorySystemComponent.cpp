@@ -272,7 +272,7 @@ void USigilInventorySystemComponent::ServerRemoveItem_Implementation(FSigilItemI
 
 FSigilItemInfo USigilInventorySystemComponent::RemoveItemByDefinition(const TSoftObjectPtr<USigilItemDefinition> ItemDefinition, const int32 Amount)
 {
-	if (ItemDefinition.IsNull() || Amount == 0)
+	if (ItemDefinition.IsNull() || Amount <= 0)
 	{
 		return FSigilItemInfo::None;
 	}
@@ -283,23 +283,25 @@ FSigilItemInfo USigilInventorySystemComponent::RemoveItemByDefinition(const TSof
 	int32 AmountToRemove = Amount;
 	FSigilItemInfo LastItemInfoRemoved = FSigilItemInfo::None;
 
-	for (int32 i = 0; i < Amount; i++)
+	while (AmountToRemove > 0)
 	{
 		FSigilItemInfo ItemInfo;
-		if (!GetItemInfoByDefinition(ItemDefinition, ItemInfo))
+		if (!GetItemInfoByDefinition(ItemDefinition, ItemInfo) || ItemInfo.Amount <= 0)
 		{
 			break;
 		}
 
-		LastItemInfoRemoved = RemoveItem(ItemInfo);
+		// 查询返回整叠；仅请求剩余数量，并按实际删除量推进。
+		ItemInfo.Amount = FMath::Min(AmountToRemove, ItemInfo.Amount);
+		const FSigilItemInfo Removed = RemoveItem(ItemInfo);
+		if (Removed.Amount <= 0)
+		{
+			break;
+		}
 
-		AmountRemoved += LastItemInfoRemoved.Amount;
+		LastItemInfoRemoved = Removed;
+		AmountRemoved += Removed.Amount;
 		AmountToRemove = Amount - AmountRemoved;
-
-		if (AmountToRemove == 0)
-		{
-			break;
-		}
 	}
 
 	return FSigilItemInfo(AmountRemoved, LastItemInfoRemoved);
