@@ -58,6 +58,11 @@ bool ASigilWeaponActor::IsWeaponActive_Implementation() const
 	return bWeaponActive;
 }
 
+bool ASigilWeaponActor::IsAbilitySourceActive_Implementation() const
+{
+	return ISigilWeaponInterface::Execute_IsWeaponActive(this);
+}
+
 UPrimitiveComponent* ASigilWeaponActor::GetPrimitiveComponent_Implementation()
 {
 	if (CachedPrimitiveComponent)

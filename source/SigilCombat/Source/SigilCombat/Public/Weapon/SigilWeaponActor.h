@@ -6,6 +6,7 @@
 #include "GameplayTagAssetInterface.h"
 #include "SigilCombatStructLibrary.h"
 #include "SigilWeaponInterface.h"
+#include "Abilities/SigilAbilitySourceInterface.h"
 #include "GameFramework/Actor.h"
 #include "SigilWeaponActor.generated.h"
 
@@ -22,7 +23,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSigilWeaponActiveStateChangedSignat
  * @注意 扩展此类以实现自定义武器逻辑。
  */
 UCLASS(BlueprintType, Blueprintable, Abstract, ClassGroup=(GCS))
-class SIGILCOMBAT_API ASigilWeaponActor : public AActor, public ISigilWeaponInterface, public IGameplayTagAssetInterface
+class SIGILCOMBAT_API ASigilWeaponActor : public AActor, public ISigilWeaponInterface, public IGameplayTagAssetInterface, public ISigilAbilitySourceInterface
 {
 	GENERATED_BODY()
 
@@ -32,6 +33,15 @@ public:
 	 * 默认构造函数。
 	 */
 	ASigilWeaponActor(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+	/**
+	 * Bridges ISigilAbilitySourceInterface to IsWeaponActive so abilities granted with this weapon as SourceObject
+	 * can use USigilGameplayAbility::bRequireSourceObjectActive.
+	 * 把 ISigilAbilitySourceInterface 桥接到 IsWeaponActive，使以本武器为 SourceObject 授予的技能可用
+	 * USigilGameplayAbility::bRequireSourceObjectActive 做门禁。
+	 * @return True if the weapon is active. 武器激活则返回 true。
+	 */
+	virtual bool IsAbilitySourceActive_Implementation() const override;
 
 	/**
 	 * Gets the pawn owning this weapon.

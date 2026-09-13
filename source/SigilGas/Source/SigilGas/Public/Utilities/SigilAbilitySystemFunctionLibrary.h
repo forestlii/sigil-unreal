@@ -235,6 +235,19 @@ public:
 	static bool FindAbilityWithTags(const UAbilitySystemComponent* AbilitySystem, FGameplayAbilitySpecHandle& OutAbilityHandle, FGameplayTagContainer Tags, bool bExactMatch = true);
 
 	/**
+	 * Finds the handle of the first granted ability of the exact class, optionally filtered by the spec's SourceObject
+	 * (for example the weapon or equipment instance that granted it). Returns an invalid handle if none matches.
+	 * Adapted from GASShooter UGSAbilitySystemComponent::FindAbilitySpecHandleForClass (Copyright 2020 Dan Kestranek, MIT).
+	 * 查找第一个类完全相同的已授予技能句柄，可按规格的 SourceObject（例如授予它的武器 / 装备实例）过滤；无匹配时返回无效句柄。
+	 * @param AbilitySystem The ability system component. 技能系统组件。
+	 * @param AbilityClass The exact ability class to match. 要精确匹配的技能类。
+	 * @param OptionalSourceObject If set, the spec's SourceObject must equal this object. 若设置，规格的 SourceObject 必须等于该对象。
+	 * @return The matching handle, or an invalid handle. 匹配的句柄，或无效句柄。
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "GGA|AbilitySystem")
+	static FGameplayAbilitySpecHandle FindAbilitySpecHandleForClass(const UAbilitySystemComponent* AbilitySystem, TSubclassOf<UGameplayAbility> AbilityClass, const UObject* OptionalSourceObject = nullptr);
+
+	/**
 	 * Adds a non-replicated gameplay tag to an ability system component.
 	 * 向技能系统组件添加非复制的游戏标签。
 	 * @param AbilitySystem The ability system component. 技能系统组件。

@@ -1,6 +1,7 @@
 ﻿// Copyright (c) 2026 Likeon. All Rights Reserved.
 
 #include "SigilMovementSystemComponent.h"
+#include "SigilCharacterMovementSystemComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "GameplayTagAssetInterface.h"
@@ -503,6 +504,16 @@ void USigilMovementSystemComponent::RefreshMovementSetSetting()
 		{
 			MovementDefinitions[i].LoadSynchronous();
 		}
+		if (!MovementDefinitions[i].IsValid())
+		{
+			UE_LOG(
+				LogSigilMovement,
+				Warning,
+				TEXT("Unable to load movement definition '%s' on actor '%s'."),
+				*MovementDefinitions[i].ToSoftObjectPath().ToString(),
+				*GetOwner()->GetName());
+			continue;
+		}
 		if (MovementDefinitions[i]->MovementSets.Contains(MovementSet))
 		{
 			MovementDefinition = MovementDefinitions[i].Get();
@@ -604,6 +615,8 @@ void USigilMovementSystemComponent::SetDesiredMovement(const FGameplayTag& NewDe
 	DesiredMovementState = NewDesiredMovement;
 
 	MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, DesiredMovementState, this)
+
+	ApplyMovementSetting();
 
 	if (bSendRpc)
 	{
@@ -964,7 +977,12 @@ void USigilMovementSystemComponent::SetEnableRotate(bool bEnable)
 #if WITH_EDITORONLY_DATA
 EDataValidationResult USigilMovementSystemComponent::IsDataValid(class FDataValidationContext& Context) const
 {
-	if (!IsValid(AnimGraphSetting))
+	const USigilCharacterMovementSystemComponent* CharacterMovementSystem =
+		Cast<USigilCharacterMovementSystemComponent>(this);
+	const bool bAllowsMissingAnimGraph = CharacterMovementSystem
+		&& CharacterMovementSystem->GetRuntimeInitializationMode()
+			== ESigilMovementRuntimeInitializationMode::DeferredUntilConfigured;
+	if (!IsValid(AnimGraphSetting) && !bAllowsMissingAnimGraph)
 	{
 		Context.AddError(FText::FromString("AnimGraphSetting is required!"));
 		return EDataValidationResult::Invalid;

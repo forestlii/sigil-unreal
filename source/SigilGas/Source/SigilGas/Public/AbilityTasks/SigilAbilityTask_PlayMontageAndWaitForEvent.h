@@ -7,6 +7,9 @@
 #include "Abilities/Tasks/AbilityTask.h"
 #include "SigilAbilityTask_PlayMontageAndWaitForEvent.generated.h"
 
+class USigilAbilitySystemComponent;
+class USkeletalMeshComponent;
+
 USTRUCT(BlueprintType)
 struct FSigilPlayMontageAndWaitForEventTaskParams
 {
@@ -18,6 +21,15 @@ struct FSigilPlayMontageAndWaitForEventTaskParams
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GGA")
 	FName TaskInstanceName;
+
+	/**
+	 * Optional mesh to play the montage on. Null (default) plays on the avatar's main mesh through the engine path.
+	 * Any other mesh is played locally through USigilAbilitySystemComponent::PlayMontageForMesh (not replicated).
+	 * 可选：播放蒙太奇的网格。null（默认）走引擎路径在化身主网格上播放；其他网格通过
+	 * USigilAbilitySystemComponent::PlayMontageForMesh 本地播放（不复制）。
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="GGA")
+	TObjectPtr<USkeletalMeshComponent> Mesh = nullptr;
 
 	/**
 	 * The montage to play on the character
@@ -160,6 +172,31 @@ public:
 	static USigilAbilityTask_PlayMontageAndWaitForEvent* PlayMontageAndWaitForEventExt(UGameplayAbility* OwningAbility, FSigilPlayMontageAndWaitForEventTaskParams Params);
 
 	/**
+	 * Same as PlayMontageAndWaitForEvent but on a specific skeletal mesh of the avatar (first person body, arms, weapon).
+	 * The avatar's main mesh uses the engine's replicated montage path; other meshes play locally only and require a
+	 * USigilAbilitySystemComponent. AnimRootMotionTranslationScale is only applied for the main mesh.
+	 * API shape from GASShooter UGSAT_PlayMontageForMeshAndWaitForEvent (Copyright 2020 Dan Kestranek, MIT).
+	 * 与 PlayMontageAndWaitForEvent 相同，但在化身指定的骨骼网格上播放（第一人称身体、手臂、武器）。主网格走引擎复制路径；
+	 * 其他网格仅本地播放且需要 USigilAbilitySystemComponent。AnimRootMotionTranslationScale 只对主网格生效。
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|Tasks", meta = (HidePin = "OwningAbility", DefaultToSelf = "OwningAbility", BlueprintInternalUseOnly = "TRUE"))
+	static USigilAbilityTask_PlayMontageAndWaitForEvent* PlayMontageForMeshAndWaitForEvent(
+		UGameplayAbility* OwningAbility,
+		FName TaskInstanceName,
+		USkeletalMeshComponent* Mesh,
+		UAnimMontage* MontageToPlay,
+		FGameplayTagContainer EventTags,
+		float Rate = 1.f,
+		FName StartSection = NAME_None,
+		bool bStopWhenAbilityEnds = true,
+		float AnimRootMotionTranslationScale = 1.f,
+		float StartTimeSeconds = 0.f,
+		bool bAllowInterruptAfterBlendOut = false);
+
+	/** Mesh the montage plays on, or null for the avatar's main mesh. 播放蒙太奇的网格，null 表示化身主网格。 */
+	USkeletalMeshComponent* GetTargetMesh() const { return Mesh; }
+
+	/**
 	* The Blueprint node for this task, PlayMontageAndWaitForEvent, has some black magic from the plugin that automagically calls Activate()
 	* inside of K2Node_LatentAbilityCall as stated in the AbilityTask.h. Ability logic written in C++ probably needs to call Activate() itself manually.
 	*/
@@ -178,6 +215,33 @@ protected:
 
 	/** Checks if the ability is playing a montage and stops that montage, returns true if a montage was stopped, false if not. */
 	bool StopPlayingMontage();
+
+	/** Anim instance of the target mesh, or of the avatar's main mesh when no mesh is set. */
+	UAnimInstance* GetTargetAnimInstance() const;
+
+	/** Montage the ability currently plays on the target mesh (engine CurrentMontage when no mesh is set). */
+	UAnimMontage* GetAbilityCurrentMontage() const;
+
+	/** True when the montage targets a mesh other than the avatar's main mesh. */
+	bool UsesSecondaryMesh() const;
+
+	/** Sigil ability system component, required for secondary meshes. */
+	USigilAbilitySystemComponent* GetSigilAbilitySystemComponent() const;
+
+	/** Mesh to play on; null means the avatar's main mesh through the engine path. */
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> Mesh;
+
+	/**
+	 * Secondary mesh skipped because this machine does not render it (not locally controlled): the montage is not played
+	 * but the task still completes after the montage's scaled play length so ability timing is unchanged.
+	 * 次要网格因本机不渲染（非本地控制）被跳过：不播放蒙太奇，但任务仍在蒙太奇缩放后的时长过后完成，技能时序不变。
+	 */
+	void StartSkippedSecondaryMeshTimer();
+	void OnSkippedSecondaryMeshFinished();
+
+	FTimerHandle SkippedSecondaryMeshTimerHandle;
+	bool bSecondaryMeshSkipped = false;
 
 	FOnMontageBlendingOutStarted BlendingOutDelegate;
 	FOnMontageEnded MontageEndedDelegate;

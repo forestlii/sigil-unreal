@@ -37,8 +37,46 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "GGA|TargetActor")
 	float TargetingSpreadMax;
 
-	// 连续瞄准的当前扩散
+	// 连续瞄准的当前扩散（未计入衰减；读取请用 GetCurrentTargetingSpread）
 	float CurrentTargetingSpread;
+
+	/**
+	 * Degrees per second that CurrentTargetingSpread recovers after the last shot. 0 (default) keeps the original
+	 * "only accumulate until ResetSpread" behaviour. Decay is evaluated lazily from world time, so it works with instant
+	 * confirmation where Tick never runs.
+	 * 上一次射击后 CurrentTargetingSpread 每秒回落的角度。0（默认）保持原来"只累加、直到 ResetSpread"的行为。
+	 * 衰减按世界时间惰性结算，因此即时确认（Tick 从不运行）下也有效。
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ExposeOnSpawn = true, ClampMin = 0), Category = "GGA|TargetActor")
+	float TargetingSpreadDecayRate;
+
+	/**
+	 * Seconds after the last shot before decay starts.
+	 * 上一次射击后多少秒才开始衰减。
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ExposeOnSpawn = true, ClampMin = 0), Category = "GGA|TargetActor")
+	float TargetingSpreadDecayDelay;
+
+	/**
+	 * Adds TargetingSpreadIncrement (clamped to TargetingSpreadMax) after settling any pending decay. Called once per trace.
+	 * 先结算待处理的衰减，再累加 TargetingSpreadIncrement（上限 TargetingSpreadMax）。每次检测调用一次。
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|TargetActor")
+	virtual void AddTargetingSpread();
+
+	/**
+	 * Applies the decay accumulated since the last update to CurrentTargetingSpread.
+	 * 把自上次更新以来累积的衰减结算到 CurrentTargetingSpread。
+	 */
+	UFUNCTION(BlueprintCallable, Category = "GGA|TargetActor")
+	virtual void UpdateTargetingSpreadDecay();
+
+	/**
+	 * Continuous-targeting spread including decay that has not been settled yet.
+	 * 计入尚未结算衰减后的连续瞄准扩散。
+	 */
+	UFUNCTION(BlueprintPure, Category = "GGA|TargetActor")
+	virtual float GetCurrentTargetingSpread() const;
 
 	/** 是否使用瞄准扩散，开启后，检测方向会产生随机扩散（轻微改变检测方向） */
 	UPROPERTY(BlueprintReadWrite, Category = "GGA|TargetActor")
@@ -80,6 +118,16 @@ public:
 	/**是否从玩家控制器的视角开始检测,否则从StartLocation开始检测*/
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ExposeOnSpawn = true), Category = "GGA|TargetActor")
 	bool bTraceFromPlayerViewPoint;
+
+	/**
+	 * When a player controller exists, aim along its view even though the trace itself starts at StartLocation
+	 * ("aim from the camera, shoot from the muzzle"). This is GASShooter's unconditional behaviour; Sigil defaults to
+	 * false and aims along StartLocation's rotation unless bTraceFromPlayerViewPoint is set.
+	 * 存在玩家控制器时，即使检测从 StartLocation 出发也沿其视线瞄准（"相机瞄准、枪口出射"）。这是 GASShooter 的
+	 * 无条件行为；Sigil 默认 false，除非设置 bTraceFromPlayerViewPoint，否则沿 StartLocation 的旋转瞄准。
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ExposeOnSpawn = true), Category = "GGA|TargetActor")
+	bool bAlwaysAimWithPlayerController;
 
 	// HitResults will persist until Confirmation/Cancellation or until a new HitResult takes its place
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ExposeOnSpawn = true), Category = "GGA|TargetActor")
@@ -123,12 +171,31 @@ public:
 	virtual void AimWithPlayerController(const AActor* InSourceActor, FCollisionQueryParams Params,
 	                                     const FVector& TraceStart, FVector& OutTraceEnd, bool bIgnorePitch = false);
 
+	/**
+	 * Resolves the view point the aim ray is cast from: the player controller's view when bTraceFromPlayerViewPoint or
+	 * bAlwaysAimWithPlayerController is set and a controller exists, otherwise TraceStart with StartLocation's rotation.
+	 * 解析瞄准射线的出发视点：设置了 bTraceFromPlayerViewPoint 或 bAlwaysAimWithPlayerController 且存在玩家控制器时
+	 * 用其视线，否则用 TraceStart 与 StartLocation 的旋转。
+	 */
+	virtual void GetAimViewPoint(const FVector& TraceStart, FVector& OutViewStart, FRotator& OutViewRot) const;
+
 	virtual bool ClipCameraRayToAbilityRange(FVector CameraLocation, FVector CameraDirection, FVector AbilityCenter,
 	                                         float AbilityRange, FVector& ClippedPosition);
 
 	virtual void StopTargeting();
 
 protected:
+	/** World time of the last AddTargetingSpread. 上一次 AddTargetingSpread 的世界时间。 */
+	double LastTargetingSpreadIncreaseTime;
+
+	/** World time up to which decay has been settled into CurrentTargetingSpread. 衰减已结算到 CurrentTargetingSpread 的世界时间。 */
+	double LastTargetingSpreadDecayTime;
+
+	/** Decayed spread at WorldTime without mutating state. 不改状态地计算 WorldTime 时刻的衰减后扩散。 */
+	float ComputeDecayedTargetingSpread(double WorldTime) const;
+
+	double GetSpreadWorldTime() const;
+
 	// 检测终点, useful for debug drawing
 	FVector CurrentTraceEnd;
 

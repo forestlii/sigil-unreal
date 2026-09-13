@@ -9,6 +9,22 @@ class USigilCharacterMovementSetting_Default;
 class USigilCharacterRotationSetting_Default;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSimpleSignature);
 
+UENUM(BlueprintType)
+enum class ESigilMovementRuntimeInitializationMode : uint8
+{
+	Strict,
+	DeferredUntilConfigured
+};
+
+UENUM(BlueprintType)
+enum class ESigilMovementRotationAuthority : uint8
+{
+	SigilMovement,
+	Controller,
+	MovementDirection,
+	External
+};
+
 
 /**
  *  SigilMovementComponent
@@ -22,6 +38,24 @@ public:
 	explicit USigilCharacterMovementSystemComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem|Initialization")
+	void SetRuntimeInitializationMode(ESigilMovementRuntimeInitializationMode NewMode);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem|Initialization")
+	ESigilMovementRuntimeInitializationMode GetRuntimeInitializationMode() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem|Initialization")
+	bool IsConfiguredRuntimeActive() const;
+
+	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem|Initialization")
+	bool TryActivateConfiguredRuntime();
+
+	UFUNCTION(BlueprintCallable, Category="GMS|MovementSystem|Rotation")
+	bool SetRotationAuthority(ESigilMovementRotationAuthority NewAuthority);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|MovementSystem|Rotation")
+	ESigilMovementRotationAuthority GetRotationAuthority() const;
 
 	UCharacterMovementComponent* GetCharacterMovement() const { return CharacterMovement; };
 	
@@ -71,6 +105,7 @@ protected:
 	 * This is where GMS primarily change CMC.
 	 */
 	virtual void ApplyMovementSetting() override;
+	virtual void OnMovementSetChanged_Implementation(const FGameplayTag& PreviousMovementSet) override;
 
 	virtual void RefreshInput(float DeltaTime) override;
 
@@ -158,4 +193,24 @@ public:
 	virtual FSigilPredictGroundMovementPivotLocationParams GetPredictGroundMovementPivotLocationParams() const override;
 	virtual FSigilPredictGroundMovementStopLocationParams GetPredictGroundMovementStopLocationParams() const override;
 #pragma endregion
+
+private:
+	static bool IsSupportedRotationAuthority(
+		ESigilMovementRotationAuthority Authority);
+	bool ApplyRotationAuthority(ESigilMovementRotationAuthority Authority);
+	void StartConfiguredRuntime();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings|Initialization", meta=(AllowPrivateAccess="true"))
+	ESigilMovementRuntimeInitializationMode RuntimeInitializationMode{
+		ESigilMovementRuntimeInitializationMode::Strict};
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings|Rotation", meta=(AllowPrivateAccess="true"))
+	ESigilMovementRotationAuthority RotationAuthority{
+		ESigilMovementRotationAuthority::SigilMovement};
+
+	UPROPERTY(Transient)
+	bool bConfiguredRuntimeActive{false};
+
+	UPROPERTY(Transient)
+	bool bRotationAuthorityLocked{false};
 };

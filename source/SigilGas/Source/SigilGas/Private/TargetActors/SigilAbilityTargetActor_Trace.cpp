@@ -20,6 +20,7 @@ ASigilAbilityTargetActor_Trace::ASigilAbilityTargetActor_Trace()
 	bIgnoreBlockingHits = false;
 	bTraceAffectsAimPitch = true;
 	bTraceFromPlayerViewPoint = false;
+	bAlwaysAimWithPlayerController = false;
 	MaxRange = 999999.0f;
 	bUseAimingSpreadMod = false;
 	BaseSpread = 0.0f;
@@ -27,6 +28,10 @@ ASigilAbilityTargetActor_Trace::ASigilAbilityTargetActor_Trace()
 	TargetingSpreadIncrement = 0.0f;
 	TargetingSpreadMax = 0.0f;
 	CurrentTargetingSpread = 0.0f;
+	TargetingSpreadDecayRate = 0.0f;
+	TargetingSpreadDecayDelay = 0.0f;
+	LastTargetingSpreadIncreaseTime = 0.0;
+	LastTargetingSpreadDecayTime = 0.0;
 	bUsePersistentHitResults = false;
 }
 
@@ -38,11 +43,61 @@ void ASigilAbilityTargetActor_Trace::ResetSpread()
 	TargetingSpreadIncrement = 0.0f;
 	TargetingSpreadMax = 0.0f;
 	CurrentTargetingSpread = 0.0f;
+	TargetingSpreadDecayRate = 0.0f;
+	TargetingSpreadDecayDelay = 0.0f;
+	LastTargetingSpreadIncreaseTime = 0.0;
+	LastTargetingSpreadDecayTime = 0.0;
+}
+
+double ASigilAbilityTargetActor_Trace::GetSpreadWorldTime() const
+{
+	const UWorld* World = GetWorld();
+	return World ? World->GetTimeSeconds() : 0.0;
+}
+
+float ASigilAbilityTargetActor_Trace::ComputeDecayedTargetingSpread(double WorldTime) const
+{
+	if (TargetingSpreadDecayRate <= 0.0f || CurrentTargetingSpread <= 0.0f)
+	{
+		return CurrentTargetingSpread;
+	}
+
+	// Decay starts after the delay following the last shot, and only for time not settled yet.
+	const double DecayStart = FMath::Max(LastTargetingSpreadDecayTime, LastTargetingSpreadIncreaseTime + TargetingSpreadDecayDelay);
+	const double DecaySeconds = WorldTime - DecayStart;
+	if (DecaySeconds <= 0.0)
+	{
+		return CurrentTargetingSpread;
+	}
+
+	return FMath::Max(0.0f, CurrentTargetingSpread - TargetingSpreadDecayRate * static_cast<float>(DecaySeconds));
+}
+
+void ASigilAbilityTargetActor_Trace::UpdateTargetingSpreadDecay()
+{
+	const double Now = GetSpreadWorldTime();
+	CurrentTargetingSpread = ComputeDecayedTargetingSpread(Now);
+	LastTargetingSpreadDecayTime = FMath::Max(LastTargetingSpreadDecayTime, Now);
+}
+
+void ASigilAbilityTargetActor_Trace::AddTargetingSpread()
+{
+	UpdateTargetingSpreadDecay();
+	CurrentTargetingSpread = FMath::Min(TargetingSpreadMax, CurrentTargetingSpread + TargetingSpreadIncrement);
+
+	const double Now = GetSpreadWorldTime();
+	LastTargetingSpreadIncreaseTime = Now;
+	LastTargetingSpreadDecayTime = Now;
+}
+
+float ASigilAbilityTargetActor_Trace::GetCurrentTargetingSpread() const
+{
+	return ComputeDecayedTargetingSpread(GetSpreadWorldTime());
 }
 
 float ASigilAbilityTargetActor_Trace::GetCurrentSpread() const
 {
-	float FinalSpread = BaseSpread + CurrentTargetingSpread;
+	float FinalSpread = BaseSpread + GetCurrentTargetingSpread();
 
 	if (bUseAimingSpreadMod && AimingTag.IsValid() && AimingRemovalTag.IsValid())
 	{
@@ -167,6 +222,8 @@ void ASigilAbilityTargetActor_Trace::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	UpdateTargetingSpreadDecay();
+
 	TArray<FHitResult> HitResults;
 	if (bDebug || bUsePersistentHitResults)
 	{
@@ -231,14 +288,9 @@ void ASigilAbilityTargetActor_Trace::AimWithPlayerController(const AActor* InSou
 		return;
 	}
 
-	// Default values in case of AI Controller
-	FVector ViewStart = TraceStart;
-	FRotator ViewRot = StartLocation.GetTargetingTransform().GetRotation().Rotator();
-
-	if (PrimaryPC && bTraceFromPlayerViewPoint)
-	{
-		PrimaryPC->GetPlayerViewPoint(ViewStart, ViewRot);
-	}
+	FVector ViewStart;
+	FRotator ViewRot;
+	GetAimViewPoint(TraceStart, ViewStart, ViewRot);
 
 	const FVector ViewDir = ViewRot.Vector();
 	FVector ViewEnd = ViewStart + (ViewDir * MaxRange);
@@ -249,7 +301,7 @@ void ASigilAbilityTargetActor_Trace::AimWithPlayerController(const AActor* InSou
 	TArray<FHitResult> HitResults;
 	LineTraceWithFilter(HitResults, InSourceActor->GetWorld(), Filter, ViewStart, ViewEnd, TraceProfile.Name, Params);
 
-	CurrentTargetingSpread = FMath::Min(TargetingSpreadMax, CurrentTargetingSpread + TargetingSpreadIncrement);
+	AddTargetingSpread();
 
 	const bool bUseTraceResult = HitResults.Num() > 0 && (FVector::DistSquared(TraceStart, HitResults[0].Location) <= (
 		MaxRange * MaxRange));
@@ -286,6 +338,20 @@ void ASigilAbilityTargetActor_Trace::AimWithPlayerController(const AActor* InSou
 	const FVector ShootDir = WeaponRandomStream.VRandCone(AdjustedAimDir, ConeHalfAngle, ConeHalfAngle);
 
 	OutTraceEnd = TraceStart + (ShootDir * MaxRange);
+}
+
+void ASigilAbilityTargetActor_Trace::GetAimViewPoint(const FVector& TraceStart, FVector& OutViewStart, FRotator& OutViewRot) const
+{
+	// Default values in case of AI Controller (or when the player view is not requested).
+	OutViewStart = TraceStart;
+	OutViewRot = StartLocation.GetTargetingTransform().GetRotation().Rotator();
+
+	// GASShooter (Copyright 2020 Dan Kestranek, MIT) always used the player view here; Sigil gates it behind
+	// bTraceFromPlayerViewPoint and, since 2026-09, bAlwaysAimWithPlayerController (see MD/devlog/decisions.md).
+	if (PrimaryPC && (bTraceFromPlayerViewPoint || bAlwaysAimWithPlayerController))
+	{
+		PrimaryPC->GetPlayerViewPoint(OutViewStart, OutViewRot);
+	}
 }
 
 bool ASigilAbilityTargetActor_Trace::ClipCameraRayToAbilityRange(FVector CameraLocation, FVector CameraDirection, FVector AbilityCenter,

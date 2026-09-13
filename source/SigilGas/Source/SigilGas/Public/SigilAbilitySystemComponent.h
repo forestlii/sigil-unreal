@@ -11,6 +11,29 @@
 class USigilAbilityTagRelationshipMapping;
 class USigilGameplayAbility;
 class USigilAbilitySet;
+class USkeletalMeshComponent;
+class UAnimMontage;
+
+/**
+ * Bookkeeping for a montage played locally on a secondary skeletal mesh of the avatar (e.g. a first person body),
+ * mirroring FGameplayAbilityLocalAnimMontage for meshes the engine's single-mesh montage path does not cover.
+ * Never replicated. Shape adapted from GASShooter FGameplayAbilityLocalAnimMontageForMesh (Copyright 2020 Dan Kestranek, MIT).
+ * 化身上次要骨骼网格（如第一人称身体）本地播放蒙太奇的记账，对应引擎单网格路径不覆盖的网格。从不复制。
+ */
+USTRUCT()
+struct FSigilLocalMeshMontage
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> Mesh = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAnimMontage> AnimMontage = nullptr;
+
+	UPROPERTY()
+	TWeakObjectPtr<UGameplayAbility> AnimatingAbility;
+};
 
 /**
  * Delegate for when the ability system is initialized.
@@ -480,6 +503,95 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "GGA|Attributes")
 	FString GetOwnedGameplayAttributeSetString();
+
+#pragma region MeshMontage
+	// ----------------------------------------------------------------------------------------------------------------
+	//	Montage support for multiple USkeletalMeshComponents on the avatar (single-player simplified version).
+	//	The avatar's main mesh (ActorInfo->SkeletalMeshComponent) goes through the engine's replicated PlayMontage path;
+	//	any other mesh is played locally only, for the locally controlled owner, and never replicated.
+	//	API shape adapted from GASShooter UGSAbilitySystemComponent (Copyright 2020 Dan Kestranek, MIT).
+	//	多网格蒙太奇支持（单机简化版）：主网格走引擎复制路径，其他网格只在本地控制者本地播放、不复制。
+	// ----------------------------------------------------------------------------------------------------------------
+public:
+	/**
+	 * True if InMesh is the avatar's main mesh known to the actor info (the one the engine montage path drives).
+	 * InMesh 是否为演员信息记录的化身主网格（引擎蒙太奇路径驱动的那个）。
+	 */
+	UFUNCTION(BlueprintPure, Category = "GGA|Animation")
+	bool IsAvatarMainMesh(const USkeletalMeshComponent* InMesh) const;
+
+	/**
+	 * True when secondary (cosmetic) mesh montages should play on this machine: the actor info is locally controlled.
+	 * Remote / simulated pawns return false; their secondary meshes stay silent while ability timing continues unchanged.
+	 * 本机是否应播放次要（纯表现）网格的蒙太奇：演员信息为本地控制时为 true。远端 / 模拟 Pawn 返回 false，
+	 * 其次要网格不播放，但技能时序照常推进。
+	 */
+	virtual bool ShouldPlaySecondaryMeshMontages() const;
+
+	/**
+	 * Plays a montage on the given mesh. Main mesh: engine PlayMontage (replicated / predicted as usual).
+	 * Other meshes: local Montage_Play only when ShouldPlaySecondaryMeshMontages() is true.
+	 * Returns the montage length; 0 when the secondary mesh was intentionally skipped (not locally controlled) so the
+	 * caller must not treat it as a failure; -1 if nothing could be played (invalid mesh / montage / anim instance).
+	 * 在指定网格上播放蒙太奇。主网格走引擎 PlayMontage（照常复制 / 预测）；其他网格仅在 ShouldPlaySecondaryMeshMontages()
+	 * 为 true 时本地 Montage_Play。返回蒙太奇长度；次要网格因非本地控制被有意跳过时返回 0（调用方不得当失败处理）；
+	 * 无法播放（网格 / 蒙太奇 / AnimInstance 无效）返回 -1。
+	 */
+	virtual float PlayMontageForMesh(UGameplayAbility* AnimatingAbility, USkeletalMeshComponent* InMesh, FGameplayAbilityActivationInfo ActivationInfo, UAnimMontage* Montage, float InPlayRate,
+	                                 FName StartSectionName = NAME_None, float StartTimeSeconds = 0.0f);
+
+	/** Stops whatever montage is currently playing on the mesh. 停止该网格当前播放的蒙太奇。 */
+	virtual void CurrentMontageStopForMesh(USkeletalMeshComponent* InMesh, float OverrideBlendOutTime = -1.0f);
+
+	/** Stops the main mesh montage and every locally tracked mesh montage. 停止主网格及所有本地跟踪网格的蒙太奇。 */
+	virtual void StopAllCurrentMontages(float OverrideBlendOutTime = -1.0f);
+
+	/** Jumps the mesh's current montage to a section. 把该网格当前蒙太奇跳到指定分段。 */
+	virtual void CurrentMontageJumpToSectionForMesh(USkeletalMeshComponent* InMesh, FName SectionName);
+
+	/** Sets the next section of the mesh's current montage. 设置该网格当前蒙太奇的下一分段。 */
+	virtual void CurrentMontageSetNextSectionNameForMesh(USkeletalMeshComponent* InMesh, FName FromSectionName, FName ToSectionName);
+
+	/** Sets the play rate of the mesh's current montage. 设置该网格当前蒙太奇的播放速率。 */
+	virtual void CurrentMontageSetPlayRateForMesh(USkeletalMeshComponent* InMesh, float InPlayRate);
+
+	/** Montage currently playing on the mesh, or null. 该网格当前播放的蒙太奇，无则为 null。 */
+	UFUNCTION(BlueprintPure, Category = "GGA|Animation")
+	UAnimMontage* GetCurrentMontageForMesh(const USkeletalMeshComponent* InMesh) const;
+
+	/** Ability animating the mesh, or null. 正在驱动该网格动画的技能，无则为 null。 */
+	UGameplayAbility* GetAnimatingAbilityForMesh(const USkeletalMeshComponent* InMesh) const;
+
+	/** True if the ability animates the main mesh or any tracked mesh. 技能是否正在驱动主网格或任一跟踪网格。 */
+	bool IsAnimatingAbilityForAnyMesh(const UGameplayAbility* Ability) const;
+
+	/** Clears the ability as the animator of the mesh if it currently is. 若该技能正驱动该网格，则清除记录。 */
+	virtual void ClearAnimatingAbilityForMesh(USkeletalMeshComponent* InMesh, UGameplayAbility* Ability);
+
+	/** Clears the ability as the animator of every mesh it currently animates. 清除该技能在所有网格上的驱动记录。 */
+	virtual void ClearAnimatingAbilityForAllMeshes(UGameplayAbility* Ability);
+
+protected:
+	/** Locally played montages on secondary meshes; at most one entry per mesh. 次要网格上本地播放的蒙太奇，每网格最多一条。 */
+	UPROPERTY(Transient)
+	TArray<FSigilLocalMeshMontage> LocalMeshMontages;
+
+	FSigilLocalMeshMontage* FindLocalMeshMontage(const USkeletalMeshComponent* InMesh);
+	const FSigilLocalMeshMontage* FindLocalMeshMontage(const USkeletalMeshComponent* InMesh) const;
+	FSigilLocalMeshMontage& FindOrAddLocalMeshMontage(USkeletalMeshComponent* InMesh);
+
+	/** Anim instance of a secondary mesh that belongs to the avatar (directly or through its owner chain), else null. */
+	UAnimInstance* GetSecondaryMeshAnimInstance(const USkeletalMeshComponent* InMesh) const;
+
+	/** Drops entries whose mesh has been destroyed / garbage collected. 删除网格已销毁 / 被 GC 的条目。 */
+	void PruneStaleMeshMontageEntries();
+
+	/** Notifies the ability and removes every secondary-mesh entry it animates (plus stale ones). 通知技能并移除其驱动的所有次要网格条目。 */
+	void ReleaseMeshMontageEntriesForAbility(UGameplayAbility* Ability);
+
+	/** Tells the (Sigil) ability which montage it is now playing on the mesh. */
+	void NotifyAbilityMeshMontage(UGameplayAbility* Ability, USkeletalMeshComponent* InMesh, UAnimMontage* Montage) const;
+#pragma endregion
 
 #pragma region TargetData
 public:
