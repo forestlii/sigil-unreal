@@ -5,7 +5,7 @@ description: 在接入、修改或排查 SigilInventory 的物品定义与 Fragm
 
 # Sigil 物品与容器
 
-源码核对基线：845ba842b674c836cab7993f72be74d9bc78189d。
+源码核对基线：9ffca225f3313e93932cadb1ecd56ec7e7fd7ea2。
 以下是静态源码事实；目标版本不同须重新核对，不代表运行验证通过。
 
 ## 来源与读取入口
@@ -31,6 +31,12 @@ description: 在接入、修改或排查 SigilInventory 的物品定义与 Fragm
   实际 AddItem 返回正数量后才通知拾取成功。
 - InventorySystemComponent 声明了子对象复制入口；
   具体对象归属和注册顺序须继续核对其实现。
+- EquipmentSystemComponent 用 bResettingEquipment、bRemovingAllEquipment、
+  EquipmentLifecycleRevision 与按分组的 GroupChangeIds 处理同步回调重入：
+  清理期间禁止创建新装备，旧切换只认自己的代号。
+  修改装备卸下或切换时同时追踪这些保护。
+- 按定义移除物品的数量与停止条件在 88980af 修正；
+  涉及数量逻辑时重读 SigilInventorySystemComponent 实现，不沿用旧行为。
 
 ## 处理当前任务
 

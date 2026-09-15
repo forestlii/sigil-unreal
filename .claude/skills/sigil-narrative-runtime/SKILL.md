@@ -5,7 +5,7 @@ description: 在接入、修改或排查 SigilNarrative 的对话会话、Quest/
 
 # Sigil 叙事运行时
 
-源码核对基线：845ba842b674c836cab7993f72be74d9bc78189d。
+源码核对基线：9ffca225f3313e93932cadb1ecd56ec7e7fd7ea2。
 以下是静态源码事实；目标版本不同须重新核对，不代表运行验证通过。
 
 ## 来源与读取入口

@@ -52,6 +52,10 @@ junction 描述与 Host 清单不同。按实际清单判断结构，不自动�
 退出状态和证据位置。未运行项写“未验证”，不能用编译结果代替
 PIE、联网、Cook、打包运行或消费项目验收。
 
+2026-09-16 在消费项目 ProjectSpecter（gitlink 9ffca22）中，全部 12 个插件随
+ProjectSpecterEditor Win64 Development 编译通过并在编辑器加载；
+Host 本身未构建，Automation 未运行。
+
 ## 开发流程
 
 1. 理解需求：确认职责、来源、验收条件、非目标和涉及的仓库。
@@ -64,11 +68,9 @@ PIE、联网、Cook、打包运行或消费项目验收。
 5. 验证与交付：仅运行获准检查，写后回读；报告实际结果及未验证项。
    Git 提交与推送按本仓任务的明确授权处理。
 
-本轮采用 bootstrap-project-workflow：
-初始化先审核两个完整入口；获准后只写这两个文件；
-初始化完成后单独进入 Skill 候选审核，不混写业务 Skill。
-
-上述本轮边界来源：Likeon，2026-09-14 的工作台接入任务指令。
+2026-09-14 初始化按 bootstrap-project-workflow 执行：先审核两个完整入口，
+获准后写入，再单独审核 Skill 候选，不混写业务 Skill。
+来源：Likeon，2026-09-14 的工作台接入任务指令。
 
 ## 项目约束
 
@@ -92,7 +94,11 @@ docs/ONBOARD-LAPTOP.md 与 docs/WORKFLOWS.md；不得假定自动发现兄弟目
 
 ## 项目 Skill
 
-初始化阶段尚未创建项目 Skill。
+现有 13 个项目 Skill（2026-09-15 获批，441ecce 合入 main），覆盖全部 12 个插件，
+SigilNarrative 拆为 runtime 与 authoring：
+sigil-input、sigil-gas、sigil-combat、sigil-inventory、sigil-arsenal、sigil-movement、
+sigil-camera、sigil-effects、sigil-interaction、sigil-ui、sigil-save、
+sigil-narrative-runtime、sigil-narrative-authoring。
 
 后续按职责独立、源码路径明确、会重复使用的框架或工作流拆分，
 不按目录机械生成，不预设数量。
