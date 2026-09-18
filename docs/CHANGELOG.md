@@ -24,6 +24,10 @@ Sigil is pre-1.0: minor versions may contain breaking changes. Each entry lists 
 | **sigil.movement** — `FSigilJumpStateSetting::bIsShowDebug` removed. | Delete any Blueprint reads of the field. |
 | **sigil.movement** — `bDynamicPlayRate = false` now really disables dynamic play rate (fixed 1.0). | Re-check cycle data that had the flag off. |
 | **sigil.movement** — `USigilUtility::CalculateAnimatedSpeed` no longer logs; returns 0 for unusable input. | Cache the result per asset (the default locomotion layer does). |
+| **sigil.input** — PlayerController host implemented (`BindPlayerControllerInput`, `UnbindPlayerControllerInput`, `SetGameplayRoutingEnabled`, `IsPlayerControllerInputBound`, `IsGameplayRoutingEnabled`); on a PC, gameplay routing starts off. | Call `BindPlayerControllerInput(InputComponent)` from your PC's `SetupInputComponent` and enable routing when gameplay may receive input. See [sigil.input](sigil-input.md#playercontroller-host). |
+| **sigil.input** — `SetupInputComponent` / `CleanupInputComponent` are now `final`. | Move overrides to `OnSetupPlayerInputComponent` / `OnCleanupPlayerInputComponent` or `NeutralizeGameplayReceiver`. |
+| **sigil.input** — Action event bindings are created by the component itself; `BindInputActions()` no longer binds. Only bindings the component created are removed, by handle; `InputActionValueBindings` now stores handles. | Nothing to do unless an `OnSetupPlayerInputComponent` override deliberately skipped the parent to avoid bindings. |
+| **sigil.input** — `USigilInputChecker_TagRelationship` and the Gameplay Debugger use `GetControlledPawn()` instead of the component owner. | Nothing to do for Pawn hosts. |
 
 ### Fixes
 

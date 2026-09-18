@@ -24,6 +24,10 @@ Sigil 尚在 1.0 之前：次版本可能包含破坏性变更。每条列出公
 | **sigil.movement** — 删除 `FSigilJumpStateSetting::bIsShowDebug`。 | 删掉蓝图里对该字段的读取。 |
 | **sigil.movement** — `bDynamicPlayRate = false` 现在真正关闭动态倍率（固定 1.0）。 | 复查曾把该开关关掉的循环动画数据。 |
 | **sigil.movement** — `USigilUtility::CalculateAnimatedSpeed` 不再打日志；输入不可用时返回 0。 | 按资产缓存结果（默认 locomotion 层已这样做）。 |
+| **sigil.input** — 实现 PlayerController 宿主（`BindPlayerControllerInput`、`UnbindPlayerControllerInput`、`SetGameplayRoutingEnabled`、`IsPlayerControllerInputBound`、`IsGameplayRoutingEnabled`）；挂在 PC 上时玩法路由默认关闭。 | 在 PC 的 `SetupInputComponent` 里调用 `BindPlayerControllerInput(InputComponent)`，玩法可以接收输入时再开启路由。见 [sigil.input](sigil-input.zh-CN.md#playercontroller-宿主)。 |
+| **sigil.input** — `SetupInputComponent` / `CleanupInputComponent` 改为 `final`。 | 把重写改到 `OnSetupPlayerInputComponent` / `OnCleanupPlayerInputComponent` 或 `NeutralizeGameplayReceiver`。 |
+| **sigil.input** — 动作事件绑定改由组件自己创建，`BindInputActions()` 不再绑定；只按句柄移除组件自己创建的绑定，`InputActionValueBindings` 改存句柄。 | 除非某个 `OnSetupPlayerInputComponent` 重写故意不调父类来避免绑定，否则无需处理。 |
+| **sigil.input** — `USigilInputChecker_TagRelationship` 与 Gameplay Debugger 改用 `GetControlledPawn()`，不再用组件 Owner。 | Pawn 宿主无需处理。 |
 
 ### 修复
 

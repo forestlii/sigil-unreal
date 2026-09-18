@@ -48,7 +48,48 @@ public:
 	 * 组件取消注册时调用。
 	 */
 	virtual void OnUnregister() override;
+
+	/**
+	 * Called when the component ends play; releases the input host through the same ordered teardown.
+	 * 组件结束游戏时调用；通过同一有序拆除释放输入宿主。
+	 */
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	//~ End UActorComponent interface
+
+	/**
+	 * Binds gameplay input to the owning local PlayerController's input component.
+	 * 将玩法输入绑定到所属本地PlayerController的输入组件。
+	 * @attention PlayerController owner only. The owning PC should call this from its SetupInputComponent. Fails without side effects unless the owner is a local PC with a LocalPlayer, the component is an EnhancedInputComponent, the Enhanced Input subsystem exists, and InputConfig plus a current InputControlSetup are set. Gameplay routing stays disabled after a new bind.
+	 * 仅限PlayerController宿主，应由所属PC在SetupInputComponent中调用。只有本地PC、存在LocalPlayer、为增强输入组件、增强输入子系统可用且InputConfig与当前InputControlSetup有效时才会绑定，否则无副作用地失败。新绑定后玩法路由保持关闭。
+	 * @param NewInputComponent The PlayerController input component. PlayerController的输入组件。
+	 * @return True if bound (repeat bind of the same component is a no-op success). 绑定成功返回true（同一组件重复绑定为无操作成功）。
+	 */
+	bool BindPlayerControllerInput(UInputComponent* NewInputComponent);
+
+	/**
+	 * Releases the PlayerController input binding after an ordered gameplay teardown. Idempotent.
+	 * 在有序玩法拆除后释放PlayerController输入绑定。幂等。
+	 */
+	void UnbindPlayerControllerInput();
+
+	/**
+	 * Requests gameplay routing on or off. Disabling neutralizes the recorded receiver first, then closes the route, removes the owned mapping context and clears transient input state.
+	 * 请求开启或关闭玩法路由。关闭时先中和已记录的接收者，再关闭路由、移除自有映射上下文并清空瞬态输入状态。
+	 * @param bEnabled Whether gameplay input may be routed. 是否允许路由玩法输入。
+	 */
+	void SetGameplayRoutingEnabled(bool bEnabled);
+
+	/**
+	 * Whether this PlayerController-hosted component currently owns an input binding.
+	 * 此PlayerController宿主组件当前是否持有输入绑定。
+	 */
+	bool IsPlayerControllerInputBound() const;
+
+	/**
+	 * Whether gameplay input is currently routed.
+	 * 当前是否路由玩法输入。
+	 */
+	bool IsGameplayRoutingEnabled() const;
 
 	/**
 	 * Gets the Pawn associated with this component.
@@ -148,18 +189,28 @@ protected:
 	void SetupInputActionValueBindings();
 
 	/**
-	 * Sets up the input component.
-	 * 设置输入组件。
+	 * Sets up the input component. Sealed adapter: PlayerController owners forward to BindPlayerControllerInput.
+	 * 设置输入组件。密封适配器：PlayerController宿主转发到BindPlayerControllerInput。
 	 * @param NewInputComponent The new input component. 新输入组件。
 	 */
-	virtual void SetupInputComponent(UInputComponent* NewInputComponent);
+	virtual void SetupInputComponent(UInputComponent* NewInputComponent) final;
 
 	/**
-	 * Cleans up the input component.
-	 * 清理输入组件。
+	 * Cleans up the input component. Sealed adapter: PlayerController owners forward to UnbindPlayerControllerInput, Pawn owners run the same ordered teardown.
+	 * 清理输入组件。密封适配器：PlayerController宿主转发到UnbindPlayerControllerInput，Pawn宿主执行同一有序拆除。
 	 * @param OldController The previous controller (optional). 前一个控制器（可选）。
 	 */
-	virtual void CleanupInputComponent(AController* OldController = nullptr);
+	virtual void CleanupInputComponent(AController* OldController = nullptr) final;
+
+	/**
+	 * Releases held gameplay inputs on the receiver that got them, before routing is closed.
+	 * 在关闭路由前，对曾接收按住输入的接收者释放这些输入。
+	 * @attention Default dispatches Canceled through the current setup only while OldReceiver is still the controlled pawn; never forwards to a different pawn.
+	 * 默认仅在OldReceiver仍为受控Pawn时通过当前设置派发Canceled；绝不转发给其他Pawn。
+	 * @param OldReceiver The pawn that received the held inputs (may be null). 接收按住输入的Pawn（可为空）。
+	 * @param HeldInputTags Routed inputs that were started and not yet released. 已开始且未释放的已路由输入。
+	 */
+	virtual void NeutralizeGameplayReceiver(APawn* OldReceiver, const FGameplayTagContainer& HeldInputTags);
 
 	/**
 	 * Gets the enhanced input subsystem.
@@ -390,8 +441,8 @@ protected:
 	void InputActionCallback(const FInputActionInstance& ActionData, FGameplayTag InputTag, ETriggerEvent TriggerEvent);
 
 	/**
-	 * Mapping of input tags to action value bindings.
-	 * 输入标签到动作值绑定的映射。
+	 * Mapping of input tags to action value binding handles.
+	 * 输入标签到动作值绑定句柄的映射。
 	 */
 	UPROPERTY(VisibleInstanceOnly, Category="GIPS|Input", meta=(ForceInlineRow))
 	TMap<FGameplayTag, int32> InputActionValueBindings;
@@ -540,4 +591,47 @@ protected:
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
 #endif
 #pragma endregion
+
+private:
+	friend struct FSigilInputSystemComponentTestAccess;
+
+	/** Binds owned value/event bindings to the component; rolls back and returns false on failure. 绑定自有值/事件绑定；失败时回滚并返回false。 */
+	bool BindInputComponentCore(UEnhancedInputComponent* NewInputComponent, bool bRequireValidActions);
+
+	/** Removes only the bindings this component created, then forgets the input component. 仅移除本组件创建的绑定，然后释放输入组件。 */
+	void ReleaseInputBindingsCore();
+
+	/** Neutralize old receiver, close route, remove owned mapping context, reset transient state. 中和旧接收者、关闭路由、移除自有映射上下文、重置瞬态。 */
+	void TeardownGameplayRouteCore();
+
+	/** Only valid after the ordered teardown closed the route and released the mapping context. 仅可在有序拆除关闭路由并释放映射上下文之后调用。 */
+	void ResetTransientInputStateAfterOrderedTeardown();
+
+	void AddOwnedGameplayMappingContext();
+	void RemoveOwnedGameplayMappingContext();
+	void RecordRoutedInputEvent(const FGameplayTag& InputTag, ETriggerEvent TriggerEvent);
+
+	/** Action event binding handles created by this component. 本组件创建的动作事件绑定句柄。 */
+	TArray<uint32> OwnedActionEventBindingHandles;
+
+	/** Action value binding handles created by this component; pre-existing bindings are borrowed and never removed. 本组件新建的动作值绑定句柄；已存在的绑定视为借用，绝不移除。 */
+	TArray<uint32> OwnedActionValueBindingHandles;
+
+	/** Subsystem that received the owned mapping context. 接收自有映射上下文的子系统。 */
+	TWeakObjectPtr<UEnhancedInputLocalPlayerSubsystem> OwnedMappingContextSubsystem;
+
+	bool bOwnsGameplayMappingContext = false;
+
+	bool bGameplayRoutingEnabled = false;
+
+	bool bTearingDownGameplayRoute = false;
+
+	/** Increments on every successful new bind. 每次成功新建绑定时递增。 */
+	int32 BindingGeneration = 0;
+
+	/** The pawn that received routed held inputs in this generation; used only for teardown. 本代中接收已路由按住输入的Pawn，仅用于拆除。 */
+	TWeakObjectPtr<APawn> RoutedGameplayReceiver;
+
+	/** Routed inputs started and not yet completed or canceled. 已路由且尚未完成或取消的按住输入。 */
+	FGameplayTagContainer ActiveHeldInputTags;
 };

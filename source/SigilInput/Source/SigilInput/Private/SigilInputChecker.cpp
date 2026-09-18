@@ -3,6 +3,7 @@
 
 #include "SigilInputChecker.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 #include "GameplayTagAssetInterface.h"
 #include "SigilInputSystemComponent.h"
 
@@ -19,8 +20,9 @@ bool USigilInputChecker::DoCheckInput_Implementation(USigilInputSystemComponent*
 
 FGameplayTagContainer USigilInputChecker_TagRelationship::GetActorTags_Implementation(USigilInputSystemComponent* IC) const
 {
+	// The gameplay subject is the currently controlled pawn, never the host PlayerController or a previous pawn.
 	FGameplayTagContainer Tags;
-	if (const IGameplayTagAssetInterface* TagAssetInterface = Cast<IGameplayTagAssetInterface>(IC->GetOwner()))
+	if (const IGameplayTagAssetInterface* TagAssetInterface = Cast<IGameplayTagAssetInterface>(IC ? IC->GetControlledPawn() : nullptr))
 	{
 		TagAssetInterface->GetOwnedGameplayTags(Tags);
 	}

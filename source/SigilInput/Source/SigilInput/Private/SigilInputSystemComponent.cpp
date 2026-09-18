@@ -47,9 +47,11 @@ void USigilInputSystemComponent::OnRegister()
 
 		if (OwnerType == ESigilOwnerType::PC)
 		{
-			if (ensure(PCOwner))
+			// If our PlayerController already set up its input component we were added afterwards.
+			// Otherwise the owning PC binds from its SetupInputComponent.
+			if (ensure(PCOwner) && PCOwner->InputComponent)
 			{
-				// TODO 支持放到PC上。
+				BindPlayerControllerInput(PCOwner->InputComponent);
 			}
 		}
 	}
@@ -64,18 +66,118 @@ void USigilInputSystemComponent::OnUnregister()
 
 		if (OwnerType == ESigilOwnerType::Pawn)
 		{
-			APawn* PawnOwner = GetOwner<APawn>();
-			PawnOwner->ReceiveRestartedDelegate.RemoveAll(this);
-			PawnOwner->ReceiveControllerChangedDelegate.RemoveAll(this);
-		}
-
-		if (OwnerType == ESigilOwnerType::PC)
-		{
-			APlayerController* PCOwner = GetOwner<APlayerController>();
+			if (APawn* PawnOwner = GetOwner<APawn>())
+			{
+				PawnOwner->ReceiveRestartedDelegate.RemoveAll(this);
+				PawnOwner->ReceiveControllerChangedDelegate.RemoveAll(this);
+			}
 		}
 	}
 
 	Super::OnUnregister();
+}
+
+void USigilInputSystemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	CleanupInputComponent();
+
+	Super::EndPlay(EndPlayReason);
+}
+
+bool USigilInputSystemComponent::BindPlayerControllerInput(UInputComponent* NewInputComponent)
+{
+	// Read-only preflight: any failure leaves every binding, context and transient state untouched.
+	APlayerController* PC = GetOwner<APlayerController>();
+	if (OwnerType != ESigilOwnerType::PC || !PC)
+	{
+		UE_LOG(LogSigilInput, Warning, TEXT("BindPlayerControllerInput requires a PlayerController owner. Owner: %s"), GetOwner() ? *GetOwner()->GetName() : TEXT("NONE"));
+		return false;
+	}
+
+	if (!PC->IsLocalController() || !PC->GetLocalPlayer())
+	{
+		UE_LOG(LogSigilInput, Verbose, TEXT("BindPlayerControllerInput skipped for non-local PlayerController: %s"), *PC->GetName());
+		return false;
+	}
+
+	UEnhancedInputComponent* NewEnhancedInputComponent = Cast<UEnhancedInputComponent>(NewInputComponent);
+	if (!NewEnhancedInputComponent)
+	{
+		UE_LOG(LogSigilInput, Error, TEXT("BindPlayerControllerInput requires an EnhancedInputComponent. PlayerController: %s"), *PC->GetName());
+		return false;
+	}
+
+	if (!GetEnhancedInputSubsystem())
+	{
+		UE_LOG(LogSigilInput, Error, TEXT("BindPlayerControllerInput requires the Enhanced Input local player subsystem. PlayerController: %s"), *PC->GetName());
+		return false;
+	}
+
+	if (!InputConfig || !GetCurrentInputSetup())
+	{
+		UE_LOG(LogSigilInput, Error, TEXT("BindPlayerControllerInput requires InputConfig and a current InputControlSetup. PlayerController: %s"), *PC->GetName());
+		return false;
+	}
+
+	if (InputComponent == NewEnhancedInputComponent)
+	{
+		return true;
+	}
+
+	if (InputComponent)
+	{
+		TeardownGameplayRouteCore();
+		ReleaseInputBindingsCore();
+	}
+
+	return BindInputComponentCore(NewEnhancedInputComponent, true);
+}
+
+void USigilInputSystemComponent::UnbindPlayerControllerInput()
+{
+	if (OwnerType != ESigilOwnerType::PC)
+	{
+		return;
+	}
+
+	TeardownGameplayRouteCore();
+	ReleaseInputBindingsCore();
+}
+
+void USigilInputSystemComponent::SetGameplayRoutingEnabled(bool bEnabled)
+{
+	if (!bEnabled)
+	{
+		if (bGameplayRoutingEnabled)
+		{
+			TeardownGameplayRouteCore();
+		}
+		return;
+	}
+
+	if (bGameplayRoutingEnabled)
+	{
+		return;
+	}
+
+	if (!InputComponent)
+	{
+		UE_LOG(LogSigilInput, Warning, TEXT("SetGameplayRoutingEnabled(true) ignored: no bound input component. Owner: %s"), GetOwner() ? *GetOwner()->GetName() : TEXT("NONE"));
+		return;
+	}
+
+	AddOwnedGameplayMappingContext();
+	bGameplayRoutingEnabled = true;
+}
+
+bool USigilInputSystemComponent::IsPlayerControllerInputBound() const
+{
+	return OwnerType == ESigilOwnerType::PC && InputComponent != nullptr;
+}
+
+bool USigilInputSystemComponent::IsGameplayRoutingEnabled() const
+{
+	return bGameplayRoutingEnabled;
 }
 
 APawn* USigilInputSystemComponent::GetControlledPawn() const
@@ -138,67 +240,278 @@ void USigilInputSystemComponent::OnControllerChanged(APawn* Pawn, AController* O
 
 void USigilInputSystemComponent::CleanInputActionValueBindings()
 {
-	for (auto& Binding : InputActionValueBindings)
+	// Only bindings created by this component are removed; borrowed bindings keep their original handle.
+	if (InputComponent)
 	{
-		InputComponent->RemoveActionValueBinding(Binding.Value);
-		UE_LOG(LogSigilInput, Verbose, TEXT("Clean input action value binding for InputTag:{%s}"), *Binding.Key.ToString());
+		for (const uint32 Handle : OwnedActionValueBindingHandles)
+		{
+			InputComponent->RemoveBindingByHandle(Handle);
+		}
 	}
+	OwnedActionValueBindingHandles.Empty();
 	InputActionValueBindings.Empty();
 }
 
 void USigilInputSystemComponent::SetupInputActionValueBindings()
 {
-	check(InputConfig);
+	if (!InputComponent || !InputConfig)
+	{
+		return;
+	}
+
 	for (auto& Mapping : InputConfig->InputActionMappings)
 	{
-		if (Mapping.Value.bValueBinding)
+		if (!Mapping.Value.bValueBinding || !Mapping.Value.InputAction || InputActionValueBindings.Contains(Mapping.Key))
 		{
-			FEnhancedInputActionValueBinding& Binding = InputComponent->BindActionValue(Mapping.Value.InputAction);
-			int32 BindingIndex = InputComponent->GetActionValueBindings().Find(Binding);
-			InputActionValueBindings.Emplace(Mapping.Key, BindingIndex);
-			UE_LOG(LogSigilInput, Verbose, TEXT("Setup input action value binding for InputTag:{%s} ad index:{%d}"), *Mapping.Key.ToString(), BindingIndex);
+			continue;
 		}
+
+		const UInputAction* Action = Mapping.Value.InputAction;
+		const bool bBorrowed = InputComponent->GetActionValueBindings().ContainsByPredicate([Action](const FEnhancedInputActionValueBinding& Binding)
+		{
+			return Binding.GetAction() == Action;
+		});
+
+		const uint32 Handle = InputComponent->BindActionValue(Action).GetHandle();
+		if (!bBorrowed)
+		{
+			OwnedActionValueBindingHandles.Add(Handle);
+		}
+		InputActionValueBindings.Emplace(Mapping.Key, static_cast<int32>(Handle));
+		UE_LOG(LogSigilInput, Verbose, TEXT("Setup input action value binding for InputTag:{%s} handle:{%u} borrowed:{%d}"), *Mapping.Key.ToString(), Handle, bBorrowed);
 	}
 }
 
 void USigilInputSystemComponent::SetupInputComponent(UInputComponent* NewInputComponent)
 {
-	InputComponent = Cast<UEnhancedInputComponent>(NewInputComponent);
-
-	if (ensureMsgf(InputComponent, TEXT("Project must use EnhancedInputComponent to support PlayerControlsComponent")))
+	if (OwnerType == ESigilOwnerType::PC)
 	{
-		UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSubsystem();
+		BindPlayerControllerInput(NewInputComponent);
+		return;
+	}
 
-		if (Subsystem && InputMappingContext)
+	UEnhancedInputComponent* NewEnhancedInputComponent = Cast<UEnhancedInputComponent>(NewInputComponent);
+	if (!ensureMsgf(NewEnhancedInputComponent, TEXT("Project must use EnhancedInputComponent to support PlayerControlsComponent")))
+	{
+		return;
+	}
+
+	if (!InputConfig)
+	{
+		UE_LOG(LogSigilInput, Error, TEXT("SetupInputComponent requires InputConfig. Owner: %s"), GetOwner() ? *GetOwner()->GetName() : TEXT("NONE"));
+		return;
+	}
+
+	if (InputComponent != NewEnhancedInputComponent)
+	{
+		if (InputComponent)
 		{
-			Subsystem->AddMappingContext(InputMappingContext, InputPriority);
+			TeardownGameplayRouteCore();
+			ReleaseInputBindingsCore();
 		}
 
-		CleanInputActionValueBindings();
-
-		SetupInputActionValueBindings();
-
-		UE_LOG(LogSigilInput, Verbose, TEXT("SetupInputComponent for Pawn/PC: %s"), GetOwner() ? *GetOwner()->GetName() : TEXT("NONE"))
-		OnSetupPlayerInputComponent(InputComponent);
-		SetupInputComponentEvent.Broadcast(InputComponent);
+		if (!BindInputComponentCore(NewEnhancedInputComponent, false))
+		{
+			return;
+		}
 	}
+
+	// Pawn hosts keep their original behavior: gameplay routing opens as soon as input is set up.
+	SetGameplayRoutingEnabled(true);
 }
 
 void USigilInputSystemComponent::CleanupInputComponent(AController* OldController)
 {
-	UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSubsystem(OldController);
-	if (Subsystem && InputComponent)
+	if (OwnerType == ESigilOwnerType::PC)
 	{
-		OnCleanupPlayerInputComponent(InputComponent);
-		CleanupInputComponentEvent.Broadcast(InputComponent);
+		UnbindPlayerControllerInput();
+		return;
+	}
 
-		if (InputMappingContext)
+	// The owned mapping context is removed from the subsystem it was added to, so OldController is no longer needed.
+	TeardownGameplayRouteCore();
+	ReleaseInputBindingsCore();
+}
+
+void USigilInputSystemComponent::NeutralizeGameplayReceiver(APawn* OldReceiver, const FGameplayTagContainer& HeldInputTags)
+{
+	if (!IsValid(OldReceiver) || OldReceiver != GetControlledPawn())
+	{
+		// Never forward an old release to a different pawn; the server-side pawn/ASC lifecycle owns authoritative cancel.
+		UE_LOG(LogSigilInput, Verbose, TEXT("Skip neutralizing %d held inputs: receiver %s is no longer the controlled pawn."), HeldInputTags.Num(),
+		       OldReceiver ? *OldReceiver->GetName() : TEXT("NONE"));
+		return;
+	}
+
+	const FInputActionInstance EmptyActionData;
+	for (const FGameplayTag& InputTag : HeldInputTags)
+	{
+		ProcessInput(EmptyActionData, InputTag, ETriggerEvent::Canceled);
+	}
+}
+
+bool USigilInputSystemComponent::BindInputComponentCore(UEnhancedInputComponent* NewInputComponent, bool bRequireValidActions)
+{
+	check(NewInputComponent && InputConfig && !InputComponent);
+
+	if (bRequireValidActions)
+	{
+		for (const auto& Mapping : InputConfig->InputActionMappings)
+		{
+			if (!Mapping.Value.InputAction)
+			{
+				UE_LOG(LogSigilInput, Error, TEXT("Input bind failed: InputTag:{%s} has no InputAction in %s."), *Mapping.Key.ToString(), *InputConfig->GetName());
+				return false;
+			}
+		}
+	}
+
+	InputComponent = NewInputComponent;
+
+	SetupInputActionValueBindings();
+
+	for (const auto& Pair : InputConfig->InputActionMappings)
+	{
+		const UInputAction* Action = Pair.Value.InputAction;
+		if (!Action)
+		{
+			UE_LOG(LogSigilInput, Warning, TEXT("Skip binding InputTag:{%s}: no InputAction in %s."), *Pair.Key.ToString(), *InputConfig->GetName());
+			continue;
+		}
+
+		for (const ETriggerEvent TriggerEvent : {ETriggerEvent::Triggered, ETriggerEvent::Started, ETriggerEvent::Ongoing, ETriggerEvent::Completed, ETriggerEvent::Canceled})
+		{
+			OwnedActionEventBindingHandles.Add(InputComponent->BindAction(Action, TriggerEvent, this, &ThisClass::InputActionCallback, Pair.Key, TriggerEvent).GetHandle());
+		}
+	}
+
+	++BindingGeneration;
+
+	UE_LOG(LogSigilInput, Verbose, TEXT("SetupInputComponent for Pawn/PC: %s, generation: %d"), GetOwner() ? *GetOwner()->GetName() : TEXT("NONE"), BindingGeneration)
+	OnSetupPlayerInputComponent(InputComponent);
+	SetupInputComponentEvent.Broadcast(InputComponent);
+	return true;
+}
+
+void USigilInputSystemComponent::ReleaseInputBindingsCore()
+{
+	if (!InputComponent)
+	{
+		OwnedActionEventBindingHandles.Empty();
+		OwnedActionValueBindingHandles.Empty();
+		InputActionValueBindings.Empty();
+		return;
+	}
+
+	OnCleanupPlayerInputComponent(InputComponent);
+	CleanupInputComponentEvent.Broadcast(InputComponent);
+
+	for (const uint32 Handle : OwnedActionEventBindingHandles)
+	{
+		InputComponent->RemoveBindingByHandle(Handle);
+	}
+	OwnedActionEventBindingHandles.Empty();
+
+	CleanInputActionValueBindings();
+
+	InputComponent = nullptr;
+}
+
+void USigilInputSystemComponent::TeardownGameplayRouteCore()
+{
+	if (bTearingDownGameplayRoute)
+	{
+		return;
+	}
+	TGuardValue<bool> TeardownGuard(bTearingDownGameplayRoute, true);
+
+	// 1. Neutralize the recorded receiver exactly once, while the route still points at it.
+	APawn* OldReceiver = RoutedGameplayReceiver.Get();
+	const FGameplayTagContainer HeldInputTags = ActiveHeldInputTags;
+	ActiveHeldInputTags.Reset();
+	RoutedGameplayReceiver.Reset();
+	if (bGameplayRoutingEnabled && !HeldInputTags.IsEmpty())
+	{
+		NeutralizeGameplayReceiver(OldReceiver, HeldInputTags);
+	}
+
+	// 2. Close the route.
+	bGameplayRoutingEnabled = false;
+
+	// 3. Remove the owned gameplay mapping context.
+	RemoveOwnedGameplayMappingContext();
+
+	// 4. Clear transient state.
+	ResetTransientInputStateAfterOrderedTeardown();
+}
+
+void USigilInputSystemComponent::ResetTransientInputStateAfterOrderedTeardown()
+{
+	ensure(bTearingDownGameplayRoute && !bGameplayRoutingEnabled && !bOwnsGameplayMappingContext);
+
+	ActiveBufferWindows.Empty();
+	CurrentBufferedInput = FSigilBufferedInput();
+	LastBufferedInput = FSigilBufferedInput();
+	PassedInputEntries.Empty();
+	BlockedInputEntries.Empty();
+	BufferedInputEntries.Empty();
+	LastInputActionValues.Empty();
+	ActiveHeldInputTags.Reset();
+	RoutedGameplayReceiver.Reset();
+}
+
+void USigilInputSystemComponent::AddOwnedGameplayMappingContext()
+{
+	if (bOwnsGameplayMappingContext || !InputMappingContext)
+	{
+		return;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = GetEnhancedInputSubsystem();
+	if (!Subsystem || Subsystem->HasMappingContext(InputMappingContext))
+	{
+		// A context added by someone else is borrowed and never removed by this component.
+		return;
+	}
+
+	FModifyContextOptions Options;
+	Options.bIgnoreAllPressedKeysUntilRelease = true;
+	Subsystem->AddMappingContext(InputMappingContext, InputPriority, Options);
+	OwnedMappingContextSubsystem = Subsystem;
+	bOwnsGameplayMappingContext = true;
+}
+
+void USigilInputSystemComponent::RemoveOwnedGameplayMappingContext()
+{
+	if (bOwnsGameplayMappingContext && InputMappingContext)
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = OwnedMappingContextSubsystem.Get())
 		{
 			Subsystem->RemoveMappingContext(InputMappingContext);
 		}
-		CleanInputActionValueBindings();
 	}
-	InputComponent = nullptr;
+	OwnedMappingContextSubsystem.Reset();
+	bOwnsGameplayMappingContext = false;
+}
+
+void USigilInputSystemComponent::RecordRoutedInputEvent(const FGameplayTag& InputTag, ETriggerEvent TriggerEvent)
+{
+	if (TriggerEvent == ETriggerEvent::Started)
+	{
+		ActiveHeldInputTags.AddTag(InputTag);
+		if (!RoutedGameplayReceiver.IsValid())
+		{
+			RoutedGameplayReceiver = GetControlledPawn();
+		}
+	}
+	else if (TriggerEvent == ETriggerEvent::Completed || TriggerEvent == ETriggerEvent::Canceled)
+	{
+		ActiveHeldInputTags.RemoveTag(InputTag);
+		if (ActiveHeldInputTags.IsEmpty())
+		{
+			RoutedGameplayReceiver.Reset();
+		}
+	}
 }
 
 UEnhancedInputLocalPlayerSubsystem* USigilInputSystemComponent::GetEnhancedInputSubsystem(AController* OldController) const
@@ -230,17 +543,9 @@ UEnhancedInputLocalPlayerSubsystem* USigilInputSystemComponent::GetEnhancedInput
 
 void USigilInputSystemComponent::BindInputActions()
 {
-	check(InputConfig);
-
-	for (auto& Pair : InputConfig->InputActionMappings)
-	{
-		// Generic binding.
-		InputComponent->BindAction(Pair.Value.InputAction, ETriggerEvent::Triggered, this, &ThisClass::InputActionCallback, Pair.Key, ETriggerEvent::Triggered);
-		InputComponent->BindAction(Pair.Value.InputAction, ETriggerEvent::Started, this, &ThisClass::InputActionCallback, Pair.Key, ETriggerEvent::Started);
-		InputComponent->BindAction(Pair.Value.InputAction, ETriggerEvent::Ongoing, this, &ThisClass::InputActionCallback, Pair.Key, ETriggerEvent::Ongoing);
-		InputComponent->BindAction(Pair.Value.InputAction, ETriggerEvent::Completed, this, &ThisClass::InputActionCallback, Pair.Key, ETriggerEvent::Completed);
-		InputComponent->BindAction(Pair.Value.InputAction, ETriggerEvent::Canceled, this, &ThisClass::InputActionCallback, Pair.Key, ETriggerEvent::Canceled);
-	}
+	// Generic action event bindings are created and owned by the bind core before OnSetupPlayerInputComponent runs,
+	// so calling this again never duplicates them.
+	UE_LOG(LogSigilInput, Verbose, TEXT("BindInputActions: %d action event bindings owned by generation %d."), OwnedActionEventBindingHandles.Num(), BindingGeneration);
 }
 
 USigilInputControlSetup* USigilInputSystemComponent::GetCurrentInputSetup() const
@@ -290,11 +595,13 @@ bool USigilInputSystemComponent::CheckInputAllowed(const FInputActionInstance& A
 
 void USigilInputSystemComponent::InputActionCallback(const FInputActionInstance& ActionData, FGameplayTag InputTag, ETriggerEvent TriggerEvent)
 {
-	if (InputTag.IsValid())
+	// Fail closed while gameplay routing is off: nothing is processed, buffered or replayed later.
+	if (InputTag.IsValid() && bGameplayRoutingEnabled)
 	{
 		if (!bProcessingInputExternally && CheckInputAllowed(ActionData, InputTag, TriggerEvent))
 		{
 			ProcessInput(ActionData, InputTag, TriggerEvent);
+			RecordRoutedInputEvent(InputTag, TriggerEvent);
 		}
 		LastInputActionValues.Emplace(InputTag, ActionData.GetValue());
 		OnReceivedInput.Broadcast(ActionData, InputTag, TriggerEvent);
@@ -395,6 +702,7 @@ bool USigilInputSystemComponent::TrySaveInput(const FInputActionInstance& Action
 void USigilInputSystemComponent::FireBufferedInput()
 {
 	ProcessInput(CurrentBufferedInput.ActionData, CurrentBufferedInput.InputTag, CurrentBufferedInput.TriggerEvent);
+	RecordRoutedInputEvent(CurrentBufferedInput.InputTag, CurrentBufferedInput.TriggerEvent);
 	OnFireBufferedInput.Broadcast(CurrentBufferedInput.ActionData, CurrentBufferedInput.InputTag, CurrentBufferedInput.TriggerEvent);
 	ResetBufferedInput();
 	CloseActiveInputBufferWindows();
