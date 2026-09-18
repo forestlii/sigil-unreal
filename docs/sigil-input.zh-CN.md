@@ -10,7 +10,7 @@ sigil.input 是架在 Enhanced Input 之上的一层「Tag 化」输入抽象：
 
 ### Tag 化输入事件
 
-系统核心是 `USigilInputSystemComponent`，挂在 Pawn 或 PlayerController 上。组件注册时会把自己的 `InputMappingContext` 加进 Enhanced Input 本地玩家子系统，并绑定 `USigilInputConfig` 里列出的全部 `UInputAction`。此后每个 Enhanced Input 触发事件（`Started`、`Triggered`、`Ongoing`、`Canceled`、`Completed`）都会被转换成 `(FInputActionInstance, FGameplayTag, ETriggerEvent)` 三元组，送入控制管线。
+系统核心是 `USigilInputSystemComponent`，挂在 Pawn 或 PlayerController 上。挂在 Pawn 上时，Pawn 在本地控制器下重启时完成绑定：把自己的 `InputMappingContext` 加进 Enhanced Input 本地玩家子系统，并绑定 `USigilInputConfig` 里列出的全部 `UInputAction`。挂在 PlayerController 上见 [PlayerController 宿主](#playercontroller-宿主)。此后每个 Enhanced Input 触发事件（`Started`、`Triggered`、`Ongoing`、`Canceled`、`Completed`）都会被转换成 `(FInputActionInstance, FGameplayTag, ETriggerEvent)` 三元组，送入控制管线。
 
 输入 Tag 约定挂在 `InputTag` 或 `Sigil.Input.InputTag` 两个根下——插件里所有 Tag 属性都带 `meta=(Categories="InputTag,Sigil.Input.InputTag")` 过滤。
 
@@ -34,6 +34,34 @@ sigil.input 是架在 Enhanced Input 之上的一层「Tag 化」输入抽象：
 | `HighestPriority` | `AllowedInputs` 列表中越靠前优先级越高，窗口关闭时触发优先级最高的那个。 |
 
 缓冲输入触发时通过 `OnFireBufferedInput` 广播。
+
+### PlayerController 宿主
+
+把组件挂在 PlayerController 上，可以在没有 Pawn 时（前端菜单、登录、死亡界面）保留玩法输入绑定。UI 导航本身归 CommonUI / sigil.ui；这个宿主只负责玩法动作绑定、玩法映射上下文和输入 Tag 生成。
+
+PC 宿主由五个 C++ 函数驱动（不暴露给蓝图）：
+
+| 函数 | 行为 |
+| --- | --- |
+| `BindPlayerControllerInput(InputComponent)` | 在 PlayerController 的 `SetupInputComponent` 里调用。只有本地 PC、存在 LocalPlayer、`EnhancedInputComponent`、Enhanced Input 子系统、`InputConfig` 和当前 `InputControlSetup` 都齐全时才绑定，否则返回 `false` 且无副作用。同一组件重复绑定为无操作；换新组件会先释放旧绑定。 |
+| `UnbindPlayerControllerInput()` | 先有序拆除，再只移除组件自己创建的绑定。幂等；`EndPlay` / 注销时也会执行。 |
+| `SetGameplayRoutingEnabled(bool)` | 每次绑定后玩法路由默认**关闭**。开启时加入映射上下文（忽略已按住的键）。关闭时先对接收过、且仍是当前受控 Pawn 的接收者发送仍按住输入的 `Canceled`，再关闭路由、移除映射上下文并清空缓冲与历史。 |
+| `IsPlayerControllerInputBound()` / `IsGameplayRoutingEnabled()` | 状态查询。 |
+
+路由关闭期间所有绑定动作一律丢弃：不检查、不处理、不缓冲，也不会事后回放。Checker、Processor 与 Gameplay Debugger 都以 `GetControlledPawn()` 为玩法主体，没有 Pawn 时得到 `null`，不会拿控制器或上一个 Pawn 顶替。需要自定义按住输入的释放方式时重写 `NeutralizeGameplayReceiver`。Pawn 宿主保持原行为，Setup 完成后自动开启路由。同一玩家不要同时在 Pawn 和 PlayerController 上挂这个组件。
+
+```cpp
+void AMyPlayerController::SetupInputComponent()
+{
+    Super::SetupInputComponent();
+    SigilInput->BindPlayerControllerInput(InputComponent);
+}
+
+// Pawn 就绪且没有菜单阻断玩法时：
+SigilInput->SetGameplayRoutingEnabled(true);
+// 解除控制、打开模态菜单或重载之前：
+SigilInput->SetGameplayRoutingEnabled(false);
+```
 
 ### 调试
 
@@ -77,7 +105,7 @@ sigil.input 是架在 Enhanced Input 之上的一层「Tag 化」输入抽象：
 | `USigilInputConfig` | Const 数据资产：`InputActionMappings`（Tag → Action 映射）+ `InputBufferDefinitions`（缓冲窗口）。 |
 | `USigilInputControlSetup` | Const 数据资产：打包 `InputCheckers`、`InputProcessors`、`bEnableInputBuffer` 与执行顺序，可用 `PushInputSetup`/`PopInputSetup` 栈式切换。 |
 | `USigilInputChecker` | 抽象、可蓝图化的输入校验基类，重写 `DoCheckInput` 决定放行与否。 |
-| `USigilInputChecker_TagRelationship` | 内置检查器：按 `FGameplayTagQuery` 匹配角色 Tag，只放行对应关系里列的输入；Tag 来源可重写 `GetActorTags`。 |
+| `USigilInputChecker_TagRelationship` | 内置检查器：按 `FGameplayTagQuery` 匹配受控 Pawn 的 Tag，只放行对应关系里列的输入；Tag 来源可重写 `GetActorTags`。 |
 | `USigilInputProcessor` | 可蓝图化的处理器：按 `InputTags`/`TriggerEvents` 过滤，按触发事件分发蓝图事件。 |
 | `FSigilInputActionSetting` | `UInputAction` 引用 + `bValueBinding`。 |
 | `FSigilInputBufferWindow` | 缓冲窗口定义：`Tag`、`BufferType`、`AllowedInputs`。 |

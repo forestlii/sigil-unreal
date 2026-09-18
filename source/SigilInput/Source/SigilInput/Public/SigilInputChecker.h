@@ -65,8 +65,8 @@ protected:
 	TArray<FSigilInputTagRelationship> InputTagRelationships;
 
 	/**
-	 * Gets the actor's tags for validation.
-	 * 获取用于验证的演员标签。
+	 * Gets the controlled pawn's tags for validation. Empty when there is no controlled pawn.
+	 * 获取用于验证的受控Pawn标签。没有受控Pawn时为空。
 	 * @param IC The input system component. 输入系统组件。
 	 * @return The actor's gameplay tag container. 演员的游戏标签容器。
 	 */

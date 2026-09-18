@@ -10,7 +10,7 @@ sigil.input is a tag-driven input abstraction layer built on top of Enhanced Inp
 
 ### Tag-based input events
 
-`USigilInputSystemComponent` is the core of the system. Attach it to a Pawn or a PlayerController. On registration it adds its `InputMappingContext` to the Enhanced Input local player subsystem and binds every `UInputAction` listed in its `USigilInputConfig`. From that point on, every Enhanced Input trigger event (`Started`, `Triggered`, `Ongoing`, `Canceled`, `Completed`) is converted into a `(FInputActionInstance, FGameplayTag, ETriggerEvent)` tuple and pushed through the control pipeline.
+`USigilInputSystemComponent` is the core of the system. Attach it to a Pawn or a PlayerController. On a Pawn it binds when the pawn restarts under a local controller: it adds its `InputMappingContext` to the Enhanced Input local player subsystem and binds every `UInputAction` listed in its `USigilInputConfig`. On a PlayerController see [PlayerController host](#playercontroller-host). From that point on, every Enhanced Input trigger event (`Started`, `Triggered`, `Ongoing`, `Canceled`, `Completed`) is converted into a `(FInputActionInstance, FGameplayTag, ETriggerEvent)` tuple and pushed through the control pipeline.
 
 Input tags are expected to live under the `InputTag` or `Sigil.Input.InputTag` tag roots — every tag property in the plugin is filtered with `meta=(Categories="InputTag,Sigil.Input.InputTag")`.
 
@@ -18,7 +18,7 @@ Input tags are expected to live under the `InputTag` or `Sigil.Input.InputTag` t
 
 Each component holds a stack of `USigilInputControlSetup` data assets (`InputControlSetups`); the last entry is the active setup. A setup runs two phases for every incoming event:
 
-1. **Check** — every instanced `USigilInputChecker` in `InputCheckers` must approve the input. The built-in `USigilInputChecker_TagRelationship` checks the owning actor's tags against a `FGameplayTagQuery` and only allows the inputs listed for the matching relationship.
+1. **Check** — every instanced `USigilInputChecker` in `InputCheckers` must approve the input. The built-in `USigilInputChecker_TagRelationship` checks the controlled pawn's tags against a `FGameplayTagQuery` and only allows the inputs listed for the matching relationship.
 2. **Process** — if the input passed, the instanced `USigilInputProcessor` objects in `InputProcessors` handle it. Each processor filters by `InputTags` and `TriggerEvents`, and dispatches to per-event Blueprint-implementable handlers (`HandleInputStarted`, `HandleInputTriggered`, `HandleInputOngoing`, `HandleInputCanceled`, `HandleInputCompleted`). `InputProcessorExecutionType` selects whether all matching processors run (`MatchAll`) or only the first (`FirstOnly`).
 
 Use `PushInputSetup` / `PopInputSetup` to swap the whole rule set at runtime — for example a separate setup for menus, vehicles, or cutscenes.
@@ -34,6 +34,34 @@ If the active setup enables `bEnableInputBuffer`, inputs that are *rejected* by 
 | `HighestPriority` | Inputs earlier in the `AllowedInputs` list win over later ones; the winner fires when the window closes. |
 
 Fired buffered inputs are broadcast through `OnFireBufferedInput`.
+
+### PlayerController host
+
+Hosting the component on the PlayerController keeps gameplay input bindings alive while there is no pawn (front-end menus, login, death screens). UI navigation itself belongs to CommonUI / sigil.ui; this host only owns gameplay action bindings, the gameplay mapping context and input tag generation.
+
+The PC host is driven by five C++ functions (not exposed to Blueprint):
+
+| Function | Behavior |
+| --- | --- |
+| `BindPlayerControllerInput(InputComponent)` | Call from your PlayerController's `SetupInputComponent`. Binds only for a local PC with a LocalPlayer, an `EnhancedInputComponent`, the Enhanced Input subsystem, an `InputConfig` and a current `InputControlSetup`; otherwise returns `false` with no side effects. Rebinding the same component is a no-op; a new component replaces the old binding. |
+| `UnbindPlayerControllerInput()` | Ordered teardown, then removes only the bindings the component created. Idempotent; also runs on `EndPlay` / unregister. |
+| `SetGameplayRoutingEnabled(bool)` | Gameplay routing starts **off** after every bind. Enabling adds the mapping context (ignoring keys already held). Disabling first sends `Canceled` for still-held routed inputs to the pawn that received them (only if it is still the controlled pawn), then closes the route, removes the mapping context and clears buffers and histories. |
+| `IsPlayerControllerInputBound()` / `IsGameplayRoutingEnabled()` | State queries. |
+
+While routing is off every bound action is dropped: nothing is checked, processed, buffered or replayed later. Checkers, processors and the Gameplay Debugger treat `GetControlledPawn()` as the gameplay subject, so with no pawn they see `null` rather than the controller or a previous pawn. Override `NeutralizeGameplayReceiver` to customise how held inputs are released. Pawn hosts keep their previous behavior and open routing automatically after setup. Do not host the component on both the Pawn and the PlayerController of the same player.
+
+```cpp
+void AMyPlayerController::SetupInputComponent()
+{
+    Super::SetupInputComponent();
+    SigilInput->BindPlayerControllerInput(InputComponent);
+}
+
+// When the pawn is ready and no menu blocks gameplay:
+SigilInput->SetGameplayRoutingEnabled(true);
+// Before unpossessing, opening a modal menu or reloading:
+SigilInput->SetGameplayRoutingEnabled(false);
+```
 
 ### Diagnostics
 
@@ -79,7 +107,7 @@ Before using the plugin, make sure you have:
 | `USigilInputConfig` | Const data asset: `InputActionMappings` (tag → action) and `InputBufferDefinitions` (buffer windows). |
 | `USigilInputControlSetup` | Const data asset bundling `InputCheckers`, `InputProcessors`, `bEnableInputBuffer`, and processor execution order. Stacked via `PushInputSetup`/`PopInputSetup`. |
 | `USigilInputChecker` | Abstract, Blueprintable validator. Override `DoCheckInput` to approve or reject an input event. |
-| `USigilInputChecker_TagRelationship` | Built-in checker: matches the actor's tags against `FGameplayTagQuery` rules and allows only the listed inputs. Override `GetActorTags` to supply tags. |
+| `USigilInputChecker_TagRelationship` | Built-in checker: matches the controlled pawn's tags against `FGameplayTagQuery` rules and allows only the listed inputs. Override `GetActorTags` to supply tags. |
 | `USigilInputProcessor` | Blueprintable handler; filters by `InputTags`/`TriggerEvents` and exposes per-trigger-event Blueprint events. |
 | `FSigilInputActionSetting` | `UInputAction` reference plus `bValueBinding`. |
 | `FSigilInputBufferWindow` | Buffer window definition: `Tag`, `BufferType`, `AllowedInputs`. |

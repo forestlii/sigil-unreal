@@ -28,15 +28,46 @@ FSigilGameplayDebuggerCategory_Input::FSigilGameplayDebuggerCategory_Input()
 	BindKeyPress(KeyNameFour, FGameplayDebuggerInputModifier::Shift, this, &FSigilGameplayDebuggerCategory_Input::OnShowBufferedInputEntriesToggle, EGameplayDebuggerInputMode::Local);
 }
 
-void FSigilGameplayDebuggerCategory_Input::CollectData(APlayerController* OwnerPC, AActor* DebugActor)
+const USigilInputSystemComponent* FSigilGameplayDebuggerCategory_Input::ResolveInputSystem(const AActor* DebugActor)
 {
 	if (const USigilInputSystemComponent* InputSystem = USigilInputSystemComponent::GetInputSystemComponent(DebugActor))
 	{
+		return InputSystem;
+	}
+
+	// The component may live on the pawn's own controller; never fall back to the viewer's PlayerController.
+	if (const APawn* Pawn = Cast<APawn>(DebugActor))
+	{
+		return USigilInputSystemComponent::GetInputSystemComponent(Pawn->GetController());
+	}
+	return nullptr;
+}
+
+FString FSigilGameplayDebuggerCategory_Input::GetDisplayName(const USigilInputSystemComponent* InputSystem)
+{
+	if (!InputSystem)
+	{
+		return TEXT("None");
+	}
+	if (const APawn* Pawn = InputSystem->GetControlledPawn())
+	{
+		return Pawn->GetName();
+	}
+	const AActor* Owner = InputSystem->GetOwner();
+	return FString::Printf(TEXT("%s (NoPawn)"), Owner ? *Owner->GetName() : TEXT("None"));
+}
+
+void FSigilGameplayDebuggerCategory_Input::CollectData(APlayerController* OwnerPC, AActor* DebugActor)
+{
+	DataPack = FRepData();
+
+	if (const USigilInputSystemComponent* InputSystem = ResolveInputSystem(DebugActor))
+	{
+		DataPack.ActorName = GetDisplayName(InputSystem);
 		if (USigilInputControlSetup* InputControlSetup = InputSystem->GetCurrentInputSetup())
 		{
 			if (USigilInputConfig* InputConfig = InputSystem->GetInputConfig())
 			{
-				DataPack.ActorName = OwnerPC->GetPawn()->GetName();
 				DataPack.InputConfig = InputConfig->GetName();
 				DataPack.InputControlSetup = InputControlSetup->GetName();
 
@@ -211,7 +242,7 @@ void FSigilGameplayDebuggerCategory_Input::DrawInputBuffers(FGameplayDebuggerCan
 
 void FSigilGameplayDebuggerCategory_Input::DrawInputEntries(FGameplayDebuggerCanvasContext& CanvasContext, const APlayerController* OwnerPC) const
 {
-	const USigilInputSystemComponent* InputSystem = USigilInputSystemComponent::GetInputSystemComponent(FindLocalDebugActor());
+	const USigilInputSystemComponent* InputSystem = ResolveInputSystem(FindLocalDebugActor());
 	if (InputSystem == nullptr || (!bShowPassedInputEntries && !bShowBlockedInputEntries && !bShowBufferedInputEntries))
 		return;
 
