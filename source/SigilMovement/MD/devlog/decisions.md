@@ -20,3 +20,13 @@
 - 「后方有无地面」只认不低于脚底 `BackFloorMaxDropBelowFeet`（默认 50）的地面：外面有落差的窗走翻越而不是跨栏。
 - 验证：`SigilMovement.Traversal.Rules`、`SigilMovement.Traversal.BoxLedges` 两项 Automation 通过（在 ProjectSpecter 里随 ProjectSpecterEditor Win64 Development 编译后运行）；`CheckTraversal` 的世界检测由 ProjectSpecter 的 `ProjectSpecter.Traversal.*` 三项测试覆盖。Host 未构建。
 - 未做：样条边缘组件（取代参考工程里窗用的边缘组件）、规则数据资产与动画选择、网络同步。未运行：PIE 人工手感、Cook、打包。
+
+## 2026-09-20 · 攀爬翻越检测：样条边缘组件与前探越过不可攀物
+
+来源：同上提案第 2.1 节；ProjectSpecter 的推拉窗需要沿摆好的样条翻越。
+
+- 新增 `USigilTraversalLedgeComponent`（`Public/Traversal/SigilTraversalLedgeComponent.h`）：实现 `ISigilTraversableInterface`，按名字引用所属 Actor 上成对的样条（`FSigilTraversalLedgePair`），离角色最近的一条为前边缘、与它配对的为后边缘；`SetTraversalEnabled` 可在运行时关闭（关着的窗）。
+- 法线不依赖样条上摆好的朝上向量：取「前边缘点 − 后边缘点」的水平方向；没有对边时取角色所在的一侧。几何部分是纯函数 `ComputePolylineLedges`，样条先采样成折线（默认 8 点，直边两点即精确）。
+- `CheckTraversal` 的前探不再只认第一个命中：碰到不可攀的东西（或已关闭的可攀物）就忽略它再探，最多 4 次，且只接受距第一个阻挡物不超过 `FSigilTraversalCheckInputs::TraversableSearchDepth`（默认 50）的可攀物。原因：窗嵌在墙里、墙面与窗齐平时，先碰到的常是墙。空间检查仍只忽略角色自身，不会因此穿墙。
+- 验证：新增 `SigilMovement.Traversal.PolylineLedges`，连同原两项在 ProjectSpecter 内通过；ProjectSpecter 里真实 PIE 对一扇打开的推拉窗按跳跃键，角色攀上窗台。Host 未构建。
+- 未做：规则数据资产与动画选择、网络同步。

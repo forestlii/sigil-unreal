@@ -51,6 +51,13 @@ struct SIGILMOVEMENT_API FSigilTraversalCheckInputs
 	float TraceHalfHeight = 60.0f;
 
 	/**
+	 * How far behind the first blocking hit the probe keeps looking for something traversable. Zero: only the first hit counts.
+	 * 前探在第一个阻挡物之后还往后找多远的可攀物。为零则只认第一个命中。
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sigil|Traversal", meta = (ClampMin = "0.0"))
+	float TraversableSearchDepth = 50.0f;
+
+	/**
 	 * The character's own capsule, used to check that it fits on and behind the obstacle. The forward probe is usually
 	 * smaller than this so that it skims over steps and the floor. Zero or less: use the probe's size.
 	 * 角色自身的胶囊，用于检查障碍物顶面与后方放不放得下角色。前探用的胶囊通常比它小，好掠过台阶与地面。不大于零则沿用前探尺寸。
