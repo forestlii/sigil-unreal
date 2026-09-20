@@ -331,4 +331,42 @@ bool FSigilNarrativeDialogueCallbackReentrancyTest::RunTest(const FString& Param
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilNarrativeDialogueLineSecondsTest,
+	"SigilNarrative.Dialogue.LineSeconds",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilNarrativeDialogueLineSecondsTest::RunTest(const FString& Parameters)
+{
+	FSigilDialogueNode Node;
+	Node.Text = FText::FromString(FString::ChrN(100, TEXT('a')));
+
+	TestTrue(TEXT("new lines are skippable by default"), Node.bSkippable);
+	TestTrue(TEXT("default duration mode"), Node.LineDuration == ESigilDialogueLineDuration::Default);
+
+	TestEqual(TEXT("default prefers the voice length"), USigilDialogueAsset::ResolveLineSeconds(Node, 3.5f), 3.5f);
+	TestEqual(TEXT("default falls back to reading time"), USigilDialogueAsset::ResolveLineSeconds(Node, 0.0f), 4.0f);
+	TestEqual(TEXT("reading rate is configurable"), USigilDialogueAsset::ResolveLineSeconds(Node, 0.0f, 10.0f), 10.0f);
+
+	Node.Text = FText::FromString(TEXT("hi"));
+	TestEqual(TEXT("short lines keep the minimum reading time"), USigilDialogueAsset::ResolveLineSeconds(Node, 0.0f), 2.0f);
+
+	Node.LineDuration = ESigilDialogueLineDuration::AfterReadingTime;
+	TestEqual(TEXT("reading time ignores the voice"), USigilDialogueAsset::ResolveLineSeconds(Node, 9.0f), 2.0f);
+
+	Node.LineDuration = ESigilDialogueLineDuration::WhenVoiceEnds;
+	TestEqual(TEXT("voice mode uses the voice"), USigilDialogueAsset::ResolveLineSeconds(Node, 9.0f), 9.0f);
+	TestEqual(TEXT("voice mode without a voice reads instead"), USigilDialogueAsset::ResolveLineSeconds(Node, 0.0f), 2.0f);
+
+	Node.LineDuration = ESigilDialogueLineDuration::AfterSeconds;
+	Node.DurationSeconds = 1.25f;
+	TestEqual(TEXT("typed seconds win"), USigilDialogueAsset::ResolveLineSeconds(Node, 9.0f), 1.25f);
+
+	Node.LineDuration = ESigilDialogueLineDuration::Default;
+	Node.Text = FText::GetEmpty();
+	TestEqual(TEXT("an empty line without a voice takes no time"), USigilDialogueAsset::ResolveLineSeconds(Node, 0.0f), 0.0f);
+
+	return true;
+}
+
 #endif
