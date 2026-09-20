@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Traversal/SigilTraversalLedgeComponent.h"
 #include "Traversal/SigilTraversalLibrary.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -99,6 +100,51 @@ bool FSigilMovementTraversalBoxLedgesTest::RunTest(const FString& Parameters)
 	// Standing over the box footprint offers nothing. 站在盒子投影范围内时不提供边缘。
 	TestFalse(TEXT("inside the footprint"), USigilTraversalLibrary::ComputeBoxLedges(Wall, Extent, FVector(1000.0, 0.0, 100.0), FVector(1000.0, 0.0, 190.0), Ledges));
 	TestFalse(TEXT("degenerate box"), USigilTraversalLibrary::ComputeBoxLedges(FTransform(FQuat::Identity, FVector::ZeroVector, FVector(0.0, 1.0, 1.0)), Extent, FVector::ZeroVector, FVector(-100.0, 0.0, 0.0), Ledges));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSigilMovementTraversalPolylineLedgesTest,
+	"SigilMovement.Traversal.PolylineLedges",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSigilMovementTraversalPolylineLedgesTest::RunTest(const FString& Parameters)
+{
+	// A window sill: two 80 long edges along Y, 64 apart in X, 100 above the floor. Approached from -X.
+	// 一个窗台：两条沿 Y、长 80 的边，X 方向相距 64，离地 100。从 -X 方向走近。
+	const TArray<FVector> Near = {FVector(100.0, -40.0, 100.0), FVector(100.0, 40.0, 100.0)};
+	const TArray<FVector> Far = {FVector(164.0, -40.0, 100.0), FVector(164.0, 40.0, 100.0)};
+	FSigilTraversalLedges Ledges;
+
+	TestTrue(TEXT("sill has ledges"), USigilTraversalLedgeComponent::ComputePolylineLedges(Near, Far, FVector(100.0, 10.0, 60.0), FVector(0.0, 10.0, 90.0), 0.0f, Ledges));
+	TestTrue(TEXT("front point is the nearest point of the near edge"), Ledges.FrontLedgeLocation.Equals(FVector(100.0, 10.0, 100.0), 0.01));
+	TestTrue(TEXT("front normal points away from the far edge"), Ledges.FrontLedgeNormal.Equals(FVector(-1.0, 0.0, 0.0), 0.001));
+	TestTrue(TEXT("back point is straight across"), Ledges.bHasBackLedge && Ledges.BackLedgeLocation.Equals(FVector(164.0, 10.0, 100.0), 0.01));
+	TestTrue(TEXT("back normal is opposite"), Ledges.BackLedgeNormal.Equals(FVector(1.0, 0.0, 0.0), 0.001));
+
+	// A hit beside the opening is pulled back onto the edge, and MinLedgeWidth keeps it off the very end.
+	// 命中点在洞口旁边时被拉回边上；MinLedgeWidth 让它不贴着端点。
+	TestTrue(TEXT("hit beside the opening"), USigilTraversalLedgeComponent::ComputePolylineLedges(Near, Far, FVector(100.0, 90.0, 60.0), FVector(0.0, 90.0, 90.0), 0.0f, Ledges));
+	TestTrue(TEXT("clamped to the end"), FMath::IsNearlyEqual(Ledges.FrontLedgeLocation.Y, 40.0, 0.01));
+	TestTrue(TEXT("with a minimum width"), USigilTraversalLedgeComponent::ComputePolylineLedges(Near, Far, FVector(100.0, 90.0, 60.0), FVector(0.0, 90.0, 90.0), 60.0f, Ledges));
+	TestTrue(TEXT("kept half the width from the end"), FMath::IsNearlyEqual(Ledges.FrontLedgeLocation.Y, 10.0, 0.01));
+	TestFalse(TEXT("edge shorter than the minimum width"), USigilTraversalLedgeComponent::ComputePolylineLedges(Near, Far, FVector(100.0, 0.0, 60.0), FVector(0.0, 0.0, 90.0), 100.0f, Ledges));
+
+	// No far edge: a platform. The normal is the side the character stands on.
+	// 没有对边：平台。法线取角色所在的一侧。
+	TestTrue(TEXT("single edge"), USigilTraversalLedgeComponent::ComputePolylineLedges(Near, TArray<FVector>(), FVector(100.0, 0.0, 60.0), FVector(0.0, 0.0, 90.0), 0.0f, Ledges));
+	TestFalse(TEXT("no back ledge"), Ledges.bHasBackLedge);
+	TestTrue(TEXT("normal faces the character"), Ledges.FrontLedgeNormal.Equals(FVector(-1.0, 0.0, 0.0), 0.001));
+	TestTrue(TEXT("single edge from the other side"), USigilTraversalLedgeComponent::ComputePolylineLedges(Near, TArray<FVector>(), FVector(100.0, 0.0, 60.0), FVector(300.0, 0.0, 90.0), 0.0f, Ledges));
+	TestTrue(TEXT("normal flips"), Ledges.FrontLedgeNormal.Equals(FVector(1.0, 0.0, 0.0), 0.001));
+
+	// A bent edge: the nearest point is found on the right segment. 折线边：最近点落在正确的线段上。
+	const TArray<FVector> Bent = {FVector(0.0, 0.0, 50.0), FVector(100.0, 0.0, 50.0), FVector(100.0, 100.0, 50.0)};
+	TestTrue(TEXT("bent edge"), USigilTraversalLedgeComponent::ComputePolylineLedges(Bent, TArray<FVector>(), FVector(130.0, 60.0, 20.0), FVector(200.0, 60.0, 90.0), 0.0f, Ledges));
+	TestTrue(TEXT("point on the second segment"), Ledges.FrontLedgeLocation.Equals(FVector(100.0, 60.0, 50.0), 0.01));
+	TestTrue(TEXT("normal of the second segment"), Ledges.FrontLedgeNormal.Equals(FVector(1.0, 0.0, 0.0), 0.001));
+
+	TestFalse(TEXT("degenerate edge"), USigilTraversalLedgeComponent::ComputePolylineLedges(TArray<FVector>{FVector::ZeroVector}, TArray<FVector>(), FVector::ZeroVector, FVector::ZeroVector, 0.0f, Ledges));
 	return true;
 }
 

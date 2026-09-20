@@ -13,6 +13,9 @@ namespace SigilTraversalPrivate
 	/** Clearance kept between the capsule and the obstacle when checking for room. 做空间检查时胶囊与障碍物之间留的余量。 */
 	constexpr float RoomClearance = 2.0f;
 
+	/** How many things the forward probe may look past before giving up. 前探最多越过几个不可攀的东西。 */
+	constexpr int32 MaxProbeAttempts = 4;
+
 	/** The obstacle itself, or one of the hit actor's components, that knows its ledges. 知道自己边缘的对象：被命中的组件、其 Actor，或该 Actor 的某个组件。 */
 	UObject* FindTraversable(const FHitResult& Hit)
 	{
@@ -162,19 +165,52 @@ bool USigilTraversalLibrary::CheckTraversal(
 	const FVector Start = InstigatorLocation + Inputs.TraceOriginOffset;
 	const FVector End = Start + Inputs.TraceForwardDirection.GetSafeNormal() * Inputs.TraceForwardDistance + Inputs.TraceEndOffset;
 
+	// The first thing in the way is not always the traversable one: a window sits in a wall whose face is flush with it.
+	// Look a little further behind anything that cannot be traversed, but never further than TraversableSearchDepth.
+	// 挡在面前的第一个东西不一定就是可攀的：窗嵌在墙里，墙面与窗齐平。不可攀的就再往后找一点，但不超过 TraversableSearchDepth。
+	FCollisionQueryParams ProbeParams = Params;
 	FHitResult Hit;
-	if (!World->SweepSingleByChannel(Hit, Start, End, FQuat::Identity, ECC_Visibility, Capsule, Params))
+	bool bFound = false;
+	float FirstBlockingDistance = -1.0f;
+	for (int32 Attempt = 0; Attempt < MaxProbeAttempts && !bFound; ++Attempt)
 	{
-		return false;
-	}
+		if (!World->SweepSingleByChannel(Hit, Start, End, FQuat::Identity, ECC_Visibility, Capsule, ProbeParams))
+		{
+			return false;
+		}
+		if (FirstBlockingDistance < 0.0f)
+		{
+			FirstBlockingDistance = Hit.Distance;
+		}
+		else if (Hit.Distance > FirstBlockingDistance + Inputs.TraversableSearchDepth)
+		{
+			return false;
+		}
 
-	// A probe that starts out touching the obstacle has no meaningful impact point: use the character's own position.
-	// 起点就贴着障碍物的检测没有可用的命中点：改用角色自身位置。
-	const FVector HitLocation = Hit.bStartPenetrating ? InstigatorLocation : FVector(Hit.ImpactPoint);
-	UObject* Traversable = FindTraversable(Hit);
-	if (!Traversable ||
-		!ISigilTraversableInterface::Execute_GetTraversalLedges(Traversable, HitLocation, InstigatorLocation, OutResult.Ledges) ||
-		!OutResult.Ledges.bHasFrontLedge)
+		// A probe that starts out touching the obstacle has no meaningful impact point: use the character's own position.
+		// 起点就贴着障碍物的检测没有可用的命中点：改用角色自身位置。
+		const FVector HitLocation = Hit.bStartPenetrating ? InstigatorLocation : FVector(Hit.ImpactPoint);
+		UObject* Traversable = FindTraversable(Hit);
+		bFound = Traversable &&
+			ISigilTraversableInterface::Execute_GetTraversalLedges(Traversable, HitLocation, InstigatorLocation, OutResult.Ledges) &&
+			OutResult.Ledges.bHasFrontLedge;
+		if (!bFound)
+		{
+			if (const AActor* HitActor = Hit.GetActor())
+			{
+				ProbeParams.AddIgnoredActor(HitActor);
+			}
+			else if (const UPrimitiveComponent* HitPrimitive = Hit.GetComponent())
+			{
+				ProbeParams.AddIgnoredComponent(HitPrimitive);
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
+	if (!bFound)
 	{
 		OutResult = FSigilTraversalCheckResult();
 		return false;
