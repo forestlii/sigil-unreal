@@ -126,3 +126,32 @@ const FSigilDialogueNode* USigilDialogueAsset::FindNode(const FName NodeId) cons
 		return Node.NodeId == NodeId;
 	});
 }
+
+float USigilDialogueAsset::ResolveLineSeconds(
+	const FSigilDialogueNode& Node,
+	const float VoiceSeconds,
+	const float LettersPerSecond,
+	const float MinReadingSeconds)
+{
+	const auto ReadingSeconds = [&Node, LettersPerSecond, MinReadingSeconds]()
+	{
+		if (Node.Text.IsEmptyOrWhitespace())
+		{
+			return 0.0f;
+		}
+		const float Rate = FMath::Max(LettersPerSecond, 1.0f);
+		return FMath::Max(static_cast<float>(Node.Text.ToString().Len()) / Rate, FMath::Max(MinReadingSeconds, 0.0f));
+	};
+
+	switch (Node.LineDuration)
+	{
+	case ESigilDialogueLineDuration::AfterSeconds:
+		return FMath::Max(Node.DurationSeconds, 0.0f);
+	case ESigilDialogueLineDuration::AfterReadingTime:
+		return ReadingSeconds();
+	case ESigilDialogueLineDuration::WhenVoiceEnds:
+	case ESigilDialogueLineDuration::Default:
+	default:
+		return VoiceSeconds > 0.0f ? VoiceSeconds : ReadingSeconds();
+	}
+}
