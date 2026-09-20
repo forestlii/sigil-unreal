@@ -1,6 +1,6 @@
 ---
 name: sigil-movement
-description: 在接入、修改或排查 SigilMovement 的运行时初始化、移动配置、旋转控制权、Locomotion 或配套动画节点时读取。
+description: 在接入、修改或排查 SigilMovement 的运行时初始化、移动配置、旋转控制权、Locomotion、配套动画节点，或攀爬翻越检测（Traversal：可攀接口、前探与空间检查、动作判定、盒体积与样条边缘）时读取。
 ---
 
 # Sigil 移动与动画配套
@@ -44,6 +44,20 @@ description: 在接入、修改或排查 SigilMovement 的运行时初始化、�
   缺 Owner 或组件时重置为空快照，只记录一次警告。
   来源：source/SigilMovement/MD/devlog/decisions.md。
 
+## 攀爬翻越检测（Traversal，核对基线 0f1212d52635de5f0da3db1ff8a1fdd720e44827）
+
+入口：Public/Traversal/ 下 SigilTraversalTypes.h、SigilTraversableInterface.h、SigilTraversalLibrary.h、
+SigilTraversalLedgeComponent.h 及对应 Private 实现；测试在 Private/Tests/SigilTraversalTest.cpp。
+设计取舍与阈值来源见 source/SigilMovement/MD/devlog/decisions.md 的两条 2026-09-20 记录，这里只列约束：
+
+- 只做判定，不含移动与动画；把角色送过去由消费项目决定。
+- 障碍物自己回答边缘在哪（ISigilTraversableInterface::GetTraversalLedges）。查找顺序：被命中的组件、其 Actor、该 Actor 上实现接口的组件。
+  边缘法线水平、指向障碍物外侧。盒体积用 USigilTraversalLibrary::ComputeBoxLedges，样条用 USigilTraversalLedgeComponent（按名字配对，可运行时开关）。
+- CheckTraversal 走 ECC_Visibility。前探胶囊与角色胶囊分开传（FSigilTraversalCheckInputs 的 Trace* 与 Capsule*）；
+  前探碰到不可攀物会忽略它再探，最多 4 次，且只接受距第一个阻挡物 TraversableSearchDepth 以内的可攀物；空间检查只忽略角色自身。
+- ClassifyAction 是四行判定表加高度上限，阈值全在 FSigilTraversalRules，除 CheckTraversal 外都是纯函数，可无世界单测。
+- 未做：规则数据资产与动画选择、网络同步。Host 未构建；测试在消费项目 ProjectSpecter 内运行通过。
+
 ## 处理当前任务
 
 先区分初始化模式、配置是否齐备、运行是否激活和旋转控制权。
@@ -54,5 +68,5 @@ description: 在接入、修改或排查 SigilMovement 的运行时初始化、�
 ## 范围
 
 覆盖现有移动与配套动画机制。
-不预设游戏翻越、钩爪或其他动作，也不把 WIP Mover 当作成熟接入方案；
+翻越只提供判定，不预设游戏如何移动角色，也不预设钩爪或其他动作；不把 WIP Mover 当作成熟接入方案；
 动画资产及许可由消费项目另行处理。
