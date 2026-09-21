@@ -672,6 +672,20 @@ bool USigilEquipmentSystemComponent::IsEquipmentSystemInitialized() const
 	return bEquipmentSystemInitialized;
 }
 
+bool USigilEquipmentSystemComponent::SetTargetCollectionTag(const FGameplayTag NewTargetCollectionTag)
+{
+	if (bEquipmentSystemInitialized)
+	{
+		UE_LOG(LogSigilInventory, Warning,
+			TEXT("%hs: already initialized, refusing to change the target collection tag from %s to %s."),
+			__FUNCTION__, *TargetCollectionTag.ToString(), *NewTargetCollectionTag.ToString());
+		return false;
+	}
+
+	TargetCollectionTag = NewTargetCollectionTag;
+	return true;
+}
+
 void USigilEquipmentSystemComponent::BindToEquipmentSystemInitialized(FSigilEquipmentSystem_Initialized_DynamicEvent Delegate)
 {
 	if (bEquipmentSystemInitialized)
