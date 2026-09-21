@@ -203,6 +203,20 @@ public:
 	FGameplayTag GetTargetCollectionTag() const { return TargetCollectionTag; };
 
 	/**
+	 * Sets the target collection tag before initialization.
+	 * TargetCollectionTag is EditDefaultsOnly and protected, so a host that is a plain C++ class
+	 * (no Blueprint subclass to configure in the details panel) had no way to set it at all.
+	 * Refuses to change the tag once the equipment system is initialized, since the component
+	 * has already subscribed to a collection by then.
+	 * 在初始化前设置目标集合标签。TargetCollectionTag 是 EditDefaultsOnly 且 protected，
+	 * 纯 C++ 宿主（没有蓝图子类可以在细节面板里配）此前根本无从设置。
+	 * 初始化之后拒绝修改——那时组件已经订阅了某个集合。
+	 * @return Whether the tag was applied. 是否设置成功。
+	 */
+	UFUNCTION(BlueprintCallable, Category="GIS|InventorySystem")
+	bool SetTargetCollectionTag(FGameplayTag NewTargetCollectionTag);
+
+	/**
 	 * Checks if the equipment system is initialized.
 	 * 检查装备系统是否已初始化。
 	 * @return True if initialized, false otherwise. 如果已初始化则返回true，否则返回false。
