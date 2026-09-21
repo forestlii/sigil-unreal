@@ -526,7 +526,21 @@ void USigilMovementSystemComponent::RefreshMovementSetSetting()
 	}
 	if (!bFoundMovementSet)
 	{
-		UE_LOG(LogSigilMovement, Error, TEXT("No movement set(%s) found in movement definitions on actor(%s)! %S"), *MovementSet.ToString(), *GetOwner()->GetName(), __FUNCTION__);
+		// Bootstrap state, not an error: a host must call PushMovementDefinition and
+		// SetMovementSet in some order, so exactly one of them necessarily runs while the
+		// other half is still unset, and both funnel through OnMovementSetChanged() to here.
+		// Only "a movement set was chosen and definitions exist, yet nothing matches" is a
+		// genuine misconfiguration.
+		// 装配中的合法中间态，不是错误：宿主必须分别调用 PushMovementDefinition 与 SetMovementSet，
+		// 无论先后，总有一次是在另一半尚未就绪时触发到这里。
+		// 只有「已选定运动集、且已有运动定义，却匹配不到」才是真正的配置错误。
+		const bool bBootstrapping = !MovementSet.IsValid() || MovementDefinitions.IsEmpty();
+		UE_CLOG(bBootstrapping, LogSigilMovement, Verbose,
+			TEXT("Movement set(%s) not resolved yet on actor(%s); definitions=%d. %S"),
+			*MovementSet.ToString(), *GetOwner()->GetName(), MovementDefinitions.Num(), __FUNCTION__);
+		UE_CLOG(!bBootstrapping, LogSigilMovement, Error,
+			TEXT("No movement set(%s) found in movement definitions on actor(%s)! %S"),
+			*MovementSet.ToString(), *GetOwner()->GetName(), __FUNCTION__);
 	}
 }
 

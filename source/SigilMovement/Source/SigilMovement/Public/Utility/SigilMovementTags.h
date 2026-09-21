@@ -26,6 +26,20 @@ namespace SigilMovementStateTags
 	SIGILMOVEMENT_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Sprint)
 }
 
+/**
+ * Movement set tags. USigilMovementSystemComponent::SetMovementSet already declares
+ * Meta = (Categories = "Sigil.Movement.Set"), but no tag was ever defined under it,
+ * so every host had to invent its own. These are the canonical ones.
+ * 运动集标签。SetMovementSet 早已声明分类为 Sigil.Movement.Set，却没有任何标签定义在该命名空间下，
+ * 导致每个宿主各自造标签、必然漂移。此处补齐规范标签。
+ */
+namespace SigilMovementSetTags
+{
+	SIGILMOVEMENT_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Default)
+	SIGILMOVEMENT_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Crouched)
+	SIGILMOVEMENT_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ladder)
+}
+
 namespace SigilOverlayModeTags
 {
 	SIGILMOVEMENT_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(None)

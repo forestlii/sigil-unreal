@@ -24,6 +24,13 @@ namespace SigilMovementStateTags
 	UE_DEFINE_GAMEPLAY_TAG(Sprint, FName{TEXTVIEW("Sigil.Movement.State.Sprint")})
 }
 
+namespace SigilMovementSetTags
+{
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Default, FName{TEXTVIEW("Sigil.Movement.Set.Default")}, "Default upright movement set")
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Crouched, FName{TEXTVIEW("Sigil.Movement.Set.Crouched")}, "Crouched movement set")
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ladder, FName{TEXTVIEW("Sigil.Movement.Set.Ladder")}, "Ladder movement set")
+}
+
 namespace SigilOverlayModeTags
 {
 	UE_DEFINE_GAMEPLAY_TAG(None, FName{TEXTVIEW("Sigil.Movement.OverlayMode.None")})
