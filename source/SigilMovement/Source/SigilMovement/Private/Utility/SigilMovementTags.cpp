@@ -29,6 +29,10 @@ namespace SigilMovementSetTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Default, FName{TEXTVIEW("Sigil.Movement.Set.Default")}, "Default upright movement set")
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Crouched, FName{TEXTVIEW("Sigil.Movement.Set.Crouched")}, "Crouched movement set")
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ladder, FName{TEXTVIEW("Sigil.Movement.Set.Ladder")}, "Ladder movement set")
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(ADS, FName{TEXTVIEW("Sigil.Movement.Set.ADS")}, "Aiming-down-sights movement set")
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(ADS_Crouched, FName{TEXTVIEW("Sigil.Movement.Set.ADS_Crouched")}, "Crouched aiming-down-sights movement set")
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Guard, FName{TEXTVIEW("Sigil.Movement.Set.Guard")}, "Guarding movement set")
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Guard_Crouched, FName{TEXTVIEW("Sigil.Movement.Set.Guard_Crouched")}, "Crouched guarding movement set")
 }
 
 namespace SigilOverlayModeTags
