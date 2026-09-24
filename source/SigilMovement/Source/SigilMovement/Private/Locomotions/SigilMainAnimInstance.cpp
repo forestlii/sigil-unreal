@@ -329,7 +329,36 @@ void USigilMainAnimInstance::NativeThreadSafeUpdateAnimation(const float DeltaTi
 
 void USigilMainAnimInstance::SetAnimLayerBySetting(const USigilAnimLayerSetting* LayerSetting, TObjectPtr<USigilAnimLayer>& LayerInstance)
 {
-	check(IsInGameThread() && IsValid(MSC) && IsValid(MSC->AnimGraphSetting))
+	// Being off the game thread is a programming error, so it still asserts.
+	// 跑在非游戏线程属于程序错误，仍然断言。
+	check(IsInGameThread())
+
+	// A missing component or AnimGraphSetting means the host forgot to configure the character.
+	// That must not take the game down: report it once, with the character name and what to set,
+	// then leave the layers unlinked. The character keeps its reference pose and play continues.
+	// 组件或 AnimGraphSetting 缺失说明宿主漏配了角色，不能因此让游戏崩：
+	// 带上角色名与该配什么，只报一次，然后不链接动画层。角色保持参考姿势，游戏继续。
+	if (!IsValid(MSC) || !IsValid(MSC->AnimGraphSetting))
+	{
+		if (!bLoggedMissingAnimGraphSetting)
+		{
+			bLoggedMissingAnimGraphSetting = true;
+			const AActor* OwnerActor = GetOwningActor();
+			UE_LOG(LogSigilMovement, Error,
+			       TEXT("Anim layers cannot be linked for '%s' (anim instance %s): %s. ")
+			       TEXT("Set AnimGraphSetting on the character's Sigil movement system component ")
+			       TEXT("(Settings|Animation) to a USigilAnimGraphSetting asset. ")
+			       TEXT("The character will stay in its reference pose until then. %S"),
+			       OwnerActor ? *OwnerActor->GetName() : TEXT("<no owner>"),
+			       *GetClass()->GetName(),
+			       IsValid(MSC)
+				       ? TEXT("its movement system component has no AnimGraphSetting")
+				       : TEXT("it has no Sigil movement system component"),
+			       __FUNCTION__)
+		}
+		return;
+	}
+	bLoggedMissingAnimGraphSetting = false;
 
 	//invalid setting
 	if (!IsValid(LayerSetting))

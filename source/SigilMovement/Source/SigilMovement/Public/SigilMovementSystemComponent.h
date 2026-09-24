@@ -578,6 +578,13 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<APawn> OwnerPawn{nullptr};
 
+	/**
+	 * Guards the "movement state setting is unusable" error, which would otherwise repeat on every
+	 * state refresh. Cleared as soon as a usable setting is applied.
+	 * 防止「运动状态设置不可用」的报错在每次状态刷新时重复；一旦应用到可用设置就复位。
+	 */
+	bool bLoggedInvalidMovementStateSetting = false;
+
 #pragma endregion
 
 #if WITH_EDITORONLY_DATA

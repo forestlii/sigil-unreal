@@ -169,19 +169,36 @@ bool USigilCharacterMovementSystemComponent::TryActivateConfiguredRuntime()
 	{
 		return true;
 	}
+	// Each bail-out says why. Hosts call this during assembly and a false is often expected
+	// (nothing configured yet), so these are Verbose rather than warnings — but without them a
+	// host that *did* mean to configure the character has no way to tell which step it missed.
+	// 每个提前返回都说明原因。宿主在装配期调用本函数，返回 false 常常是预期内的（还没配），
+	// 所以用 Verbose 而不是警告；但没有这些信息，真打算配好的宿主根本看不出卡在哪一步。
 	if (!IsValid(AnimGraphSetting))
 	{
+		UE_LOG(LogSigilMovement, Verbose,
+		       TEXT("Configured runtime not activated on '%s': AnimGraphSetting is not set. %S"),
+		       *GetOwner()->GetName(), __FUNCTION__)
 		return false;
 	}
 
 	if (!ApplyRotationAuthority(RotationAuthority))
 	{
+		UE_LOG(LogSigilMovement, Verbose,
+		       TEXT("Configured runtime not activated on '%s': rotation authority could not be applied. %S"),
+		       *GetOwner()->GetName(), __FUNCTION__)
 		return false;
 	}
 
 	AnimationInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
 	if (!IsValid(AnimationInstance))
 	{
+		UE_LOG(LogSigilMovement, Verbose,
+		       TEXT("Configured runtime not activated on '%s': %s. %S"),
+		       *GetOwner()->GetName(),
+		       GetMesh() ? TEXT("the mesh has no anim instance (is an anim class assigned?)")
+		                 : TEXT("the character has no mesh"),
+		       __FUNCTION__)
 		return false;
 	}
 
@@ -190,6 +207,10 @@ bool USigilCharacterMovementSystemComponent::TryActivateConfiguredRuntime()
 			|| OwnerPawn->bUseControllerRotationYaw
 			|| OwnerPawn->bUseControllerRotationRoll))
 	{
+		UE_LOG(LogSigilMovement, Verbose,
+		       TEXT("Configured runtime not activated on '%s': rotation authority is SigilMovement ")
+		       TEXT("but the pawn still has bUseControllerRotation* enabled. %S"),
+		       *GetOwner()->GetName(), __FUNCTION__)
 		return false;
 	}
 

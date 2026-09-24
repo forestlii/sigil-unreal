@@ -50,6 +50,12 @@ public:
 	/**
 	 * Apply an anim layer setting to anim layer instance.
 	 * 应用动画层设置到动画层实例。
+	 *
+	 * A missing movement component or AnimGraphSetting is a host configuration mistake, not a
+	 * programming error, so it logs once and returns instead of asserting: the character keeps
+	 * its reference pose and everything else keeps running.
+	 * 缺少运动组件或 AnimGraphSetting 属于宿主漏配、不是程序错误，因此只报一次错并返回，
+	 * 不再断言：角色保持参考姿势，其余逻辑照常运行。
 	 */
 	virtual void SetAnimLayerBySetting(const USigilAnimLayerSetting* LayerSetting, TObjectPtr<USigilAnimLayer>& LayerInstance);
 
@@ -283,4 +289,11 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, Category="AnimLayers", meta=(ShowInnerProperties))
 	TObjectPtr<USigilAnimLayer> SkeletonControlsLayerInstance;
+
+	/**
+	 * Guards the "missing AnimGraphSetting" error so one misconfigured character does not flood
+	 * the log: RefreshLayerSettings calls SetAnimLayerBySetting five times per refresh.
+	 * 防止漏配 AnimGraphSetting 的角色刷屏：RefreshLayerSettings 每次刷新会调用五次。
+	 */
+	bool bLoggedMissingAnimGraphSetting = false;
 };
