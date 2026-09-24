@@ -4,6 +4,7 @@
 #include "Locomotions/SigilAnimLayer_Overlay_Stacks.h"
 #include "Locomotions/SigilMainAnimInstance.h"
 #include "UObject/ObjectSaveContext.h"
+#include "Utility/SigilLog.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(SigilAnimLayer_Overlay_Stacks)
 
@@ -30,7 +31,16 @@ void USigilAnimLayer_Overlay_Stack::NativeThreadSafeUpdateAnimation(float DeltaS
 
 void USigilAnimLayer_Overlay_Stack::ApplySetting_Implementation(const USigilAnimLayerSetting* Setting)
 {
-	check(IsValid(Setting))
+	// A null setting reaching here means a caller passed one in, which is a data/wiring mistake
+	// rather than something worth taking the game down for.
+	// 传进来的 Setting 为空属于数据或接线错误，不值得让游戏崩。
+	if (!IsValid(Setting))
+	{
+		UE_LOG(LogSigilMovement, Error,
+		       TEXT("Overlay stack layer '%s' was given a null anim layer setting; the overlay is left unchanged. %S"),
+		       *GetClass()->GetName(), __FUNCTION__)
+		return;
+	}
 	//setting changes or invalid, reset.
 	if (PrevSetting != Setting || PrevOverlayMode != GetParent()->OverlayMode)
 	{

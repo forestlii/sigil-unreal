@@ -582,7 +582,21 @@ void USigilMovementSystemComponent::RefreshMovementStateSetting()
 	FSigilMovementStateSetting NewStateSetting;
 	if (!ControlSetting->GetStateByTag(MovementState, NewStateSetting))
 	{
-		checkf(!ControlSetting->MovementStates.IsEmpty(), TEXT("Found empty MovementState Settings on %s!"), *ControlSetting->GetName())
+		// An empty MovementStates list is a data mistake in the control asset, not a programming
+		// error. Keep the previous setting and say which asset needs fixing instead of asserting.
+		// MovementStates 为空是控制资产的数据错误、不是程序错误：保留上一份设置并指名要改哪个资产，不断言。
+		if (ControlSetting->MovementStates.IsEmpty())
+		{
+			if (!bLoggedInvalidMovementStateSetting)
+			{
+				bLoggedInvalidMovementStateSetting = true;
+				UE_LOG(LogSigilMovement, Error,
+				       TEXT("Movement control setting '%s' has no MovementStates, so no movement state can be applied on '%s'. ")
+				       TEXT("Add at least one entry to its MovementStates array. %S"),
+				       *ControlSetting->GetName(), *GetOwner()->GetName(), __FUNCTION__)
+			}
+			return;
+		}
 		NewStateSetting = ControlSetting->MovementStates.Last();
 		SetDesiredMovement(NewStateSetting.Tag);
 		UE_LOG(LogSigilMovement, Verbose, TEXT("No MovementState setting for current movement state(%s), Change desired last one(%s) in list. actor:%s"), *MovementState.ToString(),
@@ -592,7 +606,23 @@ void USigilMovementSystemComponent::RefreshMovementStateSetting()
 
 	MovementStateSetting = NewStateSetting;
 
-	check(!MovementStateSetting.AllowedRotationModes.IsEmpty())
+	// Same story for AllowedRotationModes: a state with none configured is a data mistake.
+	// Keep the current desired rotation mode rather than bringing the game down.
+	// AllowedRotationModes 同理：某个步态一个都没勾是数据错误，保留当前朝向模式，不让游戏崩。
+	if (MovementStateSetting.AllowedRotationModes.IsEmpty())
+	{
+		if (!bLoggedInvalidMovementStateSetting)
+		{
+			bLoggedInvalidMovementStateSetting = true;
+			UE_LOG(LogSigilMovement, Error,
+			       TEXT("Movement state '%s' in control setting '%s' has no AllowedRotationModes, ")
+			       TEXT("so the rotation mode of '%s' is left unchanged. Tick at least one allowed rotation mode for that state. %S"),
+			       *MovementStateSetting.Tag.ToString(), *ControlSetting->GetName(),
+			       *GetOwner()->GetName(), __FUNCTION__)
+		}
+		return;
+	}
+	bLoggedInvalidMovementStateSetting = false;
 
 	if (!MovementStateSetting.AllowedRotationModes.Contains(DesiredRotationMode))
 	{
