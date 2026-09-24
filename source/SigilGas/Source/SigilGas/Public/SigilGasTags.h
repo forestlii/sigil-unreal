@@ -16,12 +16,21 @@ namespace SigilAbilityActivateFailTags
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Networking);
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivationGroup);
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(SourceObjectInactive);
+
+	/**
+	 * Failures for required context an ability could not resolve at activation time.
+	 * 激活时所需上下文缺失导致的失败原因。
+	 */
+	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Missing_AbilityAction);
+	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Missing_AttackInstigator);
+	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Missing_MovementInput);
 }
 
 namespace SigilAbilityTraitTags
 {
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivationOnSpawn)
 	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Persistent)
+	SIGILGAS_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(MovementCancellable)
 
 }
 
