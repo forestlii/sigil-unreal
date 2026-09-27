@@ -59,6 +59,13 @@ public:
 	 */
 	virtual void SetAnimLayerBySetting(const USigilAnimLayerSetting* LayerSetting, TObjectPtr<USigilAnimLayer>& LayerInstance);
 
+	/**
+	 * One layer's state for the refresh log: "<unset>", "Setting->Instance" or "Setting->FAILED".
+	 * 单个动画层在刷新日志里的状态。
+	 */
+	static FString DescribeLayerLink(const USigilAnimLayerSetting* LayerSetting,
+	                                 const USigilAnimLayer* LayerInstance);
+
 
 	/**
 	 *  Add "anim state node to tag mappings" for the specified anim instance.

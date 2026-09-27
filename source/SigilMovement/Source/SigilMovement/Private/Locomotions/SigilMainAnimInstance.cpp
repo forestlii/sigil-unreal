@@ -73,6 +73,41 @@ void USigilMainAnimInstance::RefreshLayerSettings_Implementation()
 	SetAnimLayerBySetting(MSSetting.AnimLayerSetting_View, ViewLayerInstance);
 	SetAnimLayerBySetting(MSSetting.AnimLayerSetting_Additive, AdditiveLayerInstance);
 	SetAnimLayerBySetting(MSSetting.AnimLayerSetting_SkeletalControls, SkeletonControlsLayerInstance);
+
+	// One line saying which movement set resolved and which of the five layers actually linked.
+	// A character stuck in its reference pose looks identical whether the set failed to resolve,
+	// the settings are empty, or the layers failed to link — this tells the three apart.
+	// 一行说清运动集解析到什么、五个层各自链上了没有。角色卡在参考姿势时，
+	// 「运动集没解析」「设置为空」「层没链上」三种原因看起来一模一样，这条日志把它们分开。
+	UE_LOG(LogSigilMovement, Verbose,
+	       TEXT("Anim layers refreshed on '%s': set=%s | states=%s overlay=%s view=%s additive=%s skeletal=%s. %S"),
+	       GetOwningActor() ? *GetOwningActor()->GetName() : TEXT("<no owner>"),
+	       IsValid(MSC) ? *MSC->GetMovementSet().ToString() : TEXT("<no MSC>"),
+	       *DescribeLayerLink(States, StateLayerInstance),
+	       *DescribeLayerLink(Overlay, OverlayLayerInstance),
+	       *DescribeLayerLink(MSSetting.AnimLayerSetting_View, ViewLayerInstance),
+	       *DescribeLayerLink(MSSetting.AnimLayerSetting_Additive, AdditiveLayerInstance),
+	       *DescribeLayerLink(MSSetting.AnimLayerSetting_SkeletalControls, SkeletonControlsLayerInstance),
+	       __FUNCTION__)
+}
+
+FString USigilMainAnimInstance::DescribeLayerLink(const USigilAnimLayerSetting* LayerSetting,
+                                                  const USigilAnimLayer* LayerInstance)
+{
+	if (!IsValid(LayerSetting))
+	{
+		// Not configured for this movement set — expected for most characters, not an error.
+		// 这个运动集没配这一层，多数角色都是如此，不是错误。
+		return TEXT("<unset>");
+	}
+	if (!IsValid(LayerInstance))
+	{
+		// Configured but not linked: the mapping lookup or the layer spawn failed.
+		// 配了却没链上：映射查找或层实例化失败。
+		return FString::Printf(TEXT("%s->FAILED"), *LayerSetting->GetClass()->GetName());
+	}
+	return FString::Printf(TEXT("%s->%s"), *LayerSetting->GetClass()->GetName(),
+	                       *LayerInstance->GetClass()->GetName());
 }
 
 void USigilMainAnimInstance::SetOffsetRootBoneRotationMode_Implementation(EOffsetRootBoneMode NewRotationMode)
