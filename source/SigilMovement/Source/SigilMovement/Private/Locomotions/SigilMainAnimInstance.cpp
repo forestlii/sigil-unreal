@@ -453,6 +453,9 @@ void USigilMainAnimInstance::SetAnimLayerBySetting(const USigilAnimLayerSetting*
 
 	if (LayerInstance)
 	{
+		// Record it before the event so thread-safe layer code can read it (see USigilAnimLayer::GetAppliedSetting).
+		// 先记下再触发事件，线程安全的层代码才读得到（见 USigilAnimLayer::GetAppliedSetting）。
+		LayerInstance->SetAppliedSetting(LayerSetting);
 		LayerInstance->ApplySetting(LayerSetting);
 	}
 }

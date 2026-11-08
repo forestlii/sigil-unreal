@@ -106,4 +106,21 @@ public:
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Settings", meta=(TitleProperty="Tag"))
 	TArray<FSigilAnimStateNameToTag> AnimStateNameToTagMapping;
+
+	/**
+	 * The setting most recently handed to this layer through ApplySetting. The main anim instance records it on the
+	 * game thread just before the event fires, so thread-safe code can read it without touching a Blueprint object
+	 * variable — which thread-safe Blueprint functions are not allowed to do.
+	 * 最近一次经 ApplySetting 交给本层的设置。主动画实例在游戏线程上、事件触发前记下它，
+	 * 这样线程安全的代码不必读蓝图里的对象变量（线程安全的蓝图函数不允许那样做）也能拿到。
+	 */
+	UFUNCTION(BlueprintPure, Category="GMS|AnimationLayer", meta=(BlueprintThreadSafe))
+	const USigilAnimLayerSetting* GetAppliedSetting() const { return AppliedSetting; }
+
+	/** Called by the main anim instance on the game thread. 由主动画实例在游戏线程调用。 */
+	void SetAppliedSetting(const USigilAnimLayerSetting* InSetting) { AppliedSetting = InSetting; }
+
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<const USigilAnimLayerSetting> AppliedSetting;
 };
