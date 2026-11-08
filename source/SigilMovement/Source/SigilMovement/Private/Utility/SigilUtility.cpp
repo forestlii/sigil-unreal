@@ -194,6 +194,35 @@ bool USigilUtility::IsValidPoseSearchDatabasesChooser(const UChooserTable* Choos
 	return true;
 }
 
+UChooserTable* USigilUtility::GetPoseSearchDatabasesChooserFromLayer(const USigilAnimLayer* AnimLayerInstance)
+{
+	if (!IsValid(AnimLayerInstance))
+	{
+		return nullptr;
+	}
+	const USigilAnimLayerSetting* Setting = AnimLayerInstance->GetAppliedSetting();
+	if (!IsValid(Setting))
+	{
+		return nullptr;
+	}
+
+	// Look the property up by type rather than by name, so Blueprint setting subclasses that named it
+	// differently still work. The first non-null chooser table wins.
+	// 按类型而不是按名字找属性，这样蓝图设置子类不管怎么命名都能用；取第一个非空的选择表。
+	for (TFieldIterator<FObjectPropertyBase> It(Setting->GetClass()); It; ++It)
+	{
+		if (!It->PropertyClass || !It->PropertyClass->IsChildOf(UChooserTable::StaticClass()))
+		{
+			continue;
+		}
+		if (UChooserTable* Chooser = Cast<UChooserTable>(It->GetObjectPropertyValue_InContainer(Setting)))
+		{
+			return Chooser;
+		}
+	}
+	return nullptr;
+}
+
 TArray<UPoseSearchDatabase*> USigilUtility::EvaluatePoseSearchDatabasesChooser(const USigilMainAnimInstance* MainAnimInstance, const USigilAnimLayer* AnimLayerInstance,
                                                                               UChooserTable* ChooserTable)
 {

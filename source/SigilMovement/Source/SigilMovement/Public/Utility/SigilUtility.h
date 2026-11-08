@@ -73,6 +73,19 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="GMS|Animation", meta=(BlueprintThreadSafe))
 	static bool IsValidPoseSearchDatabasesChooser(const UChooserTable* ChooserTable);
 
+	/**
+	 * The pose search database chooser carried by the setting this layer was given — the first chooser-table
+	 * property found on it, so it works for any setting subclass, native or Blueprint.
+	 * Thread-safe: it reads the setting the main anim instance recorded on the game thread (GetAppliedSetting),
+	 * which is what a motion matching layer needs inside its thread-safe database selection function, where a
+	 * Blueprint object variable such as the cached setting may not be read.
+	 * 本层所拿到设置上的姿态数据库选择表——取其上找到的第一个选择表属性，原生与蓝图设置子类都适用。
+	 * 线程安全：读的是主动画实例在游戏线程记下的设置。motion matching 层在线程安全的数据库选择函数里
+	 * 不能读蓝图对象变量（如缓存的设置），就靠它拿表。
+	 */
+	UFUNCTION(BlueprintPure, Category="GMS|Animation", meta=(BlueprintThreadSafe))
+	static UChooserTable* GetPoseSearchDatabasesChooserFromLayer(const USigilAnimLayer* AnimLayerInstance);
+
 	UFUNCTION(BlueprintCallable, BlueprintPure=false, Category="GMS|Animation", meta=(BlueprintThreadSafe))
 	static TArray<UPoseSearchDatabase*> EvaluatePoseSearchDatabasesChooser(const USigilMainAnimInstance* MainAnimInstance, const USigilAnimLayer* AnimLayerInstance, UChooserTable* ChooserTable);
 
